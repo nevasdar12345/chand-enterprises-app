@@ -1,0 +1,529 @@
+{% extends 'base.html' %}
+
+{% block body %}
+
+<!-- ================= NAVIGATION ================= -->
+
+<header class="nav store-nav">
+
+    <a class="logo store-logo" href="/">
+
+        <span class="store-logo-mark">
+            CE
+        </span>
+
+        <span>
+            Chand Enterprises
+            <small>Darbhanga, Bihar</small>
+        </span>
+
+    </a>
+
+
+    <div class="store-actions">
+
+        <button
+            class="soft nav-action"
+            onclick="myOrders()"
+        >
+            📦
+            <span>My Orders</span>
+        </button>
+
+
+        <button
+            class="soft nav-action"
+            id="accountBtn"
+            onclick="account()"
+        >
+            Login
+        </button>
+
+
+        <button
+            class="soft nav-action"
+            id="logoutBtn"
+            onclick="logout()"
+            hidden
+        >
+            Logout
+        </button>
+
+
+        <button
+            class="cart premium-cart"
+            onclick="cart()"
+            aria-label="Shopping cart"
+        >
+            🛒
+            <b id="count">0</b>
+        </button>
+
+    </div>
+
+</header>
+
+
+<!-- ================= OFFER TICKER ================= -->
+
+<div
+    class="ticker premium-ticker"
+    aria-label="Offers"
+>
+
+    <div
+        class="track"
+        id="track"
+    ></div>
+
+</div>
+
+
+<!-- ================= HERO ================= -->
+
+<main>
+
+
+<section class="hero premium-hero">
+
+    <div class="hero-content">
+
+        <div class="hero-eyebrow">
+
+            <span class="hero-live-dot"></span>
+
+            Serving Darbhanga
+
+        </div>
+
+
+        <span class="pill hero-pill">
+            ⚡ Fast local delivery
+        </span>
+
+
+        <h1>
+            Drinks &amp; premium water,
+            <br>
+            <em>delivered to your door.</em>
+        </h1>
+
+
+        <p>
+            Cold drinks, energy drinks and premium packaged
+            drinking water from Chand Enterprises.
+        </p>
+
+
+        <div class="hero-actions">
+
+            <button
+                class="primary hero-shop-btn"
+                onclick="document.getElementById('shop').scrollIntoView({behavior:'smooth'})"
+            >
+                Shop now
+                <span>→</span>
+            </button>
+
+
+            <button
+                class="hero-secondary"
+                onclick="enquiry()"
+            >
+                WhatsApp enquiry
+            </button>
+
+        </div>
+
+
+        <div class="hero-note">
+
+            ✓ Local delivery &nbsp; · &nbsp;
+            ✓ QR / COD &nbsp; · &nbsp;
+            ✓ Bulk orders
+
+        </div>
+
+    </div>
+
+
+    <div class="hero-visual">
+
+        <div class="hero-glow"></div>
+
+
+        <div class="hero-card hero-card-main">
+            <span>🥤</span>
+        </div>
+
+
+        <div class="hero-card hero-card-water">
+            <span>💧</span>
+        </div>
+
+
+        <div class="hero-floating">
+
+            <b>Fresh</b>
+
+            <small>
+                Delivered locally
+            </small>
+
+        </div>
+
+    </div>
+
+</section>
+
+
+<!-- ================= TRUST ================= -->
+
+<section class="trust premium-trust">
+
+
+    <div class="trust-card">
+
+        <div class="trust-icon blue">
+            🚚
+        </div>
+
+        <div>
+
+            <b>
+                Local delivery
+            </b>
+
+            <small>
+                Fast delivery across Darbhanga
+            </small>
+
+        </div>
+
+    </div>
+
+
+    <div class="trust-card">
+
+        <div class="trust-icon green">
+            📱
+        </div>
+
+        <div>
+
+            <b>
+                Easy payment
+            </b>
+
+            <small>
+                Pay by QR or Cash on Delivery
+            </small>
+
+        </div>
+
+    </div>
+
+
+    <div class="trust-card">
+
+        <div class="trust-icon purple">
+            💬
+        </div>
+
+        <div>
+
+            <b>
+                WhatsApp support
+            </b>
+
+            <small>
+                Bulk orders are welcome
+            </small>
+
+        </div>
+
+    </div>
+
+</section>
+
+
+<!-- ================= CATEGORY ================= -->
+
+<section class="section category-section">
+
+    <div class="section-heading">
+
+        <div>
+
+            <span class="section-kicker">
+                EXPLORE
+            </span>
+
+            <h2>
+                Shop by category
+            </h2>
+
+            <p>
+                Find your favourite drinks and water.
+            </p>
+
+        </div>
+
+    </div>
+
+
+    <div
+        class="cats premium-cats"
+        id="cats"
+    >
+
+        <button
+            class="on category-card"
+            onclick="category('All',this)"
+        >
+
+            <span>
+                🛍️
+            </span>
+
+            <b>
+                All
+            </b>
+
+        </button>
+
+
+        <button
+            class="category-card"
+            onclick="category('Cold Drinks',this)"
+        >
+
+            <span>
+                🥤
+            </span>
+
+            <b>
+                Cold Drinks
+            </b>
+
+        </button>
+
+
+        <button
+            class="category-card"
+            onclick="category('Energy Drinks',this)"
+        >
+
+            <span>
+                ⚡
+            </span>
+
+            <b>
+                Energy Drinks
+            </b>
+
+        </button>
+
+
+        <button
+            class="category-card"
+            onclick="category('Premium Water',this)"
+        >
+
+            <span>
+                💧
+            </span>
+
+            <b>
+                Premium Water
+            </b>
+
+        </button>
+
+    </div>
+
+</section>
+
+
+<!-- ================= PRODUCTS ================= -->
+
+<section
+    class="section products-section"
+    id="shop"
+>
+
+    <div class="products-heading">
+
+        <div>
+
+            <span class="section-kicker">
+                OUR STORE
+            </span>
+
+            <h2>
+                Popular products
+            </h2>
+
+            <p>
+                Quality drinks, simple pricing.
+            </p>
+
+        </div>
+
+
+        <div class="premium-search">
+
+            <span>
+                ⌕
+            </span>
+
+            <input
+                id="search"
+                oninput="render(true)"
+                placeholder="Search products..."
+            >
+
+        </div>
+
+    </div>
+
+
+    <div
+        class="grid premium-grid"
+        id="grid"
+    ></div>
+
+</section>
+
+
+<!-- ================= BULK ENQUIRY ================= -->
+
+<section class="enquiry premium-enquiry">
+
+    <div class="enquiry-content">
+
+        <span class="pill">
+            WhatsApp enquiry
+        </span>
+
+        <h2>
+            Need a bulk order?
+        </h2>
+
+        <p>
+            Tell us what you need and we'll help you
+            arrange your order directly.
+        </p>
+
+    </div>
+
+
+    <button
+        class="primary enquiry-btn"
+        onclick="enquiry()"
+    >
+
+        Enquire on WhatsApp
+
+        <span>
+            →
+        </span>
+
+    </button>
+
+</section>
+
+
+</main>
+
+
+<!-- ================= FOOTER ================= -->
+
+<footer class="premium-footer">
+
+
+    <div class="footer-brand">
+
+        <div class="footer-logo">
+            CE
+        </div>
+
+
+        <div>
+
+            <b>
+                Chand Enterprises
+            </b>
+
+            <small>
+                Drinks &amp; premium water
+            </small>
+
+        </div>
+
+    </div>
+
+
+    <div class="footer-location">
+        📍 Darbhanga, Bihar
+    </div>
+
+
+    <a
+        href="/staff"
+        class="footer-staff"
+    >
+        Staff login
+    </a>
+
+</footer>
+
+
+<!-- ================= PRODUCT DATA ================= -->
+
+<div
+    id="productData"
+    hidden
+    data-products="{{ products|tojson|forceescape }}"
+></div>
+
+
+<script>
+
+    const productData =
+        document.querySelector(
+            '#productData'
+        );
+
+
+    if (productData) {
+
+        try {
+
+            window.PRODUCTS =
+                JSON.parse(
+                    productData.dataset.products ||
+                    '[]'
+                );
+
+        } catch (error) {
+
+            console.error(
+                'Could not load product data:',
+                error
+            );
+
+            window.PRODUCTS = [];
+
+        }
+
+    } else {
+
+        window.PRODUCTS = [];
+
+    }
+
+</script>
+
+
+{% endblock %}

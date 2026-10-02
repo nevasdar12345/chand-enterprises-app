@@ -1,0 +1,4 @@
+flask>=3.0
+flask-sqlalchemy>=3.1
+segno>=1.6
+gunicorn>=23.0

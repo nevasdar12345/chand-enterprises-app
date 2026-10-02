@@ -1,0 +1,681 @@
+/* =========================================================
+   CHAND ENTERPRISES
+   RESPONSIVE CSS
+   Uses: %, rem, vw, vh, clamp()
+   ========================================================= */
+
+/* ---------- GLOBAL ---------- */
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+html {
+    font-size: 16px;
+    scroll-behavior: smooth;
+}
+
+body {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+}
+
+img,
+video,
+iframe {
+    max-width: 100%;
+    height: auto;
+}
+
+button,
+input,
+select,
+textarea {
+    font: inherit;
+}
+
+button {
+    max-width: 100%;
+}
+
+.container,
+.page-container,
+.content-container {
+    width: min(92%, 75rem);
+    margin-inline: auto;
+}
+
+
+/* =========================================================
+   NAVIGATION
+   ========================================================= */
+
+.nav {
+    width: 100%;
+    min-height: clamp(3.75rem, 8vh, 5rem);
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    padding-inline: clamp(1rem, 4vw, 3rem);
+    gap: clamp(0.75rem, 2vw, 2rem);
+
+    position: relative;
+    z-index: 1000;
+}
+
+.logo {
+    flex-shrink: 0;
+}
+
+.nav-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+
+    gap: clamp(0.5rem, 1.5vw, 1.5rem);
+}
+
+
+/* ---------- HAMBURGER ---------- */
+
+.nav-hamburger {
+    display: none;
+
+    width: 2.75rem;
+    height: 2.75rem;
+
+    border: 0;
+    border-radius: 0.6rem;
+
+    background: transparent;
+
+    cursor: pointer;
+
+    align-items: center;
+    justify-content: center;
+
+    flex-direction: column;
+    gap: 0.3rem;
+}
+
+.nav-hamburger span {
+    display: block;
+
+    width: 1.5rem;
+    height: 0.125rem;
+
+    border-radius: 999px;
+    background: currentColor;
+
+    transition:
+        transform 0.25s ease,
+        opacity 0.25s ease;
+}
+
+.nav-hamburger.active span:nth-child(1) {
+    transform: translateY(0.425rem) rotate(45deg);
+}
+
+.nav-hamburger.active span:nth-child(2) {
+    opacity: 0;
+}
+
+.nav-hamburger.active span:nth-child(3) {
+    transform: translateY(-0.425rem) rotate(-45deg);
+}
+
+
+/* =========================================================
+   HEADINGS / TYPOGRAPHY
+   ========================================================= */
+
+h1 {
+    font-size: clamp(2rem, 5vw, 4rem);
+    line-height: 1.05;
+}
+
+h2 {
+    font-size: clamp(1.5rem, 3.5vw, 2.75rem);
+    line-height: 1.1;
+}
+
+h3 {
+    font-size: clamp(1.15rem, 2.5vw, 1.75rem);
+}
+
+p {
+    font-size: clamp(0.9rem, 1.2vw, 1rem);
+    line-height: 1.6;
+}
+
+
+/* =========================================================
+   HERO / MAIN SECTIONS
+   ========================================================= */
+
+.hero,
+.store-hero {
+    width: 100%;
+
+    min-height: clamp(25rem, 70vh, 45rem);
+
+    padding-block: clamp(3rem, 8vh, 7rem);
+    padding-inline: clamp(1rem, 5vw, 5rem);
+
+    display: flex;
+    align-items: center;
+}
+
+.hero-content,
+.store-hero-content {
+    width: min(92%, 75rem);
+    margin-inline: auto;
+}
+
+.hero-title {
+    font-size: clamp(2.2rem, 6vw, 5rem);
+}
+
+.hero-subtitle {
+    max-width: 45rem;
+    font-size: clamp(1rem, 1.8vw, 1.35rem);
+}
+
+
+/* =========================================================
+   SECTIONS
+   ========================================================= */
+
+section {
+    width: 100%;
+}
+
+.section {
+    padding-block: clamp(2.5rem, 7vh, 6rem);
+    padding-inline: clamp(1rem, 4vw, 3rem);
+}
+
+.section-title {
+    margin-bottom: clamp(1.25rem, 3vw, 2.5rem);
+}
+
+
+/* =========================================================
+   GRID SYSTEM
+   ========================================================= */
+
+.grid,
+.products-grid,
+.product-grid,
+.cards-grid {
+    display: grid;
+
+    grid-template-columns:
+        repeat(
+            auto-fit,
+            minmax(
+                min(100%, 15rem),
+                1fr
+            )
+        );
+
+    gap: clamp(1rem, 2vw, 2rem);
+}
+
+.two-column,
+.two-col {
+    display: grid;
+
+    grid-template-columns:
+        repeat(
+            2,
+            minmax(0, 1fr)
+        );
+
+    gap: clamp(1rem, 3vw, 3rem);
+}
+
+
+/* =========================================================
+   CARDS
+   ========================================================= */
+
+.card,
+.product-card {
+    width: 100%;
+    min-width: 0;
+
+    padding: clamp(1rem, 2vw, 1.75rem);
+
+    border-radius: clamp(0.7rem, 1vw, 1.25rem);
+
+    overflow: hidden;
+}
+
+.card img,
+.product-card img {
+    width: 100%;
+    height: auto;
+
+    object-fit: cover;
+}
+
+
+/* =========================================================
+   BUTTONS
+   ========================================================= */
+
+button,
+.btn,
+.button {
+    min-height: clamp(2.5rem, 5vh, 3.25rem);
+
+    padding-inline: clamp(0.9rem, 2vw, 1.5rem);
+
+    border-radius: clamp(0.4rem, 0.8vw, 0.75rem);
+
+    cursor: pointer;
+
+    white-space: normal;
+}
+
+.btn-large {
+    min-height: clamp(2.75rem, 6vh, 3.75rem);
+
+    padding-inline: clamp(1.25rem, 3vw, 2rem);
+
+    font-size: clamp(0.95rem, 1.5vw, 1.1rem);
+}
+
+
+/* =========================================================
+   FORMS
+   ========================================================= */
+
+form {
+    width: 100%;
+}
+
+.form-group {
+    width: 100%;
+    margin-bottom: clamp(0.8rem, 2vh, 1.25rem);
+}
+
+input,
+select,
+textarea {
+    width: 100%;
+    max-width: 100%;
+
+    min-height: clamp(2.5rem, 5vh, 3rem);
+
+    padding-inline: clamp(0.75rem, 1.5vw, 1rem);
+
+    border-radius: 0.5rem;
+}
+
+textarea {
+    min-height: clamp(6rem, 15vh, 12rem);
+    padding-block: 0.75rem;
+}
+
+
+/* =========================================================
+   TABLES
+   ========================================================= */
+
+.table-wrapper,
+.table-container {
+    width: 100%;
+
+    overflow-x: auto;
+    overflow-y: hidden;
+
+    -webkit-overflow-scrolling: touch;
+}
+
+table {
+    width: 100%;
+    min-width: 40rem;
+
+    border-collapse: collapse;
+}
+
+th,
+td {
+    padding: clamp(0.6rem, 1vw, 1rem);
+}
+
+
+/* =========================================================
+   DASHBOARD
+   ========================================================= */
+
+.dashboard,
+.admin-dashboard,
+.delivery-dashboard {
+    width: min(94%, 90rem);
+    margin-inline: auto;
+
+    padding-block: clamp(1.5rem, 4vh, 3rem);
+}
+
+.dashboard-grid {
+    display: grid;
+
+    grid-template-columns:
+        repeat(
+            auto-fit,
+            minmax(
+                min(100%, 13rem),
+                1fr
+            )
+        );
+
+    gap: clamp(0.75rem, 1.5vw, 1.5rem);
+}
+
+.dashboard-card,
+.stat-card {
+    min-width: 0;
+
+    padding: clamp(1rem, 2vw, 1.5rem);
+}
+
+
+/* =========================================================
+   SIDEBAR
+   ========================================================= */
+
+.sidebar {
+    width: clamp(14rem, 20vw, 18rem);
+}
+
+.main-content {
+    min-width: 0;
+    width: 100%;
+}
+
+
+/* =========================================================
+   MODAL
+   ========================================================= */
+
+#ui-modal {
+    position: fixed;
+    inset: 0;
+
+    z-index: 99999;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    padding: clamp(1rem, 4vw, 3rem);
+
+    background: rgb(0 0 0 / 55%);
+}
+
+.ui-modal-box {
+    width: min(100%, 32rem);
+
+    max-height: min(85vh, 40rem);
+
+    overflow-y: auto;
+
+    padding: clamp(1.25rem, 4vw, 2rem);
+
+    border-radius: clamp(0.75rem, 1.5vw, 1.25rem);
+}
+
+.ui-modal-title {
+    font-size: clamp(1.25rem, 3vw, 1.75rem);
+    margin-bottom: 0.75rem;
+}
+
+.ui-modal-message {
+    font-size: clamp(0.9rem, 1.5vw, 1rem);
+
+    line-height: 1.6;
+}
+
+.ui-modal-actions {
+    margin-top: clamp(1rem, 3vh, 1.5rem);
+
+    display: flex;
+    flex-wrap: wrap;
+
+    gap: 0.75rem;
+}
+
+
+/* =========================================================
+   CART / CHECKOUT
+   ========================================================= */
+
+.cart-item,
+.checkout-item {
+    display: flex;
+    align-items: center;
+
+    gap: clamp(0.75rem, 2vw, 1.5rem);
+
+    padding-block: clamp(0.75rem, 1.5vw, 1rem);
+}
+
+.cart-item-info,
+.checkout-item-info {
+    min-width: 0;
+    flex: 1;
+}
+
+.cart-item-title,
+.checkout-item-title {
+    overflow-wrap: anywhere;
+}
+
+
+/* =========================================================
+   IMAGES / BANNERS
+   ========================================================= */
+
+.banner,
+.poster,
+.store-banner {
+    width: 100%;
+    max-width: 100%;
+
+    height: auto;
+
+    object-fit: cover;
+}
+
+.banner-section {
+    min-height: clamp(12rem, 35vh, 30rem);
+}
+
+
+/* =========================================================
+   MOBILE
+   ========================================================= */
+
+@media (max-width: 56.25rem) {
+
+    .nav {
+        min-height: 4rem;
+    }
+
+    .nav-hamburger {
+        display: flex;
+    }
+
+    .nav-actions {
+        position: absolute;
+
+        top: 100%;
+        right: clamp(0.75rem, 3vw, 1.5rem);
+
+        width: min(90vw, 22rem);
+
+        display: none;
+
+        flex-direction: column;
+        align-items: stretch;
+
+        padding: 0.75rem;
+
+        border-radius: 0.75rem;
+
+        box-shadow:
+            0 1rem 2.5rem rgb(0 0 0 / 18%);
+    }
+
+    .nav-actions.open {
+        display: flex;
+    }
+
+    .nav-actions > * {
+        width: 100%;
+    }
+
+    .two-column,
+    .two-col {
+        grid-template-columns: 1fr;
+    }
+
+    .hero,
+    .store-hero {
+        min-height: clamp(28rem, 70vh, 40rem);
+
+        padding-block: clamp(2.5rem, 7vh, 5rem);
+    }
+}
+
+
+/* =========================================================
+   SMALL MOBILE
+   ========================================================= */
+
+@media (max-width: 37.5rem) {
+
+    html {
+        font-size: 15px;
+    }
+
+    .nav {
+        padding-inline: 4vw;
+    }
+
+    .section {
+        padding-block: clamp(2rem, 6vh, 3.5rem);
+        padding-inline: 4vw;
+    }
+
+    .hero,
+    .store-hero {
+        padding-inline: 4vw;
+    }
+
+    .grid,
+    .products-grid,
+    .product-grid,
+    .cards-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .dashboard,
+    .admin-dashboard,
+    .delivery-dashboard {
+        width: 94%;
+    }
+
+    .card,
+    .product-card {
+        padding: 1rem;
+    }
+
+    .cart-item,
+    .checkout-item {
+        align-items: flex-start;
+    }
+
+    .ui-modal-actions {
+        flex-direction: column;
+    }
+
+    .ui-modal-actions button,
+    .ui-modal-actions .btn {
+        width: 100%;
+    }
+}
+
+
+/* =========================================================
+   VERY SMALL PHONES
+   ========================================================= */
+
+@media (max-width: 25rem) {
+
+    html {
+        font-size: 14px;
+    }
+
+    .nav-hamburger {
+        width: 2.5rem;
+        height: 2.5rem;
+    }
+
+    .hero-title {
+        font-size: clamp(1.9rem, 10vw, 2.5rem);
+    }
+
+    .dashboard,
+    .admin-dashboard,
+    .delivery-dashboard {
+        width: 92%;
+    }
+}
+
+
+/* =========================================================
+   LANDSCAPE PHONES
+   ========================================================= */
+
+@media (max-height: 31.25rem) and (orientation: landscape) {
+
+    .hero,
+    .store-hero {
+        min-height: 100vh;
+
+        padding-block: 8vh;
+    }
+
+    .ui-modal-box {
+        max-height: 80vh;
+    }
+}
+
+
+/* =========================================================
+   LARGE SCREENS
+   ========================================================= */
+
+@media (min-width: 100rem) {
+
+    html {
+        font-size: 17px;
+    }
+
+    .nav {
+        padding-inline: 4vw;
+    }
+
+    .section {
+        padding-inline: 5vw;
+    }
+}

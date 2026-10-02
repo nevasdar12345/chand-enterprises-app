@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+
+{% block body %}
+<main class="wa-page">
+
+    <div class="wa-shell">
+
+        <!-- Left information panel -->
+        <section class="wa-hero">
+
+            <div class="wa-brand">
+                <div class="wa-logo">CE</div>
+                <div>
+                    <b>Chand Enterprises</b>
+                    <small>Darbhanga, Bihar</small>
+                </div>
+            </div>
+
+            <div class="wa-hero-content">
+                <span class="wa-kicker">CUSTOMER COMMUNICATION</span>
+
+                <h1>
+                    Connect with
+                    <em>WhatsApp.</em>
+                </h1>
+
+                <p>
+                    Write your message and continue the conversation directly
+                    through WhatsApp.
+                </p>
+
+                <div class="wa-contact-card">
+                    <div class="wa-contact-icon">💬</div>
+                    <div>
+                        <small>RECIPIENT</small>
+                        <b>{{number[-10:]}}</b>
+                    </div>
+                    <span class="wa-online">
+                        <i></i> Ready
+                    </span>
+                </div>
+            </div>
+
+            <div class="wa-hero-footer">
+                <span>🔒 Secure handoff</span>
+                <span>•</span>
+                <span>WhatsApp</span>
+            </div>
+
+        </section>
+
+
+        <!-- Message panel -->
+        <section class="wa-card">
+
+            <div class="wa-card-header">
+                <div class="wa-card-icon">💬</div>
+
+                <div>
+                    <span class="wa-badge">
+                        <i></i>
+                        WHATSAPP
+                    </span>
+
+                    <h2>Write your message</h2>
+
+                    <p>
+                        Your message will open in WhatsApp before sending.
+                    </p>
+                </div>
+            </div>
+
+
+            <div class="wa-form">
+
+                <label class="wa-label" for="waMessage">
+                    Message
+                </label>
+
+                <div class="wa-textarea-wrap">
+                    <span class="wa-textarea-icon">✎</span>
+
+                    <textarea
+                        id="waMessage"
+                        rows="8"
+                        placeholder="Type the message you want to send..."
+                    ></textarea>
+                </div>
+
+
+                <div class="wa-hint">
+                    <span>💡</span>
+                    <small>
+                        WhatsApp will open with this message prepared.
+                        You can review it before sending.
+                    </small>
+                </div>
+
+
+                <button
+                    class="primary wa-send-button"
+                    onclick="sendWA()"
+                >
+                    <span class="wa-send-icon">💬</span>
+                    <span>Open WhatsApp</span>
+                    <span class="wa-arrow">→</span>
+                </button>
+
+
+                <a href="/" class="wa-back">
+                    <span>←</span>
+                    Back to shop
+                </a>
+
+            </div>
+
+
+            <div class="wa-security">
+                <span>📱</span>
+                <div>
+                    <b>Continue in WhatsApp</b>
+                    <small>
+                        Your message is handed off to WhatsApp for delivery.
+                    </small>
+                </div>
+            </div>
+
+        </section>
+
+    </div>
+
+</main>
+{% endblock %}

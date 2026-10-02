@@ -1,0 +1,1066 @@
+{% extends 'base.html' %}
+
+{% block body %}
+
+<header class="nav admin-nav">
+
+    <a class="logo" href="/">
+
+        <span class="admin-logo-mark">
+            CE
+        </span>
+
+        <span>
+            Admin Panel
+            <small>
+                Chand Enterprises · Darbhanga
+            </small>
+        </span>
+
+    </a>
+
+
+    <div class="admin-nav-right">
+
+        <a
+            href="/"
+            class="soft admin-home"
+        >
+            View Store
+        </a>
+
+
+        <form
+            method="post"
+            action="/logout"
+        >
+
+            <button
+                class="soft admin-logout"
+            >
+                Logout
+            </button>
+
+        </form>
+
+    </div>
+
+</header>
+
+
+<main class="admin-panel">
+
+
+    <!-- =========================
+         DASHBOARD HEADING
+         ========================= -->
+
+    <section class="admin-heading">
+
+        <div>
+
+            <div class="admin-title-row">
+
+                <span class="admin-badge">
+
+                    <span class="status-dot"></span>
+
+                    ADMIN
+
+                </span>
+
+
+                <span class="dashboard-live">
+                    Dashboard
+                </span>
+
+            </div>
+
+
+            <h1>
+                Business dashboard
+            </h1>
+
+
+            <p>
+                Manage orders, products, payments and inventory
+                from one place.
+            </p>
+
+        </div>
+
+
+        <div class="admin-heading-icon">
+            📊
+        </div>
+
+    </section>
+
+
+
+    <!-- =========================
+         TABS
+         ========================= -->
+
+    <div class="tabs admin-tabs">
+
+        <button
+            class="on"
+            onclick="showTab('orders', this)"
+        >
+            📦 Orders
+        </button>
+
+
+        <button
+            onclick="showTab('products', this)"
+        >
+            🛍️ Products
+        </button>
+
+
+        <button
+            onclick="showTab('stock', this)"
+        >
+            📊 Stock
+        </button>
+
+    </div>
+
+
+
+    <!-- =========================
+         ORDERS
+         ========================= -->
+
+    <section id="tab-orders">
+
+
+        <!-- Metrics -->
+
+        <div class="metrics admin-metrics">
+
+
+            <div class="metric-card">
+
+                <div class="metric-icon blue">
+                    📦
+                </div>
+
+                <div class="metric-content">
+
+                    <small>
+                        Total Orders
+                    </small>
+
+                    <b id="mOrders">
+                        —
+                    </b>
+
+                    <span>
+                        All orders
+                    </span>
+
+                </div>
+
+            </div>
+
+
+
+            <div class="metric-card">
+
+                <div class="metric-icon green">
+                    ₹
+                </div>
+
+                <div class="metric-content">
+
+                    <small>
+                        Paid Revenue
+                    </small>
+
+                    <b id="mRev">
+                        —
+                    </b>
+
+                    <span>
+                        Confirmed payments
+                    </span>
+
+                </div>
+
+            </div>
+
+
+
+            <div class="metric-card">
+
+                <div class="metric-icon orange">
+                    💳
+                </div>
+
+                <div class="metric-content">
+
+                    <small>
+                        Payments to Check
+                    </small>
+
+                    <b id="mPend">
+                        —
+                    </b>
+
+                    <span>
+                        Requires attention
+                    </span>
+
+                </div>
+
+            </div>
+
+
+
+            <div class="metric-card">
+
+                <div class="metric-icon red">
+                    ⚠️
+                </div>
+
+                <div class="metric-content">
+
+                    <small>
+                        Low Stock
+                    </small>
+
+                    <b id="mLow">
+                        —
+                    </b>
+
+                    <span>
+                        Products to refill
+                    </span>
+
+                </div>
+
+            </div>
+
+
+        </div>
+
+
+
+        <!-- Filters -->
+
+        <div class="admin-toolbar">
+
+
+            <div class="admin-search">
+
+                <span>
+                    🔎
+                </span>
+
+                <input
+                    id="filter"
+                    oninput="loadAdminOrders()"
+                    placeholder="Search order, customer or mobile..."
+                >
+
+            </div>
+
+
+
+            <select
+                id="fstatus"
+                onchange="loadAdminOrders()"
+                class="admin-select"
+            >
+
+                <option>
+                    All
+                </option>
+
+                <option>
+                    Confirmed
+                </option>
+
+                <option>
+                    Preparing
+                </option>
+
+                <option>
+                    Out for Delivery
+                </option>
+
+                <option>
+                    Delivered
+                </option>
+
+                <option>
+                    Cancelled
+                </option>
+
+            </select>
+
+
+
+            <select
+                id="fpay"
+                onchange="loadAdminOrders()"
+                class="admin-select"
+            >
+
+                <option>
+                    All
+                </option>
+
+                <option>
+                    Pending
+                </option>
+
+                <option>
+                    Verifying
+                </option>
+
+                <option>
+                    Paid
+                </option>
+
+                <option>
+                    Failed
+                </option>
+
+            </select>
+
+
+
+            <a
+                class="primary export-btn"
+                href="/admin/export.csv"
+            >
+                ↓ Export CSV
+            </a>
+
+
+        </div>
+
+
+
+        <!-- Orders table -->
+
+        <div class="table admin-table">
+
+
+            <div class="table-header">
+
+                <div>
+
+                    <h2>
+                        Recent orders
+                    </h2>
+
+                    <small>
+                        Manage customer orders and delivery status.
+                    </small>
+
+                </div>
+
+            </div>
+
+
+
+            <table>
+
+                <thead>
+
+                    <tr>
+
+                        <th>
+                            Order
+                        </th>
+
+                        <th>
+                            Customer
+                        </th>
+
+                        <th>
+                            Total
+                        </th>
+
+                        <th>
+                            Payment
+                        </th>
+
+                        <th>
+                            Status
+                        </th>
+
+                        <th>
+                            Delivery
+                        </th>
+
+                    </tr>
+
+                </thead>
+
+
+                <tbody id="orderRows"></tbody>
+
+            </table>
+
+
+        </div>
+
+
+    </section>
+
+
+
+    <!-- =========================
+         PRODUCTS
+         ========================= -->
+
+    <section
+        id="tab-products"
+        style="display:none"
+    >
+
+
+        <div class="premium-section-head">
+
+
+            <div>
+
+                <span class="section-kicker">
+                    CATALOG
+                </span>
+
+
+                <h2>
+                    Product catalog
+                </h2>
+
+
+                <small>
+                    Manage everything your customers see in the store.
+                </small>
+
+            </div>
+
+
+
+            <button
+                class="primary premium-action"
+                onclick="productForm()"
+            >
+                + Add product
+            </button>
+
+
+        </div>
+
+
+
+        <div class="table admin-table">
+
+
+            <div class="table-header">
+
+                <div>
+
+                    <h2>
+                        All products
+                    </h2>
+
+                    <small>
+                        Products, pricing and availability.
+                    </small>
+
+                </div>
+
+            </div>
+
+
+
+            <table>
+
+                <thead>
+
+                    <tr>
+
+                        <th>
+                            Product
+                        </th>
+
+                        <th>
+                            Category
+                        </th>
+
+                        <th>
+                            Price
+                        </th>
+
+                        <th>
+                            Stock
+                        </th>
+
+                        <th>
+                            Status
+                        </th>
+
+                        <th>
+                            Actions
+                        </th>
+
+                    </tr>
+
+                </thead>
+
+
+                <tbody>
+
+
+                    {% for p in products %}
+
+                    <tr>
+
+
+                        <!-- Product -->
+
+                        <td>
+
+                            <div class="product-cell">
+
+                                <span class="product-icon">
+                                    {{ p.icon }}
+                                </span>
+
+
+                                <div>
+
+                                    <b>
+                                        {{ p.name }}
+                                    </b>
+
+                                    <small>
+                                        Product #{{ p.id }}
+                                    </small>
+
+                                </div>
+
+                            </div>
+
+                        </td>
+
+
+
+                        <!-- Category -->
+
+                        <td>
+
+                            <span class="category-chip">
+                                {{ p.category }}
+                            </span>
+
+                        </td>
+
+
+
+                        <!-- Price -->
+
+                        <td>
+
+                            <strong>
+                                ₹{{ '%g'|format(p.price) }}
+                            </strong>
+
+                        </td>
+
+
+
+                        <!-- Stock -->
+
+                        <td>
+
+                            <strong>
+                                {{ p.stock }}
+                            </strong>
+
+                        </td>
+
+
+
+                        <!-- Status -->
+
+                        <td>
+
+                            {% if p.active %}
+
+                            <span class="status active">
+
+                                <i></i>
+
+                                Active
+
+                            </span>
+
+                            {% else %}
+
+                            <span class="status inactive">
+
+                                <i></i>
+
+                                Inactive
+
+                            </span>
+
+                            {% endif %}
+
+                        </td>
+
+
+
+                        <!-- Actions -->
+
+                        <td>
+
+
+                            <!-- Edit -->
+
+                            <button
+                                class="add"
+                                data-id="{{ p.id }}"
+                                data-name="{{ p.name|e }}"
+                                data-category="{{ p.category|e }}"
+                                data-price="{{ p.price }}"
+                                data-stock="{{ p.stock }}"
+                                data-icon="{{ p.icon|e }}"
+                                onclick="
+                                    productForm(
+                                        this.dataset.id,
+                                        this.dataset.name,
+                                        this.dataset.category,
+                                        this.dataset.price,
+                                        this.dataset.stock,
+                                        this.dataset.icon
+                                    )
+                                "
+                            >
+                                Edit
+                            </button>
+
+
+
+                            {% if p.active %}
+
+
+                            <!-- Deactivate -->
+
+                            <button
+                                class="danger"
+                                data-id="{{ p.id }}"
+                                onclick="
+                                    deactivateProduct(
+                                        this.dataset.id
+                                    )
+                                "
+                            >
+                                Deactivate
+                            </button>
+
+
+                            {% else %}
+
+
+                            <!-- Activate -->
+
+                            <button
+                                class="add"
+                                data-id="{{ p.id }}"
+                                onclick="
+                                    activateProduct(
+                                        this.dataset.id
+                                    )
+                                "
+                            >
+                                Activate
+                            </button>
+
+
+                            {% endif %}
+
+
+                        </td>
+
+
+                    </tr>
+
+                    {% endfor %}
+
+
+                </tbody>
+
+            </table>
+
+
+        </div>
+
+
+    </section>
+
+
+
+    <!-- =========================
+         STOCK
+         ========================= -->
+
+    <section
+        id="tab-stock"
+        style="display:none"
+    >
+
+
+        <div class="premium-section-head">
+
+
+            <div>
+
+                <span class="section-kicker">
+                    INVENTORY
+                </span>
+
+
+                <h2>
+                    Inventory management
+                </h2>
+
+
+                <small>
+                    Monitor stock levels and update inventory quickly.
+                </small>
+
+            </div>
+
+
+
+            <div class="inventory-icon">
+                📦
+            </div>
+
+
+        </div>
+
+
+
+        <div class="inventory-toolbar">
+
+
+            <div class="inventory-summary">
+
+                <span>
+                    📦
+                </span>
+
+
+                <div>
+
+                    <b>
+                        Stock control
+                    </b>
+
+                    <small>
+                        Keep your products available for customers.
+                    </small>
+
+                </div>
+
+            </div>
+
+
+
+            <div class="admin-search stock-search">
+
+                <span>
+                    🔎
+                </span>
+
+
+                <input
+                    id="stockFilter"
+                    oninput="filterStock()"
+                    placeholder="Search stock..."
+                >
+
+            </div>
+
+
+        </div>
+
+
+
+        <div class="table admin-table">
+
+
+            <table id="stockTable">
+
+                <thead>
+
+                    <tr>
+
+                        <th>
+                            Product
+                        </th>
+
+                        <th>
+                            Category
+                        </th>
+
+                        <th>
+                            Current stock
+                        </th>
+
+                        <th>
+                            Alert at
+                        </th>
+
+                        <th>
+                            Update
+                        </th>
+
+                    </tr>
+
+                </thead>
+
+
+                <tbody>
+
+
+                    {% for p in products %}
+
+
+                    <tr
+                        class="{{ 'lowrow' if p.stock <= (p.low_stock_threshold or 10) else '' }}"
+                    >
+
+
+                        <!-- Product -->
+
+                        <td>
+
+                            <div class="product-cell">
+
+
+                                <span class="product-icon">
+                                    {{ p.icon }}
+                                </span>
+
+
+                                <div>
+
+                                    <b>
+                                        {{ p.name }}
+                                    </b>
+
+                                    <small>
+                                        Product #{{ p.id }}
+                                    </small>
+
+                                </div>
+
+
+                            </div>
+
+                        </td>
+
+
+
+                        <!-- Category -->
+
+                        <td>
+
+                            <span class="category-chip">
+                                {{ p.category }}
+                            </span>
+
+                        </td>
+
+
+
+                        <!-- Current stock -->
+
+                        <td>
+
+                            <div class="stock-input">
+
+
+                                <input
+                                    id="s{{ p.id }}"
+                                    value="{{ p.stock }}"
+                                    type="number"
+                                    min="0"
+                                >
+
+
+                                {% if p.stock <= (p.low_stock_threshold or 10) %}
+
+                                <span class="low-stock-label">
+                                    Low
+                                </span>
+
+                                {% endif %}
+
+
+                            </div>
+
+                        </td>
+
+
+
+                        <!-- Threshold -->
+
+                        <td>
+
+                            <span class="threshold">
+                                {{ p.low_stock_threshold or 10 }}
+                            </span>
+
+                        </td>
+
+
+
+                        <!-- Save -->
+
+                        <td>
+
+                            <button
+                                class="add save-stock"
+                                data-id="{{ p.id }}"
+                                onclick="
+                                    stock(
+                                        this.dataset.id
+                                    )
+                                "
+                            >
+                                ✓ Save
+                            </button>
+
+                        </td>
+
+
+                    </tr>
+
+
+                    {% endfor %}
+
+
+                </tbody>
+
+            </table>
+
+
+        </div>
+
+
+    </section>
+
+
+
+    <!-- =========================
+         FOOTER
+         ========================= -->
+
+    <footer class="admin-footer">
+
+
+        <div>
+
+            <b>
+                Chand Enterprises
+            </b>
+
+            <span>
+                Admin Console
+            </span>
+
+        </div>
+
+
+        <span>
+            Darbhanga, Bihar · Secure dashboard
+        </span>
+
+
+    </footer>
+
+
+
+    <!-- =========================
+         ADMIN DATA
+         =========================
+
+         Keep Jinja here as HTML data.
+         No Jinja is placed inside JavaScript.
+         This prevents VS Code's JavaScript
+         parser errors.
+         ========================= -->
+
+    <div
+        id="adminData"
+        hidden
+        data-delivery='{{ delivery_users|map(attribute="id")|list|tojson }}'
+        data-delivery-names='{{ delivery_users|map(attribute="name")|list|tojson }}'
+    ></div>
+
+
+    <script>
+
+        const adminData =
+            document.querySelector(
+                '#adminData'
+            );
+
+
+        if (adminData) {
+
+            try {
+
+                window.DELIVERY =
+                    JSON.parse(
+                        adminData.dataset.delivery ||
+                        '[]'
+                    );
+
+
+                window.DNAMES =
+                    JSON.parse(
+                        adminData.dataset.deliveryNames ||
+                        '[]'
+                    );
+
+            } catch (error) {
+
+                console.error(
+                    'Could not load admin data:',
+                    error
+                );
+
+
+                window.DELIVERY = [];
+
+                window.DNAMES = [];
+
+            }
+
+        } else {
+
+            window.DELIVERY = [];
+
+            window.DNAMES = [];
+
+        }
+
+    </script>
+
+
+</main>
+
+{% endblock %}

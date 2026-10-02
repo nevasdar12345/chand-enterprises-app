@@ -1,0 +1,372 @@
+{% extends 'base.html' %}
+
+{% block body %}
+
+<header class="nav staff-nav">
+
+    <a
+        class="logo staff-logo"
+        href="/"
+    >
+
+        <span class="staff-logo-mark">
+            CE
+        </span>
+
+        <span>
+            Delivery Panel
+
+            <small>
+                Chand Enterprises · Darbhanga
+            </small>
+        </span>
+
+    </a>
+
+
+    <div class="staff-nav-actions">
+
+        <a
+            href="/"
+            class="soft staff-store-link"
+        >
+            View Store
+        </a>
+
+
+        <form
+            method="post"
+            action="/logout"
+        >
+
+            <button class="soft staff-logout">
+                Logout
+            </button>
+
+        </form>
+
+    </div>
+
+</header>
+
+
+<main class="staff-panel">
+
+
+    <!-- =========================
+         HEADER
+         ========================= -->
+
+    <section class="staff-hero">
+
+        <div>
+
+            <div class="staff-title-row">
+
+                <span class="staff-role-badge">
+
+                    <span class="staff-status-dot"></span>
+
+                    DELIVERY
+
+                </span>
+
+
+                <span class="staff-live">
+                    Live dashboard
+                </span>
+
+            </div>
+
+
+            <h1>
+                Delivery dashboard
+            </h1>
+
+
+            <p>
+                Track assigned orders and
+                update delivery status.
+            </p>
+
+        </div>
+
+
+        <div class="staff-hero-icon">
+            🚚
+        </div>
+
+    </section>
+
+
+    <!-- =========================
+         DELIVERY
+         ========================= -->
+
+    <div class="staff-section-heading">
+
+        <div>
+
+            <span class="staff-kicker">
+                DELIVERY OPERATIONS
+            </span>
+
+
+            <h2>
+                Today's delivery overview
+            </h2>
+
+
+            <small>
+                Track assigned orders and
+                update delivery status.
+            </small>
+
+        </div>
+
+
+        <div class="delivery-live">
+
+            <span></span>
+
+            Live
+
+        </div>
+
+    </div>
+
+
+    <!-- =========================
+         METRICS
+         ========================= -->
+
+    <div class="metrics staff-metrics">
+
+
+        <div class="staff-metric">
+
+            <div class="staff-metric-icon blue">
+                📦
+            </div>
+
+
+            <div>
+
+                <small>
+                    Assigned
+                </small>
+
+
+                <b id="assigned">
+                    —
+                </b>
+
+
+                <span>
+                    Orders assigned to you
+                </span>
+
+            </div>
+
+        </div>
+
+
+        <div class="staff-metric">
+
+            <div class="staff-metric-icon orange">
+                🚚
+            </div>
+
+
+            <div>
+
+                <small>
+                    Out for delivery
+                </small>
+
+
+                <b id="out">
+                    —
+                </b>
+
+
+                <span>
+                    Currently on route
+                </span>
+
+            </div>
+
+        </div>
+
+
+        <div class="staff-metric">
+
+            <div class="staff-metric-icon green">
+                ✓
+            </div>
+
+
+            <div>
+
+                <small>
+                    Delivered
+                </small>
+
+
+                <b id="delivered">
+                    —
+                </b>
+
+
+                <span>
+                    Successfully completed
+                </span>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- =========================
+         DELIVERY TABLE
+         ========================= -->
+
+    <section class="table staff-table">
+
+        <div class="staff-table-head">
+
+            <div>
+
+                <h2>
+                    Assigned orders
+                </h2>
+
+
+                <small>
+                    Orders currently assigned
+                    to your delivery account.
+                </small>
+
+            </div>
+
+
+            <div class="staff-table-badge">
+                🚚 Delivery
+            </div>
+
+        </div>
+
+
+        <div class="staff-table-scroll">
+
+            <table>
+
+                <thead>
+
+                    <tr>
+
+                        <th>
+                            Order
+                        </th>
+
+                        <th>
+                            Customer
+                        </th>
+
+                        <th>
+                            Address
+                        </th>
+
+                        <th>
+                            Items
+                        </th>
+
+                        <th>
+                            Payment
+                        </th>
+
+                        <th>
+                            Status
+                        </th>
+
+                        <th>
+                            Action
+                        </th>
+
+                    </tr>
+
+                </thead>
+
+
+                <tbody
+                    id="deliveryRows"
+                ></tbody>
+
+            </table>
+
+        </div>
+
+    </section>
+
+
+    <!-- =========================
+         HELP
+         ========================= -->
+
+    <div class="staff-help">
+
+        <span class="staff-help-icon">
+            💡
+        </span>
+
+
+        <div>
+
+            <b>
+                Delivery tip
+            </b>
+
+
+            <small>
+                Update the order status immediately
+                after leaving for delivery and after
+                completing the order.
+            </small>
+
+        </div>
+
+    </div>
+
+
+    <!-- =========================
+         FOOTER
+         ========================= -->
+
+    <footer class="staff-footer">
+
+        <div>
+
+            <b>
+                Chand Enterprises
+            </b>
+
+
+            <span>
+                Delivery Console
+            </span>
+
+        </div>
+
+
+        <span>
+            Darbhanga, Bihar · Secure workspace
+        </span>
+
+    </footer>
+
+
+</main>
+
+{% endblock %}

@@ -1,0 +1,348 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+
+    <meta charset="utf-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1"
+    >
+
+    <meta
+        name="theme-color"
+        content="#0f2233"
+    >
+
+    <meta
+        name="description"
+        content="Chand Enterprises - Drinks, premium water and local delivery in Darbhanga, Bihar"
+    >
+
+    <title>
+        {% block title %}
+            Chand Enterprises · Darbhanga
+        {% endblock %}
+    </title>
+
+
+    <!-- Premium font -->
+
+    <link
+        rel="preconnect"
+        href="https://fonts.googleapis.com"
+    >
+
+    <link
+        rel="preconnect"
+        href="https://fonts.gstatic.com"
+        crossorigin
+    >
+
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+        rel="stylesheet"
+    >
+
+
+    <!-- Main stylesheet -->
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', filename='style.css') }}"
+    >
+
+<link rel="stylesheet" href="{{ url_for('static', filename='responsive.css') }}">
+
+
+    <!-- Base styling -->
+
+    <style>
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+
+        body {
+            font-family:
+                Inter,
+                system-ui,
+                -apple-system,
+                BlinkMacSystemFont,
+                "Segoe UI",
+                sans-serif;
+
+            -webkit-font-smoothing: antialiased;
+
+            text-rendering: optimizeLegibility;
+        }
+
+
+        body {
+            animation:
+                pageIn .35s ease both;
+        }
+
+
+        @keyframes pageIn {
+
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+
+        }
+
+
+        /* Scrollbar */
+
+        ::-webkit-scrollbar {
+            width: 9px;
+            height: 9px;
+        }
+
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg);
+        }
+
+
+        ::-webkit-scrollbar-thumb {
+            background: #b9c7d3;
+            border-radius: 99px;
+            border: 2px solid var(--bg);
+        }
+
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #8296a7;
+        }
+
+
+        /* Selection */
+
+        ::selection {
+            background: #0a7cff;
+            color: #fff;
+        }
+
+
+        /* Focus */
+
+        input:focus,
+        select:focus,
+        textarea:focus {
+
+            outline: none;
+
+            border-color: var(--pri);
+
+            box-shadow:
+                0 0 0 3px #0a7cff18;
+        }
+
+
+        button:focus-visible,
+        a:focus-visible {
+
+            outline:
+                3px solid #0a7cff55;
+
+            outline-offset: 2px;
+        }
+
+
+        /* Page loader */
+
+        #page-loader {
+
+            position: fixed;
+
+            top: 0;
+            left: 0;
+            right: 0;
+
+            height: 3px;
+
+            z-index: 9999;
+
+            pointer-events: none;
+
+            background:
+                linear-gradient(
+                    90deg,
+                    #0a7cff,
+                    #00c2d1,
+                    #0a7cff
+                );
+
+            background-size:
+                200% 100%;
+
+            animation:
+                loaderMove 1.2s linear infinite;
+
+            transition:
+                opacity .3s ease;
+        }
+
+
+        #page-loader.done {
+            opacity: 0;
+        }
+
+
+        @keyframes loaderMove {
+
+            from {
+                background-position: 0 0;
+            }
+
+            to {
+                background-position: 200% 0;
+            }
+
+        }
+
+
+        /* Modal */
+
+        #modal {
+            backdrop-filter: blur(5px);
+        }
+
+
+        /* Prevent overflow */
+
+        html,
+        body {
+            max-width: 100%;
+            overflow-x: hidden;
+        }
+
+    </style>
+
+
+    {% block head %}{% endblock %}
+
+</head>
+
+
+<body>
+
+
+    <!-- Page loader -->
+
+    <div id="page-loader"></div>
+
+
+    <!-- Page -->
+
+    {% block body %}{% endblock %}
+
+
+    <!-- Global modal -->
+
+    <div id="modal"></div>
+
+
+    <!-- =================================================
+         JAVASCRIPT
+         ================================================= -->
+
+
+    {% if request.path == '/staff' %}
+
+    <!-- Staff Login -->
+
+    <script
+        src="{{ url_for('static', filename='js/staff.js') }}"
+    ></script>
+
+
+{% elif session.get('role') == 'admin' %}
+
+    <!-- Admin -->
+
+    <script
+        src="{{ url_for('static', filename='js/admin.js') }}"
+    ></script>
+
+
+{% elif session.get('role') == 'developer' %}
+
+    <!-- Developer -->
+
+    <script
+        src="{{ url_for('static', filename='js/developer.js') }}"
+    ></script>
+
+
+{% elif session.get('role') == 'delivery' %}
+
+    <!-- Delivery -->
+
+    <script
+        src="{{ url_for('static', filename='js/delivery.js') }}"
+    ></script>
+
+
+{% else %}
+
+    <!-- Customer / Public -->
+
+    <script
+        src="{{ url_for('static', filename='app.js') }}"
+    ></script>
+
+{% endif %}
+
+
+    <!-- Page-specific scripts -->
+
+    {% block scripts %}{% endblock %}
+
+
+    <!-- Page loader completion -->
+
+    <script>
+
+        window.addEventListener(
+            'load',
+            function () {
+
+                const loader =
+                    document.getElementById(
+                        'page-loader'
+                    );
+
+
+                if (loader) {
+
+                    setTimeout(
+                        function () {
+
+                            loader.classList.add(
+                                'done'
+                            );
+
+                        },
+                        150
+                    );
+
+                }
+
+            }
+        );
+
+    </script>
+
+<script src="{{ url_for('static', filename='responsive.js') }}"></script>
+</body>
+
+</html>

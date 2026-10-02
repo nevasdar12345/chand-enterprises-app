@@ -1,0 +1,482 @@
+{% extends "base.html" %}
+
+{% block title %}
+Developer · Chand Enterprises
+{% endblock %}
+
+
+{% block body %}
+
+<header class="nav">
+
+    <a
+        class="logo"
+        href="/dashboard"
+    >
+        <span class="logo-mark">
+            CE
+        </span>
+
+        <span>
+            Chand Enterprises
+        </span>
+    </a>
+
+
+    <div class="nav-actions">
+
+        <button
+            onclick="developerSettings()"
+        >
+            ⚙️ Settings
+        </button>
+
+
+        <button
+            onclick="developerOffers()"
+        >
+            📢 Offers
+        </button>
+
+
+        <form method="post" action="{{ url_for('main.logout') }}">
+    <button type="submit">
+        Logout
+    </button>
+</form>
+
+    </div>
+
+</header>
+
+
+<main class="admin-panel">
+
+
+    <!-- =========================
+         HEADER
+         ========================= -->
+
+    <section class="hero">
+
+        <div>
+
+            <small>
+                DEVELOPER PANEL
+            </small>
+
+            <h1>
+                Website Management
+            </h1>
+
+            <p class="muted">
+                Manage business settings,
+                offers and products.
+            </p>
+
+        </div>
+
+
+        <div>
+
+            <button
+                class="primary"
+                onclick="addDeveloperProduct()"
+            >
+                + Add Product
+            </button>
+
+        </div>
+
+    </section>
+
+
+    <!-- =========================
+         QUICK SETTINGS
+         ========================= -->
+
+    <section class="cards">
+
+
+        <div class="card">
+
+            <div class="ic">
+                ⚙️
+            </div>
+
+            <b>
+                Business Settings
+            </b>
+
+            <small>
+                Business name, mobile,
+                WhatsApp, UPI and location.
+            </small>
+
+
+            <button
+                class="primary"
+                onclick="developerSettings()"
+            >
+                Manage
+            </button>
+
+        </div>
+
+
+        <div class="card">
+
+            <div class="ic">
+                📢
+            </div>
+
+            <b>
+                Offers & Ticker
+            </b>
+
+            <small>
+                Manage the scrolling offers
+                shown on the website.
+            </small>
+
+
+            <button
+                class="primary"
+                onclick="developerOffers()"
+            >
+                Manage
+            </button>
+
+        </div>
+
+
+        <div class="card">
+
+            <div class="ic">
+                📦
+            </div>
+
+            <b>
+                Products
+            </b>
+
+            <small>
+                Add, edit, hide and update
+                products and stock.
+            </small>
+
+
+            <button
+                class="primary"
+                onclick="
+                    loadDeveloperProducts()
+                "
+            >
+                Refresh
+            </button>
+
+        </div>
+
+
+    </section>
+
+
+    <!-- =========================
+         BUSINESS INFORMATION
+         ========================= -->
+
+    <section class="panel">
+
+        <div class="panel-head">
+
+            <div>
+
+                <h2>
+                    Current Business Settings
+                </h2>
+
+                <p class="muted">
+                    Current configuration
+                    loaded from the server.
+                </p>
+
+            </div>
+
+
+            <button
+                onclick="
+                    developerSettings()
+                "
+            >
+                Edit
+            </button>
+
+        </div>
+
+
+        <div class="settings-grid">
+
+
+            <div>
+
+                <small>
+                    Business name
+                </small>
+
+                <b
+                    data-business-name
+                >
+                    {{ settings.business_name }}
+                </b>
+
+            </div>
+
+
+            <div>
+
+                <small>
+                    Mobile
+                </small>
+
+                <b
+                    data-business-mobile
+                >
+                    {{ settings.business_mobile }}
+                </b>
+
+            </div>
+
+
+            <div>
+
+                <small>
+                    WhatsApp
+                </small>
+
+                <b>
+                    {{ settings.whatsapp }}
+                </b>
+
+            </div>
+
+
+            <div>
+
+                <small>
+                    Location
+                </small>
+
+                <b
+                    data-business-location
+                >
+                    {{ settings.business_location }}
+                </b>
+
+            </div>
+
+
+            <div>
+
+                <small>
+                    UPI ID
+                </small>
+
+                <b>
+                    {{ settings.upi }}
+                </b>
+
+            </div>
+
+
+            <div>
+
+                <small>
+                    Payment name
+                </small>
+
+                <b>
+                    {{ settings.payment_name }}
+                </b>
+
+            </div>
+
+
+        </div>
+
+    </section>
+
+
+    <!-- =========================
+         PRODUCTS
+         ========================= -->
+
+    <section class="panel">
+
+        <div class="panel-head">
+
+            <div>
+
+                <h2>
+                    Products
+                </h2>
+
+                <p class="muted">
+                    Manage products available
+                    in the store.
+                </p>
+
+            </div>
+
+
+            <button
+                class="primary"
+                onclick="
+                    addDeveloperProduct()
+                "
+            >
+                + Add Product
+            </button>
+
+        </div>
+
+
+        <div class="table-wrap">
+
+            <table class="admin-table">
+
+                <thead>
+
+                    <tr>
+
+                        <th>
+                            ID
+                        </th>
+
+                        <th>
+                            Product
+                        </th>
+
+                        <th>
+                            Category
+                        </th>
+
+                        <th>
+                            Price
+                        </th>
+
+                        <th>
+                            Stock
+                        </th>
+
+                        <th>
+                            Icon
+                        </th>
+
+                        <th>
+                            Status
+                        </th>
+
+                        <th>
+                            Actions
+                        </th>
+
+                    </tr>
+
+                </thead>
+
+
+                <tbody
+                    id="developerProductRows"
+                >
+
+                    <tr>
+
+                        <td
+                            colspan="8"
+                            style="text-align:center"
+                        >
+                            Loading products...
+                        </td>
+
+                    </tr>
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </section>
+
+
+    <!-- =========================
+         OFFERS
+         ========================= -->
+
+    <section class="panel">
+
+        <div class="panel-head">
+
+            <div>
+
+                <h2>
+                    Offers / Ticker
+                </h2>
+
+                <p class="muted">
+                    These offers appear in
+                    the website ticker.
+                </p>
+
+            </div>
+
+
+            <button
+                class="primary"
+                onclick="
+                    developerOffers()
+                "
+            >
+                Manage Offers
+            </button>
+
+        </div>
+
+
+        <div id="developerOffers">
+
+            {% if settings.offers %}
+
+                {% for offer in settings.offers %}
+
+                    <div class="row">
+
+                        <span>
+                            📢
+                        </span>
+
+                        <span>
+                            {{ offer }}
+                        </span>
+
+                    </div>
+
+                {% endfor %}
+
+            {% else %}
+
+                <p class="muted">
+                    No offers configured.
+                </p>
+
+            {% endif %}
+
+        </div>
+
+    </section>
+
+
+</main>
+
+
+{% endblock %}

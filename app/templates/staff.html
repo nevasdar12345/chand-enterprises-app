@@ -1,0 +1,162 @@
+{% extends 'base.html' %}
+
+{% block body %}
+<main class="staff-login-page">
+
+    <div class="staff-login-shell">
+
+        <!-- Left / Brand panel -->
+        <section class="staff-login-brand">
+            <div class="staff-login-brand-top">
+                <div class="staff-login-logo">CE</div>
+                <span>CHAND ENTERPRISES</span>
+            </div>
+
+            <div class="staff-login-brand-content">
+                <span class="staff-login-kicker">STAFF PORTAL</span>
+
+                <h1>
+                    Welcome to your
+                    <em>workspace.</em>
+                </h1>
+
+                <p>
+                    Secure access for admin, delivery and developer accounts.
+                </p>
+
+                <div class="staff-login-features">
+                    <div>
+                        <span>🛡️</span>
+                        <div>
+                            <b>Secure access</b>
+                            <small>Protected staff workspace</small>
+                        </div>
+                    </div>
+
+                    <div>
+                        <span>⚡</span>
+                        <div>
+                            <b>Fast operations</b>
+                            <small>Manage your assigned tasks</small>
+                        </div>
+                    </div>
+
+                    <div>
+                        <span>📊</span>
+                        <div>
+                            <b>Business tools</b>
+                            <small>Access your operational dashboard</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="staff-login-brand-footer">
+                <span>📍 Darbhanga, Bihar</span>
+                <span>•</span>
+                <span>Chand Enterprises</span>
+            </div>
+        </section>
+
+
+        <!-- Login panel -->
+        <section class="staff-login-card">
+
+            <div class="staff-login-card-head">
+                <div class="staff-login-mobile-logo">CE</div>
+
+                <span class="staff-login-badge">
+                    <span></span>
+                    STAFF LOGIN
+                </span>
+
+                <h2>Sign in</h2>
+
+                <p>
+                    Enter your staff credentials to continue.
+                </p>
+            </div>
+
+
+            <div class="staff-login-form">
+
+                <label class="staff-field">
+                    <span>Role</span>
+
+                    <div class="staff-input-wrap">
+                        <span class="staff-input-icon">👤</span>
+
+                        <select id="srole">
+                            <option value="admin">Admin</option>
+                            <option value="delivery">Delivery</option>
+                            <option value="developer">Developer</option>
+                        </select>
+                    </div>
+                </label>
+
+
+                <label class="staff-field">
+                    <span>Username</span>
+
+                    <div class="staff-input-wrap">
+                        <span class="staff-input-icon">✉️</span>
+
+                        <input
+                            id="suser"
+                            autocomplete="username"
+                            placeholder="Enter username"
+                        >
+                    </div>
+                </label>
+
+
+                <label class="staff-field">
+                    <span>Password</span>
+
+                    <div class="staff-input-wrap">
+                        <span class="staff-input-icon">🔒</span>
+
+                        <input
+                            id="spass"
+                            type="password"
+                            autocomplete="current-password"
+                            placeholder="Enter password"
+                        >
+                    </div>
+                </label>
+
+
+                <p id="serr" class="err staff-login-error"></p>
+
+
+                <button
+                    class="primary staff-login-button"
+                    onclick="staffLogin()"
+                >
+                    <span>Login securely</span>
+                    <span>→</span>
+                </button>
+
+
+                <a href="/" class="staff-back">
+                    <span>←</span>
+                    Back to shop
+                </a>
+
+            </div>
+
+
+            <div class="staff-login-security">
+                <span>🔐</span>
+                <div>
+                    <b>Private staff area</b>
+                    <small>Your dashboard is restricted to authorized accounts.</small>
+                </div>
+            </div>
+
+        </section>
+
+    </div>
+
+</main>
+{% endblock %}
