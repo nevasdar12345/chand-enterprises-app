@@ -336,7 +336,7 @@ def verify_otp():
 
     ch.attempts += 1
 
-    if not check_password_hash(ch.otp_hash, str(d.get("otp", ""))):
+    if not check_password_hash(ch.otp_hash, str(d.get("otp", ""))):     db.session.commit()     return jsonify(ok=False, error="Incorrect OTP", attempts_left=max(0, 5 - ch.attempts)), 400
 
         db.session.commit()
 
