@@ -4,30 +4,106 @@
    ========================================================= */
 
 (function () {
+
     "use strict";
+
 
     /* =====================================================
        HAMBURGER MENU
        ===================================================== */
 
     function setupMobileMenu() {
-        const nav = document.querySelector(".nav");
 
-        if (!nav) return;
+        const nav =
+            document.querySelector(".nav");
 
-        const navActions = nav.querySelector(".nav-actions");
+        if (!nav) {
+            return;
+        }
 
-        if (!navActions) return;
 
-        /* Prevent duplicate hamburger */
-        if (nav.querySelector(".nav-hamburger")) return;
+        /*
+         * Different pages use different navigation
+         * action class names.
+         *
+         * Customer:
+         * .store-actions
+         *
+         * Developer:
+         * .nav-actions
+         *
+         * Admin:
+         * .admin-nav-right
+         *
+         * Delivery:
+         * .staff-nav-actions
+         */
 
-        const button = document.createElement("button");
+        const navActions =
+            nav.querySelector(
+                ".nav-actions, " +
+                ".store-actions, " +
+                ".admin-nav-right, " +
+                ".staff-nav-actions"
+            );
+
+
+        if (!navActions) {
+            return;
+        }
+
+
+        /*
+         * Give every navigation action container
+         * the common responsive class.
+         *
+         * This allows responsive.css to control
+         * all navigation menus consistently.
+         */
+
+        navActions.classList.add(
+            "nav-actions"
+        );
+
+
+        /*
+         * Prevent duplicate hamburger
+         */
+
+        if (
+            nav.querySelector(
+                ".nav-hamburger"
+            )
+        ) {
+            return;
+        }
+
+
+        /* =================================================
+           CREATE HAMBURGER
+           ================================================= */
+
+        const button =
+            document.createElement("button");
+
 
         button.type = "button";
-        button.className = "nav-hamburger";
-        button.setAttribute("aria-label", "Open menu");
-        button.setAttribute("aria-expanded", "false");
+
+        button.className =
+            "nav-hamburger";
+
+
+        button.setAttribute(
+            "aria-label",
+            "Open menu"
+        );
+
+
+        button.setAttribute(
+            "aria-expanded",
+            "false"
+        );
+
 
         button.innerHTML = `
             <span></span>
@@ -35,106 +111,244 @@
             <span></span>
         `;
 
-        nav.insertBefore(button, navActions);
+
+        /*
+         * Put hamburger before navigation actions
+         */
+
+        nav.insertBefore(
+            button,
+            navActions
+        );
+
+
+        /* =================================================
+           CLOSE MENU
+           ================================================= */
 
         function closeMenu() {
-            navActions.classList.remove("open");
-            button.classList.remove("active");
 
-            button.setAttribute("aria-expanded", "false");
-            button.setAttribute("aria-label", "Open menu");
+            navActions.classList.remove(
+                "open"
+            );
+
+
+            button.classList.remove(
+                "active"
+            );
+
+
+            button.setAttribute(
+                "aria-expanded",
+                "false"
+            );
+
+
+            button.setAttribute(
+                "aria-label",
+                "Open menu"
+            );
         }
 
-        function toggleMenu() {
-            const isOpen = navActions.classList.toggle("open");
 
-            button.classList.toggle("active", isOpen);
+        /* =================================================
+           TOGGLE MENU
+           ================================================= */
+
+        function toggleMenu() {
+
+            const isOpen =
+                navActions.classList.toggle(
+                    "open"
+                );
+
+
+            button.classList.toggle(
+                "active",
+                isOpen
+            );
+
 
             button.setAttribute(
                 "aria-expanded",
                 String(isOpen)
             );
 
+
             button.setAttribute(
                 "aria-label",
-                isOpen ? "Close menu" : "Open menu"
+                isOpen
+                    ? "Close menu"
+                    : "Open menu"
             );
         }
 
-        button.addEventListener("click", function (event) {
-            event.stopPropagation();
-            toggleMenu();
-        });
 
-        /* Close after clicking a menu link */
+        /* =================================================
+           HAMBURGER CLICK
+           ================================================= */
 
-        navActions.addEventListener("click", function (event) {
+        button.addEventListener(
+            "click",
+            function (event) {
 
-            const link = event.target.closest("a");
+                event.stopPropagation();
 
-            if (link) {
-                closeMenu();
+                toggleMenu();
+
             }
+        );
 
-        });
 
-        /* Close when clicking outside */
+        /* =================================================
+           CLICK INSIDE MENU
+           ================================================= */
 
-        document.addEventListener("click", function (event) {
+        navActions.addEventListener(
+            "click",
+            function (event) {
 
-            if (!nav.contains(event.target)) {
-                closeMenu();
+                /*
+                 * Close after clicking:
+                 * links
+                 * buttons
+                 * form buttons
+                 * selects
+                 */
+
+                const action =
+                    event.target.closest(
+                        "a, button, input, select"
+                    );
+
+
+                if (action) {
+
+                    setTimeout(
+                        closeMenu,
+                        80
+                    );
+
+                }
+
             }
+        );
 
-        });
 
-        /* Close with Escape */
+        /* =================================================
+           CLICK OUTSIDE
+           ================================================= */
 
-        document.addEventListener("keydown", function (event) {
+        document.addEventListener(
+            "click",
+            function (event) {
 
-            if (event.key === "Escape") {
-                closeMenu();
+                if (
+                    !nav.contains(
+                        event.target
+                    )
+                ) {
+
+                    closeMenu();
+
+                }
+
             }
+        );
 
-        });
 
-        /* Close when screen becomes desktop */
+        /* =================================================
+           ESCAPE KEY
+           ================================================= */
 
-        window.addEventListener("resize", function () {
+        document.addEventListener(
+            "keydown",
+            function (event) {
 
-            if (window.innerWidth > 900) {
-                closeMenu();
+                if (
+                    event.key ===
+                    "Escape"
+                ) {
+
+                    closeMenu();
+
+                }
+
             }
+        );
 
-        });
+
+        /* =================================================
+           DESKTOP RESET
+           ================================================= */
+
+        window.addEventListener(
+            "resize",
+            function () {
+
+                if (
+                    window.innerWidth > 900
+                ) {
+
+                    closeMenu();
+
+                }
+
+            }
+        );
+
     }
 
 
     /* =====================================================
        SIMPLE UI MODAL
-       
+
        Separate from app.js #modal.
-       This prevents conflicts with cart/checkout.
+       This prevents conflicts with cart / checkout.
        ===================================================== */
 
     function createUiModal() {
 
-        if (document.getElementById("ui-modal")) {
-            return document.getElementById("ui-modal");
+        let modal =
+            document.getElementById(
+                "ui-modal"
+            );
+
+
+        if (modal) {
+
+            return modal;
+
         }
 
-        const modal = document.createElement("div");
 
-        modal.id = "ui-modal";
+        modal =
+            document.createElement(
+                "div"
+            );
+
+
+        modal.id =
+            "ui-modal";
+
 
         modal.innerHTML = `
+
             <div class="ui-modal-box">
 
-                <div class="ui-modal-title"></div>
+                <div
+                    class="ui-modal-title"
+                ></div>
 
-                <div class="ui-modal-message"></div>
 
-                <div class="ui-modal-actions">
+                <div
+                    class="ui-modal-message"
+                ></div>
+
+
+                <div
+                    class="ui-modal-actions"
+                >
 
                     <button
                         type="button"
@@ -146,31 +360,52 @@
                 </div>
 
             </div>
+
         `;
 
-        modal.style.display = "none";
 
-        document.body.appendChild(modal);
+        modal.style.display =
+            "none";
+
+
+        document.body.appendChild(
+            modal
+        );
+
 
         const closeButton =
-            modal.querySelector(".ui-modal-close");
+            modal.querySelector(
+                ".ui-modal-close"
+            );
+
 
         closeButton.addEventListener(
             "click",
             closeUiModal
         );
 
+
         /* Click outside modal */
 
-        modal.addEventListener("click", function (event) {
+        modal.addEventListener(
+            "click",
+            function (event) {
 
-            if (event.target === modal) {
-                closeUiModal();
+                if (
+                    event.target ===
+                    modal
+                ) {
+
+                    closeUiModal();
+
+                }
+
             }
+        );
 
-        });
 
         return modal;
+
     }
 
 
@@ -184,27 +419,47 @@
         buttonText = "Close"
     ) {
 
-        const modal = createUiModal();
+        const modal =
+            createUiModal();
+
 
         const titleElement =
-            modal.querySelector(".ui-modal-title");
+            modal.querySelector(
+                ".ui-modal-title"
+            );
+
 
         const messageElement =
-            modal.querySelector(".ui-modal-message");
+            modal.querySelector(
+                ".ui-modal-message"
+            );
+
 
         const closeButton =
-            modal.querySelector(".ui-modal-close");
+            modal.querySelector(
+                ".ui-modal-close"
+            );
 
-        titleElement.textContent = title || "";
 
-        messageElement.textContent = message || "";
+        titleElement.textContent =
+            title || "";
+
+
+        messageElement.textContent =
+            message || "";
+
 
         closeButton.textContent =
             buttonText || "Close";
 
-        modal.style.display = "flex";
 
-        document.body.style.overflow = "hidden";
+        modal.style.display =
+            "flex";
+
+
+        document.body.style.overflow =
+            "hidden";
+
     }
 
 
@@ -215,13 +470,23 @@
     function closeUiModal() {
 
         const modal =
-            document.getElementById("ui-modal");
+            document.getElementById(
+                "ui-modal"
+            );
 
-        if (!modal) return;
 
-        modal.style.display = "none";
+        if (!modal) {
+            return;
+        }
 
-        document.body.style.overflow = "";
+
+        modal.style.display =
+            "none";
+
+
+        document.body.style.overflow =
+            "";
+
     }
 
 
@@ -229,20 +494,40 @@
        ESCAPE KEY FOR MODAL
        ===================================================== */
 
-    document.addEventListener("keydown", function (event) {
+    document.addEventListener(
+        "keydown",
+        function (event) {
 
-        if (event.key !== "Escape") return;
+            if (
+                event.key !==
+                "Escape"
+            ) {
+                return;
+            }
 
-        const modal =
-            document.getElementById("ui-modal");
 
-        if (!modal) return;
+            const modal =
+                document.getElementById(
+                    "ui-modal"
+                );
 
-        if (modal.style.display !== "none") {
-            closeUiModal();
+
+            if (!modal) {
+                return;
+            }
+
+
+            if (
+                modal.style.display !==
+                "none"
+            ) {
+
+                closeUiModal();
+
+            }
+
         }
-
-    });
+    );
 
 
     /* =====================================================
@@ -251,44 +536,59 @@
 
     function showWelcome() {
 
-        /* Only homepage */
+        /*
+         * Only homepage
+         */
 
         if (
             window.location.pathname !== "/" &&
             window.location.pathname !== ""
         ) {
+
             return;
+
         }
 
-        /* Don't show every page refresh */
+
+        /*
+         * Don't show on every refresh
+         */
 
         if (
             sessionStorage.getItem(
                 "ce_welcome_seen"
             )
         ) {
+
             return;
+
         }
+
 
         sessionStorage.setItem(
             "ce_welcome_seen",
             "1"
         );
 
-        setTimeout(function () {
 
-            showUiModal(
-                "Welcome to Chand Enterprises",
-                "Order drinks, premium water and local delivery from one place.",
-                "Start Shopping"
-            );
+        setTimeout(
+            function () {
 
-        }, 600);
+                showUiModal(
+                    "Welcome to Chand Enterprises",
+                    "Order drinks, premium water and local delivery from one place.",
+                    "Start Shopping"
+                );
+
+            },
+            600
+        );
+
     }
 
 
     /* =====================================================
-       MOBILE VIEWPORT HELPER
+       MOBILE VIEWPORT HEIGHT
        ===================================================== */
 
     function setViewportHeight() {
@@ -298,11 +598,13 @@
                 ? window.visualViewport.height
                 : window.innerHeight;
 
+
         document.documentElement.style
             .setProperty(
                 "--viewport-height",
                 `${height}px`
             );
+
     }
 
 
@@ -317,6 +619,7 @@
         setViewportHeight();
 
         showWelcome();
+
     }
 
 
@@ -329,7 +632,10 @@
         setViewportHeight
     );
 
-    if (window.visualViewport) {
+
+    if (
+        window.visualViewport
+    ) {
 
         window.visualViewport.addEventListener(
             "resize",
@@ -360,7 +666,12 @@
        GLOBAL FUNCTIONS
        ===================================================== */
 
-    window.showUiModal = showUiModal;
-    window.closeUiModal = closeUiModal;
+    window.showUiModal =
+        showUiModal;
+
+
+    window.closeUiModal =
+        closeUiModal;
+
 
 })();
