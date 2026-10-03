@@ -3,380 +3,223 @@
    COMMON / CUSTOMER JAVASCRIPT
    ========================================================= */
 
-
 /* =========================
    HELPERS
    ========================= */
 
-const $ = selector =>
-    document.querySelector(selector);
+const $ = (selector) => document.querySelector(selector);
 
+const money = (value) => "₹" + Number(value || 0).toFixed(0);
 
-const money = value =>
-    '₹' + Number(value || 0).toFixed(0);
+const esc = (value) =>
+  String(value ?? "").replace(
+    /[&<>"']/g,
+    (char) =>
+      ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;",
+      })[char],
+  );
 
+async function api(url, method = "GET", body = undefined) {
+  try {
+    const response = await fetch(url, {
+      method,
 
-const esc = value =>
-    String(value ?? '').replace(
-        /[&<>"']/g,
-        char => ({
-            '&': '&amp;',
-            '<': '&lt;',
-            '>': '&gt;',
-            '"': '&quot;',
-            "'": '&#39;'
-        }[char])
-    );
+      headers: {
+        "Content-Type": "application/json",
+      },
 
+      body: body ? JSON.stringify(body) : undefined,
+    });
 
-async function api(
-    url,
-    method = 'GET',
-    body = undefined
-) {
+    const data = await response.json().catch(() => ({}));
 
-    try {
+    data._ok = response.ok;
 
-        const response = await fetch(url, {
-            method,
+    return data;
+  } catch (error) {
+    console.error("API error:", error);
 
-            headers: {
-                'Content-Type': 'application/json'
-            },
-
-            body: body
-                ? JSON.stringify(body)
-                : undefined
-        });
-
-
-        const data =
-            await response
-                .json()
-                .catch(() => ({}));
-
-
-        data._ok = response.ok;
-
-        return data;
-
-    } catch (error) {
-
-        console.error(
-            'API error:',
-            error
-        );
-
-        return {
-            _ok: false,
-            error: 'Network error'
-        };
-    }
+    return {
+      _ok: false,
+      error: "Network error",
+    };
+  }
 }
-
 
 /* =========================
    CUSTOMER STATE
    ========================= */
 
-let CART =
-    JSON.parse(
-        localStorage.getItem('cart') || '{}'
-    );
+let CART = JSON.parse(localStorage.getItem("cart") || "{}");
 
-
-let CAT = 'All';
-
+let CAT = "All";
 
 let ME = null;
 
-
 let ORD = {};
 
+/* Remember if login was started from checkout */
+let LOGIN_FROM_CHECKOUT = false;
 
 let CFG = {
+  whatsapp: "919304285574",
 
-    whatsapp: '919304285574',
+  upi: "chandenterprises@upi",
 
-    upi: 'chandenterprises@upi',
+  business_name: "Chand Enterprises",
 
-    business_name:
-        'Chand Enterprises',
+  business_mobile: "9304295574",
 
-    business_mobile:
-        '9304295574',
+  business_location: "Darbhanga, Bihar",
 
-    business_location:
-        'Darbhanga, Bihar',
+  payment_name: "Chand Enterprises",
 
-    payment_name:
-        'Chand Enterprises',
-
-    offers: []
+  offers: [],
 };
-
 
 /* =========================
    OFFERS / TICKER
    ========================= */
 
 const DEFAULT_OFFERS = [
+  "🥤 Pepsi 200ml @ ₹12",
 
-    '🥤 Pepsi 200ml @ ₹12',
+  "⚡ Energy Drink 250ml - Buy 2, get ₹20 off",
 
-    '⚡ Energy Drink 250ml - Buy 2, get ₹20 off',
+  "🚰 Premium Water 20L - special bulk rate",
 
-    '🚰 Premium Water 20L - special bulk rate',
+  "🚚 Free delivery above ₹500",
 
-    '🚚 Free delivery above ₹500',
+  "🎟️ Use code WELCOME10 - 10% off your first order",
 
-    '🎟️ Use code WELCOME10 - 10% off your first order',
-
-    '🍋 Lemon Soda 750ml - summer special'
-
+  "🍋 Lemon Soda 750ml - summer special",
 ];
 
-
-let OFFERS =
-    [...DEFAULT_OFFERS];
-
+let OFFERS = [...DEFAULT_OFFERS];
 
 function ticker() {
+  const track = $("#track");
 
-    const track =
-        $('#track');
+  if (!track) {
+    return;
+  }
 
+  const html = OFFERS.map((offer) => `<span>${esc(offer)}</span>`).join("");
 
-    if (!track) {
-        return;
-    }
-
-
-    const html =
-        OFFERS
-            .map(
-                offer =>
-                    `<span>${esc(offer)}</span>`
-            )
-            .join('');
-
-
-    track.innerHTML =
-        html + html;
+  track.innerHTML = html + html;
 }
-
 
 /* =========================
    MODAL
    ========================= */
 
 function modal(html) {
+  const element = $("#modal");
 
-    const element =
-        $('#modal');
+  if (!element) {
+    return;
+  }
 
+  element.innerHTML = `<div class="box">${html}</div>`;
 
-    if (!element) {
-        return;
+  element.classList.add("open");
+
+  element.onclick = (event) => {
+    if (event.target === element) {
+      closeModal();
     }
-
-
-    element.innerHTML =
-        `<div class="box">${html}</div>`;
-
-
-    element.classList.add(
-        'open'
-    );
-
-
-    element.onclick =
-        event => {
-
-            if (
-                event.target ===
-                element
-            ) {
-                closeModal();
-            }
-
-        };
+  };
 }
-
 
 function closeModal() {
+  const element = $("#modal");
 
-    const element =
-        $('#modal');
-
-
-    if (element) {
-
-        element.classList.remove(
-            'open'
-        );
-    }
+  if (element) {
+    element.classList.remove("open");
+  }
 }
-
 
 /* =========================
    CART
    ========================= */
 
 function save(anim = false) {
+  localStorage.setItem("cart", JSON.stringify(CART));
 
-    localStorage.setItem(
-        'cart',
-        JSON.stringify(CART)
-    );
+  const count = $("#count");
 
+  if (count) {
+    const total = Object.values(CART).reduce((sum, value) => sum + value, 0);
 
-    const count =
-        $('#count');
+    if (Number(count.textContent) !== total) {
+      count.classList.remove("bump");
 
+      void count.offsetWidth;
 
-    if (count) {
-
-        const total =
-            Object.values(CART)
-                .reduce(
-                    (sum, value) =>
-                        sum + value,
-                    0
-                );
-
-
-        if (
-            Number(count.textContent) !==
-            total
-        ) {
-
-            count.classList.remove(
-                'bump'
-            );
-
-
-            void count.offsetWidth;
-
-
-            count.classList.add(
-                'bump'
-            );
-        }
-
-
-        count.textContent =
-            total;
+      count.classList.add("bump");
     }
 
+    count.textContent = total;
+  }
 
-    render(anim);
+  render(anim);
 }
-
 
 function find(id) {
-
-    return (
-        window.PRODUCTS || []
-    ).find(
-        product =>
-            product.id == id
-    );
+  return (window.PRODUCTS || []).find((product) => product.id == id);
 }
-
 
 /* =========================
    PRODUCT LIST
    ========================= */
 
-function category(
-    categoryName,
-    button
-) {
+function category(categoryName, button) {
+  CAT = categoryName;
 
-    CAT =
-        categoryName;
+  document
+    .querySelectorAll("#cats button")
+    .forEach((item) => item.classList.remove("on"));
 
+  if (button) {
+    button.classList.add("on");
+  }
 
-    document
-        .querySelectorAll(
-            '#cats button'
-        )
-        .forEach(
-            item =>
-                item.classList.remove(
-                    'on'
-                )
-        );
-
-
-    if (button) {
-
-        button.classList.add(
-            'on'
-        );
-    }
-
-
-    render(true);
+  render(true);
 }
 
-
 function render(anim = false) {
+  const grid = $("#grid");
 
-    const grid =
-        $('#grid');
+  if (!grid) {
+    return;
+  }
 
+  const search = $("#search");
 
-    if (!grid) {
-        return;
-    }
+  const query = (search?.value || "").toLowerCase();
 
+  const products = window.PRODUCTS || [];
 
-    const search =
-        $('#search');
+  const list = products.filter(
+    (product) =>
+      (CAT === "All" || product.category === CAT) &&
+      product.name.toLowerCase().includes(query),
+  );
 
+  grid.innerHTML =
+    list
+      .map((product, index) => {
+        const quantity = CART[product.id] || 0;
 
-    const query =
-        (
-            search?.value || ''
-        ).toLowerCase();
-
-
-    const products =
-        window.PRODUCTS || [];
-
-
-    const list =
-        products.filter(
-            product =>
-
-                (
-                    CAT === 'All' ||
-                    product.category === CAT
-                )
-
-                &&
-
-                product.name
-                    .toLowerCase()
-                    .includes(query)
-        );
-
-
-    grid.innerHTML =
-        list
-            .map(
-                (product, index) => {
-
-                    const quantity =
-                        CART[product.id] || 0;
-
-
-                    return `
+        return `
 
                         <div
-                            class="card${anim ? ' pop' : ''}"
+                            class="card${anim ? " pop" : ""}"
                             style="--i:${index}"
                         >
 
@@ -401,35 +244,21 @@ function render(anim = false) {
 
 
                             ${
-                                product.stock < 1
-
+                              product.stock < 1
                                 ? `
                                     <span class="badge">
                                         Out of stock
                                     </span>
                                 `
-
-                                :
-
-                                (
-
-                                    product.low
-
+                                : (product.low
                                     ? `
                                         <span class="badge">
                                             Only ${product.stock} left
                                         </span>
                                         <br>
                                     `
-
-                                    : ''
-                                )
-
-                                +
-
-                                (
-                                    quantity
-
+                                    : "") +
+                                  (quantity
                                     ? `
                                         <div class="qty">
 
@@ -463,7 +292,6 @@ function render(anim = false) {
 
                                         </div>
                                     `
-
                                     : `
                                         <button
                                             class="primary"
@@ -476,174 +304,96 @@ function render(anim = false) {
                                         >
                                             Add
                                         </button>
-                                    `
-                                )
+                                    `)
                             }
 
                         </div>
 
                     `;
-                }
-            )
-            .join('')
-
-        ||
-
-        `
+      })
+      .join("") ||
+    `
             <p class="muted">
                 No products found.
             </p>
         `;
 }
 
-
 /* =========================
    CHANGE CART
    ========================= */
 
-function chg(
-    id,
-    change
-) {
+function chg(id, change) {
+  const product = find(id);
 
-    const product =
-        find(id);
+  if (!product) {
+    return;
+  }
 
+  let quantity = (CART[id] || 0) + change;
 
-    if (!product) {
-        return;
-    }
+  if (quantity > product.stock) {
+    quantity = product.stock;
+  }
 
+  if (quantity <= 0) {
+    delete CART[id];
+  } else {
+    CART[id] = quantity;
+  }
 
-    let quantity =
-        (CART[id] || 0) +
-        change;
-
-
-    if (
-        quantity >
-        product.stock
-    ) {
-
-        quantity =
-            product.stock;
-    }
-
-
-    if (
-        quantity <= 0
-    ) {
-
-        delete CART[id];
-
-    } else {
-
-        CART[id] =
-            quantity;
-    }
-
-
-    save();
+  save();
 }
-
 
 /* =========================
    TOTALS
    ========================= */
 
-function totals(
-    coupon = ''
-) {
+function totals(coupon = "") {
+  let subtotal = 0;
 
-    let subtotal = 0;
+  for (const id in CART) {
+    const product = find(id);
 
-
-    for (
-        const id in CART
-    ) {
-
-        const product =
-            find(id);
-
-
-        if (!product) {
-            continue;
-        }
-
-
-        subtotal +=
-            product.price *
-            CART[id];
+    if (!product) {
+      continue;
     }
 
+    subtotal += product.price * CART[id];
+  }
 
-    let discount = 0;
+  let discount = 0;
 
+  coupon = coupon.trim().toUpperCase();
 
-    coupon =
-        coupon
-            .trim()
-            .toUpperCase();
+  if (coupon === "WELCOME10") {
+    discount = Math.min(subtotal * 0.1, 100);
+  } else if (coupon === "WATER50" && subtotal >= 500) {
+    discount = 50;
+  }
 
+  const delivery = subtotal - discount >= 500 ? 0 : 30;
 
-    if (
-        coupon ===
-        'WELCOME10'
-    ) {
+  return {
+    sub: subtotal,
 
-        discount =
-            Math.min(
-                subtotal * 0.10,
-                100
-            );
+    disc: discount,
 
-    } else if (
-        coupon === 'WATER50' &&
-        subtotal >= 500
-    ) {
+    del: delivery,
 
-        discount = 50;
-    }
-
-
-    const delivery =
-        subtotal - discount >= 500
-            ? 0
-            : 30;
-
-
-    return {
-
-        sub: subtotal,
-
-        disc: discount,
-
-        del: delivery,
-
-        total:
-            Math.max(
-                0,
-                subtotal -
-                discount +
-                delivery
-            )
-    };
+    total: Math.max(0, subtotal - discount + delivery),
+  };
 }
-
 
 /* =========================
    CART MODAL
    ========================= */
 
 function cart() {
+  const ids = Object.keys(CART);
 
-    const ids =
-        Object.keys(CART);
-
-
-    if (!ids.length) {
-
-        return modal(`
+  if (!ids.length) {
+    return modal(`
 
             <h2>
                 Your cart
@@ -662,29 +412,22 @@ function cart() {
             </button>
 
         `);
-    }
+  }
 
+  const total = totals();
 
-    const total =
-        totals();
-
-
-    modal(`
+  modal(`
 
         <h2>
             Your cart
         </h2>
 
 
-        ${
-            ids
-                .map(id => {
+        ${ids
+          .map((id) => {
+            const product = find(id);
 
-                    const product =
-                        find(id);
-
-
-                    return `
+            return `
 
                         <div class="row">
 
@@ -696,17 +439,13 @@ function cart() {
 
 
                             <b>
-                                ${money(
-                                    product.price *
-                                    CART[id]
-                                )}
+                                ${money(product.price * CART[id])}
                             </b>
 
                         </div>
                     `;
-                })
-                .join('')
-        }
+          })
+          .join("")}
 
 
         <div class="row">
@@ -717,11 +456,7 @@ function cart() {
 
 
             <span>
-                ${
-                    total.del
-                        ? money(total.del)
-                        : 'Free'
-                }
+                ${total.del ? money(total.del) : "Free"}
             </span>
 
         </div>
@@ -767,34 +502,22 @@ function cart() {
     `);
 }
 
-
 /* =========================
    CHECKOUT
    ========================= */
 
 async function checkout() {
+  if (!ME) {
+    ME = await api("/api/me");
+  }
 
-    if (!ME) {
+  if (!ME.authenticated || ME.role !== "customer") {
+    LOGIN_FROM_CHECKOUT = true;
 
-        ME =
-            await api(
-                '/api/me'
-            );
-    }
+    return account("Login to place your order");
+  }
 
-
-    if (
-        !ME.authenticated ||
-        ME.role !== 'customer'
-    ) {
-
-        return account(
-            'Login to place your order'
-        );
-    }
-
-
-    modal(`
+  modal(`
 
         <h2>
             Checkout
@@ -807,11 +530,7 @@ async function checkout() {
 
             <input
                 id="cn"
-                value="${esc(
-                    ME.name === 'Customer'
-                        ? ''
-                        : ME.name
-                )}"
+                value="${esc(ME.name === "Customer" ? "" : ME.name)}"
             >
 
         </label>
@@ -824,7 +543,7 @@ async function checkout() {
             <textarea
                 id="ca"
                 rows="3"
-            >${esc(ME.address || '')}</textarea>
+            >${esc(ME.address || "")}</textarea>
 
         </label>
 
@@ -895,160 +614,82 @@ async function checkout() {
 
     `);
 
-
-    cTot();
+  cTot();
 }
-
 
 function cTot() {
+  const element = $("#ctot");
 
-    const element =
-        $('#ctot');
+  if (!element) {
+    return;
+  }
 
-
-    if (!element) {
-        return;
-    }
-
-
-    element.textContent =
-        money(
-            totals(
-                $('#cc')?.value || ''
-            ).total
-        );
+  element.textContent = money(totals($("#cc")?.value || "").total);
 }
-
 
 /* =========================
    PLACE ORDER
    ========================= */
 
 async function placeOrder() {
+  const items = Object.entries(CART).map(([id, quantity]) => ({
+    id: Number(id),
+    qty: quantity,
+  }));
 
-    const items =
-        Object.entries(CART)
-            .map(
-                ([id, quantity]) => ({
-                    id: Number(id),
-                    qty: quantity
-                })
-            );
+  const result = await api("/api/orders", "POST", {
+    name: $("#cn").value,
 
+    address: $("#ca").value,
 
-    const result =
-        await api(
-            '/api/orders',
-            'POST',
-            {
+    coupon: $("#cc").value,
 
-                name:
-                    $('#cn').value,
+    payment_method: $("#cp").value,
 
-                address:
-                    $('#ca').value,
+    items,
+  });
 
-                coupon:
-                    $('#cc').value,
+  if (!result._ok) {
+    return ($("#cerr").textContent = result.error || "Could not place order");
+  }
 
-                payment_method:
-                    $('#cp').value,
+  CART = {};
 
-                items
+  localStorage.setItem("cart", "{}");
 
-            }
-        );
+  const products = await api("/api/products");
 
+  if (Array.isArray(products)) {
+    products.forEach((product) => {
+      const current = find(product.id);
 
-    if (!result._ok) {
+      if (current) {
+        Object.assign(current, product);
+      }
+    });
+  }
 
-        return (
-            $('#cerr').textContent =
-                result.error ||
-                'Could not place order'
-        );
-    }
+  save();
 
+  ORD[result.order_id] = {
+    upi_url: result.upi_url,
+  };
 
-    CART = {};
-
-
-    localStorage.setItem(
-        'cart',
-        '{}'
-    );
-
-
-    const products =
-        await api(
-            '/api/products'
-        );
-
-
-    if (
-        Array.isArray(products)
-    ) {
-
-        products.forEach(
-            product => {
-
-                const current =
-                    find(product.id);
-
-
-                if (current) {
-
-                    Object.assign(
-                        current,
-                        product
-                    );
-                }
-
-            }
-        );
-    }
-
-
-    save();
-
-
-    ORD[result.order_id] = {
-        upi_url:
-            result.upi_url
-    };
-
-
-    if (
-        result.payment_method ===
-        'QR'
-    ) {
-
-        payQR(
-            result.order_id,
-            result.total
-        );
-
-    } else {
-
-        done(result);
-    }
+  if (result.payment_method === "QR") {
+    payQR(result.order_id, result.total);
+  } else {
+    done(result);
+  }
 }
-
 
 /* =========================
    QR PAYMENT
    ========================= */
 
-function payQR(
-    code,
-    total
-) {
+function payQR(code, total) {
+  const order = ORD[code] || {};
 
-    const order =
-        ORD[code] || {};
-
-
-    modal(`
+  modal(`
 
         <div class="qrbox">
 
@@ -1094,8 +735,7 @@ function payQR(
 
 
             ${
-                order.upi_url
-
+              order.upi_url
                 ? `
                     <a
                         class="add upilink"
@@ -1105,8 +745,7 @@ function payQR(
                         (on phone)
                     </a>
                 `
-
-                : ''
+                : ""
             }
 
 
@@ -1158,50 +797,30 @@ function payQR(
     `);
 }
 
-
 async function paid(code) {
+  const result = await api(`/api/orders/${code}/paid`, "POST", {
+    utr: $("#utr").value,
+  });
 
-    const result =
-        await api(
-            `/api/orders/${code}/paid`,
-            'POST',
-            {
-                utr:
-                    $('#utr').value
-            }
-        );
+  if (!result._ok) {
+    return ($("#uerr").textContent =
+      result.error || "Could not confirm payment");
+  }
 
-
-    if (!result._ok) {
-
-        return (
-            $('#uerr').textContent =
-                result.error ||
-                'Could not confirm payment'
-        );
-    }
-
-
-    done({
-        order_id: code,
-        verifying: 1
-    });
+  done({
+    order_id: code,
+    verifying: 1,
+  });
 }
-
 
 /* =========================
    ORDER COMPLETE
    ========================= */
 
 async function done(result) {
+  const whatsapp = await api(`/api/orders/${result.order_id}/whatsapp`);
 
-    const whatsapp =
-        await api(
-            `/api/orders/${result.order_id}/whatsapp`
-        );
-
-
-    modal(`
+  modal(`
 
         <svg
             class="tick"
@@ -1249,27 +868,21 @@ async function done(result) {
 
 
         ${
-            result.verifying
-
+          result.verifying
             ? `
                 <p>
                     Payment is being
                     verified by our team.
                 </p>
             `
-
-            :
-
-            result.pay_later
-
-            ? `
+            : result.pay_later
+              ? `
                 <p>
                     Please complete the
                     payment from My Orders.
                 </p>
             `
-
-            : ''
+              : ""
         }
 
 
@@ -1280,8 +893,7 @@ async function done(result) {
 
 
         ${
-            whatsapp.whatsapp_url
-
+          whatsapp.whatsapp_url
             ? `
                 <a
                     class="primary"
@@ -1292,8 +904,7 @@ async function done(result) {
                     Send order on WhatsApp
                 </a>
             `
-
-            : ''
+            : ""
         }
 
 
@@ -1318,106 +929,47 @@ async function done(result) {
     `);
 }
 
-
 /* =========================
    BILL
    ========================= */
 
 async function bill(code) {
+  const list = await api("/api/my-orders");
 
-    const list =
-        await api(
-            '/api/my-orders'
-        );
+  if (Array.isArray(list)) {
+    list.forEach((order) => {
+      ORD[order.code] = Object.assign(ORD[order.code] || {}, order);
+    });
+  }
 
+  const order = ORD[code];
 
-    if (
-        Array.isArray(list)
-    ) {
+  if (!order || !order.lines) {
+    return alert("Bill not available");
+  }
 
-        list.forEach(
-            order => {
+  const status =
+    order.status === "Cancelled"
+      ? ["CANCELLED", ""]
+      : order.payment_status === "Paid"
+        ? ["PAID", "ok"]
+        : order.payment_status === "Verifying"
+          ? ["PAYMENT BEING VERIFIED", ""]
+          : ["PAYMENT PENDING", ""];
 
-                ORD[order.code] =
-                    Object.assign(
-                        ORD[order.code] || {},
-                        order
-                    );
-            }
-        );
-    }
-
-
-    const order =
-        ORD[code];
-
-
-    if (
-        !order ||
-        !order.lines
-    ) {
-
-        return alert(
-            'Bill not available'
-        );
-    }
-
-
-    const status =
-
-        order.status ===
-        'Cancelled'
-
-        ? [
-            'CANCELLED',
-            ''
-        ]
-
-        :
-
-        order.payment_status ===
-        'Paid'
-
-        ? [
-            'PAID',
-            'ok'
-        ]
-
-        :
-
-        order.payment_status ===
-        'Verifying'
-
-        ? [
-            'PAYMENT BEING VERIFIED',
-            ''
-        ]
-
-        : [
-            'PAYMENT PENDING',
-            ''
-        ];
-
-
-    modal(`
+  modal(`
 
         <div class="bill">
 
             <div class="billhead">
 
                 <b>
-                    ${esc(
-                        CFG.business_name ||
-                        'Chand Enterprises'
-                    )}
+                    ${esc(CFG.business_name || "Chand Enterprises")}
                 </b>
 
 
                 <small>
-                    ${esc(
-                        CFG.business_location ||
-                        'Darbhanga, Bihar'
-                    )}
+                    ${esc(CFG.business_location || "Darbhanga, Bihar")}
                     · Bill
                 </small>
 
@@ -1497,10 +1049,9 @@ async function bill(code) {
             <hr>
 
 
-            ${
-                order.lines
-                    .map(
-                        item => `
+            ${order.lines
+              .map(
+                (item) => `
 
                             <div class="row">
 
@@ -1516,10 +1067,9 @@ async function bill(code) {
 
                             </div>
 
-                        `
-                    )
-                    .join('')
-            }
+                        `,
+              )
+              .join("")}
 
 
             <hr>
@@ -1562,11 +1112,9 @@ async function bill(code) {
 
                 <span>
                     ${
-                        order.delivery_charge
-                            ? money(
-                                order.delivery_charge
-                            )
-                            : 'Free'
+                      order.delivery_charge
+                        ? money(order.delivery_charge)
+                        : "Free"
                     }
                 </span>
 
@@ -1613,16 +1161,12 @@ async function bill(code) {
     `);
 }
 
-
 /* =========================
    CUSTOMER LOGIN
    ========================= */
 
-async function account(
-    message = ''
-) {
-
-    modal(`
+async function account(message = "") {
+  modal(`
 
         <h2>
             Customer Login
@@ -1630,15 +1174,13 @@ async function account(
 
 
         ${
-            message
-
+          message
             ? `
                 <p class="muted">
                     ${esc(message)}
                 </p>
             `
-
-            : ''
+            : ""
         }
 
 
@@ -1679,37 +1221,19 @@ async function account(
     `);
 }
 
-
 async function sendOTP() {
+  const mobile = $("#lm").value.trim();
 
-    const mobile =
-        $('#lm')
-            .value
-            .trim();
+  const result = await api("/api/login", "POST", {
+    role: "customer",
+    mobile,
+  });
 
+  if (!result._ok) {
+    return ($("#lerr").textContent = result.error || "Could not send OTP");
+  }
 
-    const result =
-        await api(
-            '/api/login',
-            'POST',
-            {
-                role: 'customer',
-                mobile
-            }
-        );
-
-
-    if (!result._ok) {
-
-        return (
-            $('#lerr').textContent =
-                result.error ||
-                'Could not send OTP'
-        );
-    }
-
-
-    modal(`
+  modal(`
 
         <h2>
             Verify OTP
@@ -1723,8 +1247,7 @@ async function sendOTP() {
 
 
         ${
-            result.dev_otp
-
+          result.dev_otp
             ? `
                 <p class="muted">
                     Demo OTP:
@@ -1733,8 +1256,7 @@ async function sendOTP() {
                     </b>
                 </p>
             `
-
-            : ''
+            : ""
         }
 
 
@@ -1775,138 +1297,87 @@ async function sendOTP() {
     `);
 }
 
-
 async function resendOTP() {
+  const result = await api("/api/otp/resend", "POST");
 
-    const result =
-        await api(
-            '/api/otp/resend',
-            'POST'
-        );
+  if (!result._ok) {
+    return ($("#oerr").textContent = result.error || "Could not resend OTP");
+  }
 
-
-    if (!result._ok) {
-
-        return (
-            $('#oerr').textContent =
-                result.error ||
-                'Could not resend OTP'
-        );
-    }
-
-
-    if (result.dev_otp) {
-
-        $('#oerr').textContent =
-            'Demo OTP: ' +
-            result.dev_otp;
-    }
+  if (result.dev_otp) {
+    $("#oerr").textContent = "Demo OTP: " + result.dev_otp;
+  }
 }
-
 
 async function verifyOTP() {
+  const result = await api("/api/verify-otp", "POST", {
+    otp: $("#otp").value.trim(),
+  });
 
-    const result =
-        await api(
-            '/api/verify-otp',
-            'POST',
-            {
-                otp:
-                    $('#otp')
-                        .value
-                        .trim()
-            }
-        );
+  if (!result._ok) {
+    return ($("#oerr").textContent = result.error || "Incorrect OTP");
+  }
 
+  ME = {
+    authenticated: true,
 
-    if (!result._ok) {
+    role: "customer",
 
-        return (
-            $('#oerr').textContent =
-                result.error ||
-                'Incorrect OTP'
-        );
-    }
+    name: result.user.name,
+
+    mobile: result.user.mobile,
+  };
+
+  await refreshMe();
 
 
-    ME = {
+if (LOGIN_FROM_CHECKOUT) {
 
-        authenticated: true,
+    LOGIN_FROM_CHECKOUT = false;
 
-        role: 'customer',
-
-        name:
-            result.user.name,
-
-        mobile:
-            result.user.mobile
-
-    };
-
-
-    closeModal();
-
-    refreshMe();
+    return checkout();
 }
 
+
+closeModal();
+}
 
 async function refreshMe() {
+  ME = await api("/api/me");
 
-    ME = await api('/api/me');
+  const accountButton = $("#accountBtn");
 
+  const logoutButton = $("#logoutBtn");
 
-    const accountButton =
-        $('#accountBtn');
-
-    const logoutButton =
-        $('#logoutBtn');
-
-
-    if (ME && ME.authenticated) {
-
-        if (accountButton) {
-
-            accountButton.textContent =
-                `Hi, ${ME.name || 'Customer'}`;
-        }
-
-        if (logoutButton) {
-
-            logoutButton.hidden = false;
-        }
-
-    } else {
-
-        if (accountButton) {
-
-            accountButton.textContent =
-                'Account';
-        }
-
-        if (logoutButton) {
-
-            logoutButton.hidden = true;
-        }
+  if (ME && ME.authenticated) {
+    if (accountButton) {
+      accountButton.textContent = `Hi, ${ME.name || "Customer"}`;
     }
-}
 
+    if (logoutButton) {
+      logoutButton.hidden = false;
+    }
+  } else {
+    if (accountButton) {
+      accountButton.textContent = "Account";
+    }
+
+    if (logoutButton) {
+      logoutButton.hidden = true;
+    }
+  }
+}
 
 /* =========================
    CUSTOMER PROFILE
    ========================= */
 
 function profile() {
+  if (!ME || !ME.authenticated) {
+    return account();
+  }
 
-    if (
-        !ME ||
-        !ME.authenticated
-    ) {
-
-        return account();
-    }
-
-
-    modal(`
+  modal(`
 
         <h2>
             My Profile
@@ -1919,9 +1390,7 @@ function profile() {
 
             <input
                 id="pn"
-                value="${esc(
-                    ME.name || ''
-                )}"
+                value="${esc(ME.name || "")}"
             >
 
         </label>
@@ -1932,9 +1401,7 @@ function profile() {
             Mobile
 
             <input
-                value="${esc(
-                    ME.mobile || ''
-                )}"
+                value="${esc(ME.mobile || "")}"
                 disabled
             >
 
@@ -1948,9 +1415,7 @@ function profile() {
             <textarea
                 id="pa"
                 rows="3"
-            >${esc(
-                ME.address || ''
-            )}</textarea>
+            >${esc(ME.address || "")}</textarea>
 
         </label>
 
@@ -1961,9 +1426,7 @@ function profile() {
 
             <input
                 id="pl"
-                value="${esc(
-                    ME.landmark || ''
-                )}"
+                value="${esc(ME.landmark || "")}"
             >
 
         </label>
@@ -1992,106 +1455,50 @@ function profile() {
     `);
 }
 
-
 async function saveProfile() {
+  const result = await api("/api/profile", "PUT", {
+    name: $("#pn").value,
 
-    const result =
-        await api(
-            '/api/profile',
-            'PUT',
-            {
+    address: $("#pa").value,
 
-                name:
-                    $('#pn').value,
+    landmark: $("#pl").value,
+  });
 
-                address:
-                    $('#pa').value,
+  if (!result._ok) {
+    return ($("#perr").textContent = result.error || "Could not save profile");
+  }
 
-                landmark:
-                    $('#pl').value
+  ME = await api("/api/me");
 
-            }
-        );
+  closeModal();
 
-
-    if (!result._ok) {
-
-        return (
-            $('#perr').textContent =
-                result.error ||
-                'Could not save profile'
-        );
-    }
-
-
-    ME =
-        await api(
-            '/api/me'
-        );
-
-
-    closeModal();
-
-    refreshMe();
+  refreshMe();
 }
-
 
 /* =========================
    MY ORDERS
    ========================= */
 
 async function orders() {
+  if (!ME || !ME.authenticated) {
+    ME = await api("/api/me");
+  }
 
-    if (
-        !ME ||
-        !ME.authenticated
-    ) {
+  if (!ME.authenticated) {
+    return account("Login to see your orders");
+  }
 
-        ME =
-            await api(
-                '/api/me'
-            );
-    }
+  const rows = await api("/api/my-orders");
 
+  if (!Array.isArray(rows)) {
+    return alert(rows.error || "Could not load orders");
+  }
 
-    if (!ME.authenticated) {
+  rows.forEach((order) => {
+    ORD[order.code] = Object.assign(ORD[order.code] || {}, order);
+  });
 
-        return account(
-            'Login to see your orders'
-        );
-    }
-
-
-    const rows =
-        await api(
-            '/api/my-orders'
-        );
-
-
-    if (
-        !Array.isArray(rows)
-    ) {
-
-        return alert(
-            rows.error ||
-            'Could not load orders'
-        );
-    }
-
-
-    rows.forEach(
-        order => {
-
-            ORD[order.code] =
-                Object.assign(
-                    ORD[order.code] || {},
-                    order
-                );
-        }
-    );
-
-
-    modal(`
+  modal(`
 
         <h2>
             My Orders
@@ -2099,13 +1506,10 @@ async function orders() {
 
 
         ${
-            rows.length
-
-            ?
-
-            rows
+          rows.length
+            ? rows
                 .map(
-                    order => `
+                  (order) => `
 
                         <div
                             class="ordercard"
@@ -2114,16 +1518,12 @@ async function orders() {
                             <div class="row">
 
                                 <b>
-                                    ${esc(
-                                        order.code
-                                    )}
+                                    ${esc(order.code)}
                                 </b>
 
 
                                 <span>
-                                    ${esc(
-                                        order.status
-                                    )}
+                                    ${esc(order.status)}
                                 </span>
 
                             </div>
@@ -2132,27 +1532,19 @@ async function orders() {
                             <div class="row">
 
                                 <span>
-                                    ${esc(
-                                        order.created
-                                    )}
+                                    ${esc(order.created)}
                                 </span>
 
 
                                 <b>
-                                    ${money(
-                                        order.total
-                                    )}
+                                    ${money(order.total)}
                                 </b>
 
                             </div>
 
 
                             <small>
-                                ${
-                                    order.items
-                                        .map(esc)
-                                        .join(' · ')
-                                }
+                                ${order.items.map(esc).join(" · ")}
                             </small>
 
 
@@ -2163,9 +1555,7 @@ async function orders() {
                                 class="add"
                                 onclick="
                                     bill(
-                                        '${esc(
-                                            order.code
-                                        )}'
+                                        '${esc(order.code)}'
                                     )
                                 "
                             >
@@ -2174,72 +1564,49 @@ async function orders() {
 
 
                             ${
-                                order.payment_method ===
-                                    'QR' &&
-
-                                order.payment_status !==
-                                    'Paid' &&
-
-                                order.status !==
-                                    'Cancelled'
-
-                                ?
-
-                                `
+                              order.payment_method === "QR" &&
+                              order.payment_status !== "Paid" &&
+                              order.status !== "Cancelled"
+                                ? `
                                     <button
                                         class="primary"
                                         onclick="
                                             payQR(
-                                                '${esc(
-                                                    order.code
-                                                )}',
+                                                '${esc(order.code)}',
                                                 ${order.total}
                                             )
                                         "
                                     >
                                         Pay
-                                        ${money(
-                                            order.total
-                                        )}
+                                        ${money(order.total)}
                                     </button>
                                 `
-
-                                : ''
+                                : ""
                             }
 
 
                             ${
-                                order.status ===
-                                'Confirmed'
-
-                                ?
-
-                                `
+                              order.status === "Confirmed"
+                                ? `
                                     <button
                                         onclick="
                                             cancelMyOrder(
-                                                '${esc(
-                                                    order.code
-                                                )}'
+                                                '${esc(order.code)}'
                                             )
                                         "
                                     >
                                         Cancel
                                     </button>
                                 `
-
-                                : ''
+                                : ""
                             }
 
                         </div>
 
-                    `
+                    `,
                 )
-                .join('')
-
-            :
-
-            `
+                .join("")
+            : `
                 <p class="muted">
                     No orders yet.
                 </p>
@@ -2256,38 +1623,22 @@ async function orders() {
     `);
 }
 
+async function cancelMyOrder(code) {
+  const result = await api(`/api/orders/${code}/cancel`, "POST");
 
-async function cancelMyOrder(
-    code
-) {
+  if (!result._ok) {
+    return alert(result.error || "Could not cancel order");
+  }
 
-    const result =
-        await api(
-            `/api/orders/${code}/cancel`,
-            'POST'
-        );
-
-
-    if (!result._ok) {
-
-        return alert(
-            result.error ||
-            'Could not cancel order'
-        );
-    }
-
-
-    orders();
+  orders();
 }
-
 
 /* =========================
    ENQUIRY
    ========================= */
 
 async function enquiry() {
-
-    modal(`
+  modal(`
 
         <h2>
             Contact us
@@ -2351,61 +1702,32 @@ async function enquiry() {
     `);
 }
 
-
 async function sendEnquiry() {
+  const result = await api("/api/enquiry", "POST", {
+    name: $("#en").value,
 
-    const result =
-        await api(
-            '/api/enquiry',
-            'POST',
-            {
+    mobile: $("#em").value,
 
-                name:
-                    $('#en').value,
+    message: $("#et").value,
+  });
 
-                mobile:
-                    $('#em').value,
+  if (!result._ok) {
+    return ($("#eerr").textContent = result.error || "Could not send enquiry");
+  }
 
-                message:
-                    $('#et').value
+  if (result.whatsapp_url) {
+    window.open(result.whatsapp_url, "_blank", "noopener");
+  }
 
-            }
-        );
-
-
-    if (!result._ok) {
-
-        return (
-            $('#eerr').textContent =
-                result.error ||
-                'Could not send enquiry'
-        );
-    }
-
-
-    if (
-        result.whatsapp_url
-    ) {
-
-        window.open(
-            result.whatsapp_url,
-            '_blank',
-            'noopener'
-        );
-    }
-
-
-    closeModal();
+  closeModal();
 }
-
 
 /* =========================
    WHATSAPP
    ========================= */
 
 async function whatsappMessage() {
-
-    modal(`
+  modal(`
 
         <h2>
             WhatsApp
@@ -2448,348 +1770,188 @@ async function whatsappMessage() {
     `);
 }
 
-
 async function sendWhatsAppMessage() {
+  const result = await api("/api/whatsapp/message", "POST", {
+    message: $("#wm").value,
+  });
 
-    const result =
-        await api(
-            '/api/whatsapp/message',
-            'POST',
-            {
-                message:
-                    $('#wm').value
-            }
-        );
+  if (!result._ok) {
+    return ($("#werr").textContent =
+      result.error || "Could not create WhatsApp link");
+  }
 
-
-    if (!result._ok) {
-
-        return (
-            $('#werr').textContent =
-                result.error ||
-                'Could not create WhatsApp link'
-        );
-    }
-
-
-    if (
-        result.whatsapp_url
-    ) {
-
-        window.open(
-            result.whatsapp_url,
-            '_blank',
-            'noopener'
-        );
-    }
+  if (result.whatsapp_url) {
+    window.open(result.whatsapp_url, "_blank", "noopener");
+  }
 }
-
 
 /* =========================
    SEARCH
    ========================= */
 
 function search() {
-
-    render(true);
+  render(true);
 }
-
 
 /* =========================
    NAVIGATION
    ========================= */
 
 function home() {
+  closeModal();
 
-    closeModal();
-
-
-    window.scrollTo({
-        top: 0,
-        behavior: 'smooth'
-    });
+  window.scrollTo({
+    top: 0,
+    behavior: "smooth",
+  });
 }
-
 
 function scrollToProducts() {
+  closeModal();
 
-    closeModal();
+  const grid = $("#grid");
 
-
-    const grid =
-        $('#grid');
-
-
-    if (grid) {
-
-        grid.scrollIntoView({
-            behavior: 'smooth',
-            block: 'start'
-        });
-    }
+  if (grid) {
+    grid.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  }
 }
-
 
 function scrollToEnquiry() {
+  closeModal();
 
-    closeModal();
+  const enquirySection = $("#enquiry");
 
-
-    const enquirySection =
-        $('#enquiry');
-
-
-    if (enquirySection) {
-
-        enquirySection.scrollIntoView({
-            behavior: 'smooth',
-            block: 'start'
-        });
-    }
+  if (enquirySection) {
+    enquirySection.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  }
 }
-
 
 /* =========================
    LOGOUT
    ========================= */
 
 async function logout() {
+  await api("/logout", "POST");
 
-    await api(
-        '/logout',
-        'POST'
-    );
-
-
-    location.href = '/';
+  location.href = "/";
 }
-
 
 /* =========================
    LOAD PRODUCTS
    ========================= */
 
 async function refreshProducts() {
+  const products = await api("/api/products");
 
-    const products =
-        await api(
-            '/api/products'
-        );
+  if (!Array.isArray(products)) {
+    return false;
+  }
 
+  window.PRODUCTS = products;
 
-    if (
-        !Array.isArray(products)
-    ) {
-        return false;
-    }
+  render();
 
-
-    window.PRODUCTS =
-        products;
-
-
-    render();
-
-
-    return true;
+  return true;
 }
-
 
 /* =========================
    CONFIG
    ========================= */
 
 async function refreshConfig() {
+  const result = await api("/api/config");
 
-    const result =
-        await api(
-            '/api/config'
-        );
+  if (!result || result._ok === false) {
+    return;
+  }
 
+  CFG = Object.assign(CFG, result);
 
-    if (
-        !result ||
-        result._ok === false
-    ) {
+  if (Array.isArray(result.offers)) {
+    OFFERS = result.offers;
+  }
 
-        return;
-    }
+  ticker();
 
+  updateBusinessUI();
 
-    CFG =
-        Object.assign(
-            CFG,
-            result
-        );
-
-
-    if (
-        Array.isArray(
-            result.offers
-        )
-    ) {
-
-        OFFERS =
-            result.offers;
-    }
-
-
-    ticker();
-
-
-    updateBusinessUI();
-
-
-    return CFG;
+  return CFG;
 }
-
 
 /* =========================
    BUSINESS INFORMATION
    ========================= */
 
 function updateBusinessUI() {
+  const name = CFG.business_name || "Chand Enterprises";
 
-    const name =
-        CFG.business_name ||
-        'Chand Enterprises';
+  const location = CFG.business_location || "Darbhanga, Bihar";
 
+  document.querySelectorAll("[data-business-name]").forEach((element) => {
+    element.textContent = name;
+  });
 
-    const location =
-        CFG.business_location ||
-        'Darbhanga, Bihar';
+  document.querySelectorAll("[data-business-location]").forEach((element) => {
+    element.textContent = location;
+  });
 
+  document.querySelectorAll("[data-business-mobile]").forEach((element) => {
+    element.textContent = CFG.business_mobile || "";
+  });
 
-    document
-        .querySelectorAll(
-            '[data-business-name]'
-        )
-        .forEach(
-            element => {
-
-                element.textContent =
-                    name;
-            }
-        );
-
-
-    document
-        .querySelectorAll(
-            '[data-business-location]'
-        )
-        .forEach(
-            element => {
-
-                element.textContent =
-                    location;
-            }
-        );
-
-
-    document
-        .querySelectorAll(
-            '[data-business-mobile]'
-        )
-        .forEach(
-            element => {
-
-                element.textContent =
-                    CFG.business_mobile ||
-                    '';
-            }
-        );
-
-
-    document
-        .querySelectorAll(
-            '[data-business-whatsapp]'
-        )
-        .forEach(
-            element => {
-
-                element.textContent =
-                    CFG.whatsapp ||
-                    '';
-            }
-        );
+  document.querySelectorAll("[data-business-whatsapp]").forEach((element) => {
+    element.textContent = CFG.whatsapp || "";
+  });
 }
-
 
 /* =========================
    BUSINESS LOADER
    ========================= */
 
 async function loadBusinessUI() {
+  await refreshConfig();
 
-    await refreshConfig();
-
-    updateBusinessUI();
+  updateBusinessUI();
 }
-
 
 /* =========================
    SAFE LOADERS
    ========================= */
 
 async function safeLoadProducts() {
-
-    return refreshProducts();
+  return refreshProducts();
 }
-
 
 async function safeLoadOrders() {
+  const rows = await api("/api/my-orders");
 
-    const rows =
-        await api(
-            '/api/my-orders'
-        );
+  if (!Array.isArray(rows)) {
+    return false;
+  }
 
+  rows.forEach((order) => {
+    ORD[order.code] = Object.assign(ORD[order.code] || {}, order);
+  });
 
-    if (
-        !Array.isArray(rows)
-    ) {
-
-        return false;
-    }
-
-
-    rows.forEach(
-        order => {
-
-            ORD[order.code] =
-                Object.assign(
-                    ORD[order.code] || {},
-                    order
-                );
-        }
-    );
-
-
-    return true;
+  return true;
 }
-
 
 /* =========================
    NUMBER / MESSAGE HELPERS
    ========================= */
 
-function formatNumber(
-    value
-) {
-
-    return Number(
-        value || 0
-    ).toLocaleString(
-        'en-IN'
-    );
+function formatNumber(value) {
+  return Number(value || 0).toLocaleString("en-IN");
 }
 
-
-function showMessage(
-    message
-) {
-
-    modal(`
+function showMessage(message) {
+  modal(`
 
         <h2>
             Message
@@ -2811,225 +1973,155 @@ function showMessage(
     `);
 }
 
-
 /* =========================
    COMPATIBILITY HELPERS
    ========================= */
 
 function openAccount() {
-    return account();
+  return account();
 }
-
 
 function openOrders() {
-    return orders();
+  return orders();
 }
-
 
 function openProfile() {
-    return profile();
+  return profile();
 }
-
 
 function openCart() {
-    return cart();
+  return cart();
 }
-
 
 function openCheckout() {
-    return checkout();
+  return checkout();
 }
-
 
 function openEnquiry() {
-    return enquiry();
+  return enquiry();
 }
-
 
 function openWhatsApp() {
-    return whatsappMessage();
+  return whatsappMessage();
 }
-
 
 /* =========================
    INITIALIZATION
    ========================= */
 
-document.addEventListener(
-    'DOMContentLoaded',
-    async () => {
+document.addEventListener("DOMContentLoaded", async () => {
+  /* Customer/storefront */
 
-        /* Customer/storefront */
+  if ($("#grid")) {
+    save(true);
 
-        if (
-            $('#grid')
-        ) {
+    ticker();
 
-            save(true);
+    await refreshMe();
 
-            ticker();
+    await refreshConfig();
 
-            await refreshMe();
+    await refreshProducts();
+  }
 
-            await refreshConfig();
-
-            await refreshProducts();
-        }
-
-
-        /*
-         * IMPORTANT:
-         * Admin, delivery and developer
-         * are now handled by their own
-         * JavaScript files.
-         */
-    }
-);
-
+  /*
+   * IMPORTANT:
+   * Admin, delivery and developer
+   * are now handled by their own
+   * JavaScript files.
+   */
+});
 
 /* =========================
    GLOBAL FUNCTIONS
    ========================= */
 
-window.category =
-    category;
+window.category = category;
 
-window.render =
-    render;
+window.render = render;
 
-window.chg =
-    chg;
+window.chg = chg;
 
-window.cart =
-    cart;
+window.cart = cart;
 
-window.checkout =
-    checkout;
+window.checkout = checkout;
 
-window.cTot =
-    cTot;
+window.cTot = cTot;
 
-window.placeOrder =
-    placeOrder;
+window.placeOrder = placeOrder;
 
-window.payQR =
-    payQR;
+window.payQR = payQR;
 
-window.paid =
-    paid;
+window.paid = paid;
 
-window.done =
-    done;
+window.done = done;
 
-window.bill =
-    bill;
+window.bill = bill;
 
+window.account = account;
 
-window.account =
-    account;
+window.sendOTP = sendOTP;
 
-window.sendOTP =
-    sendOTP;
+window.resendOTP = resendOTP;
 
-window.resendOTP =
-    resendOTP;
+window.verifyOTP = verifyOTP;
 
-window.verifyOTP =
-    verifyOTP;
+window.profile = profile;
 
+window.saveProfile = saveProfile;
 
-window.profile =
-    profile;
+window.orders = orders;
 
-window.saveProfile =
-    saveProfile;
+window.cancelMyOrder = cancelMyOrder;
 
+window.enquiry = enquiry;
 
-window.orders =
-    orders;
+window.sendEnquiry = sendEnquiry;
 
-window.cancelMyOrder =
-    cancelMyOrder;
+window.whatsappMessage = whatsappMessage;
 
+window.sendWhatsAppMessage = sendWhatsAppMessage;
 
-window.enquiry =
-    enquiry;
+window.search = search;
 
-window.sendEnquiry =
-    sendEnquiry;
+window.home = home;
 
+window.scrollToProducts = scrollToProducts;
 
-window.whatsappMessage =
-    whatsappMessage;
+window.scrollToEnquiry = scrollToEnquiry;
 
-window.sendWhatsAppMessage =
-    sendWhatsAppMessage;
+window.logout = logout;
 
+window.closeModal = closeModal;
 
-window.search =
-    search;
+window.refreshProducts = refreshProducts;
 
-window.home =
-    home;
+window.refreshConfig = refreshConfig;
 
-window.scrollToProducts =
-    scrollToProducts;
+window.loadBusinessUI = loadBusinessUI;
 
-window.scrollToEnquiry =
-    scrollToEnquiry;
+window.updateBusinessUI = updateBusinessUI;
 
+window.safeLoadProducts = safeLoadProducts;
 
-window.logout =
-    logout;
+window.safeLoadOrders = safeLoadOrders;
 
-window.closeModal =
-    closeModal;
+window.formatNumber = formatNumber;
 
-
-window.refreshProducts =
-    refreshProducts;
-
-window.refreshConfig =
-    refreshConfig;
-
-window.loadBusinessUI =
-    loadBusinessUI;
-
-window.updateBusinessUI =
-    updateBusinessUI;
-
-window.safeLoadProducts =
-    safeLoadProducts;
-
-window.safeLoadOrders =
-    safeLoadOrders;
-
-window.formatNumber =
-    formatNumber;
-
-window.showMessage =
-    showMessage;
-
+window.showMessage = showMessage;
 
 /* Compatibility */
 
-window.openAccount =
-    openAccount;
+window.openAccount = openAccount;
 
-window.openOrders =
-    openOrders;
+window.openOrders = openOrders;
 
-window.openProfile =
-    openProfile;
+window.openProfile = openProfile;
 
-window.openCart =
-    openCart;
+window.openCart = openCart;
 
-window.openCheckout =
-    openCheckout;
+window.openCheckout = openCheckout;
 
-window.openEnquiry =
-    openEnquiry;
+window.openEnquiry = openEnquiry;
 
-window.openWhatsApp =
-    openWhatsApp;
+window.openWhatsApp = openWhatsApp;
