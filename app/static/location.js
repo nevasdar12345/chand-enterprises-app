@@ -56,6 +56,7 @@ const LocPicker = (() => {
     function setPoint(lat, lng, opts = {}) {
         picked = { lat: Number(lat), lng: Number(lng) };
         updateCoords();
+        window.dispatchEvent(new CustomEvent("locationchange", { detail: picked }));
 
         if (map) {
             if (!marker) {
