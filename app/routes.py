@@ -1,4 +1,4 @@
-import csv, io, secrets, urllib.parse
+import csv, io, secrets, urllib.parse, math, re
 
 import segno
 
@@ -12,7 +12,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 from . import db
 
-from .models import User, Product, Order, OrderItem, Enquiry, Payment, OtpChallenge, SiteSetting
+from .models import User, Product, Order, OrderItem, Enquiry, Payment, OtpChallenge, SiteSetting, Coupon, LedgerEntry
 
 
 
@@ -30,6 +30,11 @@ DEFAULT_SETTINGS = {
     "business_location": "Darbhanga, Bihar",
     "upi": "chandenterprises@upi",
     "payment_name": "Chand Enterprises",
+    "business_lat": "",
+    "business_lng": "",
+    "delivery_base": "30",
+    "delivery_per_km": "10",
+    "delivery_free_above": "500",
 }
 
 DEFAULT_OFFERS = [
@@ -54,10 +59,60 @@ def set_setting(key, value):
         db.session.add(row)
     row.value = str(value or "")
 
+
+def float_setting(key, default=0):
+    try:
+        return float(setting_value(key) or default)
+    except (TypeError, ValueError):
+        return float(default)
+
+def haversine_km(lat1, lon1, lat2, lon2):
+    rad = math.pi / 180
+    dlat = (lat2 - lat1) * rad
+    dlon = (lon2 - lon1) * rad
+    a = math.sin(dlat / 2) ** 2 + math.cos(lat1 * rad) * math.cos(lat2 * rad) * math.sin(dlon / 2) ** 2
+    return 6371.0 * 2 * math.asin(min(1, math.sqrt(a)))
+
+def calculate_delivery(subtotal_after_discount, lat=None, lng=None):
+    free_above = float_setting("delivery_free_above", 500)
+    if subtotal_after_discount >= free_above:
+        return 0, 0
+    store_lat = parse_coord(setting_value("business_lat"), -90, 90)
+    store_lng = parse_coord(setting_value("business_lng"), -180, 180)
+    if store_lat is None or store_lng is None or lat is None or lng is None:
+        return float_setting("delivery_base", 30), None
+    distance = haversine_km(store_lat, store_lng, lat, lng)
+    base = float_setting("delivery_base", 30)
+    per_km = float_setting("delivery_per_km", 10)
+    # Simple, predictable formula: base + per-km charge, rounded up to nearest ₹5.
+    charge = math.ceil((base + distance * per_km) / 5) * 5
+    return float(charge), distance
+
+def coupon_dict(c):
+    return dict(id=c.id, code=c.code, discount_type=c.discount_type,
+                discount_value=c.discount_value, max_discount=c.max_discount,
+                min_order=c.min_order, active=c.active)
+
+def calculate_coupon(code, subtotal):
+    if not code:
+        return None, 0
+    c = Coupon.query.filter_by(code=code.upper(), active=True).first()
+    if not c:
+        return None, 0
+    if subtotal < (c.min_order or 0):
+        return c, 0
+    if c.discount_type == "fixed":
+        discount = c.discount_value
+    else:
+        discount = subtotal * c.discount_value / 100
+    if c.max_discount is not None:
+        discount = min(discount, c.max_discount)
+    return c, max(0, min(discount, subtotal))
+
 def developer_settings():
     raw = setting_value("offers")
     offers = [x.strip() for x in raw.splitlines() if x.strip()] if raw else DEFAULT_OFFERS[:]
-    return {"business_name": setting_value("business_name"), "business_mobile": setting_value("business_mobile"), "whatsapp": setting_value("whatsapp"), "business_location": setting_value("business_location"), "upi": setting_value("upi"), "payment_name": setting_value("payment_name"), "offers": offers}
+    return {"business_name": setting_value("business_name"), "business_mobile": setting_value("business_mobile"), "whatsapp": setting_value("whatsapp"), "business_location": setting_value("business_location"), "upi": setting_value("upi"), "payment_name": setting_value("payment_name"), "business_lat": setting_value("business_lat"), "business_lng": setting_value("business_lng"), "delivery_base": setting_value("delivery_base"), "delivery_per_km": setting_value("delivery_per_km"), "delivery_free_above": setting_value("delivery_free_above"), "offers": offers}
 
 def developer_product_dict(p):
     return dict(id=p.id, name=p.name, category=p.category, price=p.price, stock=p.stock, low_stock_threshold=p.low_stock_threshold or 10, icon=p.icon, active=p.active)
@@ -265,7 +320,7 @@ def whatsapp_page():
 
 
 
-@main.route("/logout", methods=["GET", "POST"])
+@main.post("/logout")
 
 def logout():
 
@@ -275,37 +330,11 @@ def logout():
 
 
 
-# ---------- fallbacks ----------
-
-def wants_json():
-    return request.path.startswith("/api/") or request.is_json
-
-
-@main.app_errorhandler(405)
-def method_not_allowed(e):
-    if wants_json():
-        return jsonify(ok=False, error="Wrong request method. Please refresh the page and try again."), 405
-    if request.path.startswith(("/staff", "/dashboard", "/admin", "/delivery", "/developer")):
-        return redirect(url_for("main.staff_login"))
-    return redirect(url_for("main.home"))
-
-
-@main.app_errorhandler(404)
-def not_found(e):
-    if wants_json() or request.path.startswith("/static/"):
-        return jsonify(ok=False, error="Not found"), 404
-    return redirect(url_for("main.home"))
-
-
 # ---------- auth ----------
 
-@main.route("/api/login", methods=["GET", "POST"])
+@main.post("/api/login")
 
 def login():
-
-    if request.method == "GET":
-
-        return redirect(url_for("main.staff_login"))
 
     d = request.json or {}
 
@@ -455,7 +484,7 @@ def update_profile():
 def config():
 
     cfg = developer_settings()
-    return jsonify(_ok=True, whatsapp=wa_number(), upi=cfg["upi"] or current_app.config["UPI_ID"], business_name=cfg["business_name"], business_mobile=cfg["business_mobile"], business_location=cfg["business_location"], payment_name=cfg["payment_name"], offers=cfg["offers"])
+    return jsonify(_ok=True, whatsapp=wa_number(), upi=cfg["upi"] or current_app.config["UPI_ID"], business_name=cfg["business_name"], business_mobile=cfg["business_mobile"], business_location=cfg["business_location"], payment_name=cfg["payment_name"], offers=cfg["offers"], coupons=[coupon_dict(c) for c in Coupon.query.filter_by(active=True).order_by(Coupon.code).all()])
 
 
 
@@ -533,27 +562,19 @@ def create_order():
 
         lines.append((p, qty))
 
-    discount = 0
-
-    if coupon == "WELCOME10":
-
-        discount = min(subtotal * 0.10, 100)
-
-    elif coupon == "WATER50" and subtotal >= 500:
-
-        discount = 50
-
-    delivery = 0 if subtotal - discount >= 500 else 30
-
+    coupon_row, discount = calculate_coupon(coupon, subtotal)
+    if coupon and not coupon_row:
+        return jsonify(error="Invalid or inactive coupon"), 400
+    delivery, distance_km = calculate_delivery(subtotal - discount, lat, lng)
     total = max(0, subtotal - discount + delivery)
 
     code = "CE" + datetime.now().strftime("%y%m%d%H%M%S") + secrets.token_hex(1).upper()
 
     o = Order(code=code, customer_name=name, mobile=u.mobile, address=address, latitude=lat, longitude=lng, total=total,
 
-              delivery_charge=delivery, payment_method=method, payment_status="Pending",
+              delivery_charge=delivery, cash_collected=0, payment_method=method, payment_status="Pending",
 
-              coupon_code=coupon or None, discount=discount)
+              coupon_code=coupon_row.code if coupon_row else None, discount=discount)
 
     db.session.add(o)
 
@@ -577,7 +598,7 @@ def create_order():
 
     return jsonify(ok=True, order_id=code, total=total, subtotal=subtotal, discount=discount,
 
-                   delivery_charge=delivery, payment_method=method, upi=current_app.config["UPI_ID"],
+                   delivery_charge=delivery, cash_collected=0, payment_method=method, upi=current_app.config["UPI_ID"],
 
                    upi_url=upi_uri(o))
 
@@ -1085,18 +1106,156 @@ def delivery_status(oid):
     o.status = s
 
     if s == "Delivered" and o.payment_method == "COD":
-
-        o.payment_status = "Paid"            # cash collected at the door
-
-        pay = Payment.query.filter_by(order_id=o.id).order_by(Payment.id.desc()).first()
-
-        if pay:
-
-            pay.status = "Paid"
+        if (o.cash_collected or 0) >= o.total:
+            o.payment_status = "Paid"
+            pay = Payment.query.filter_by(order_id=o.id).order_by(Payment.id.desc()).first()
+            if pay:
+                pay.status = "Paid"
 
     db.session.commit()
 
     return jsonify(ok=True)
+
+
+
+# ---------- admin analytics / credits / coupons ----------
+
+@main.get("/api/admin/sales")
+def admin_sales():
+    if not role_ok("admin"):
+        return jsonify(error="Forbidden"), 403
+    now = datetime.utcnow()
+    today_start = datetime(now.year, now.month, now.day)
+    month_start = datetime(now.year, now.month, 1)
+    paid_orders = Order.query.filter(Order.status != "Cancelled", Order.payment_status == "Paid").all()
+    today = [o for o in paid_orders if o.created_at >= today_start]
+    month = [o for o in paid_orders if o.created_at >= month_start]
+    daily = []
+    for days_ago in range(6, -1, -1):
+        start = datetime(now.year, now.month, now.day) - timedelta(days=days_ago)
+        end = start + timedelta(days=1)
+        daily.append({"label": start.strftime("%d %b"), "sales": round(sum(o.total for o in paid_orders if start <= o.created_at < end), 2)})
+    monthly = []
+    for months_ago in range(5, -1, -1):
+        y, m = now.year, now.month - months_ago
+        while m <= 0:
+            y -= 1; m += 12
+        start = datetime(y, m, 1)
+        if m == 12:
+            end = datetime(y + 1, 1, 1)
+        else:
+            end = datetime(y, m + 1, 1)
+        monthly.append({"label": start.strftime("%b %Y"), "sales": round(sum(o.total for o in paid_orders if start <= o.created_at < end), 2)})
+    counts = {}
+    for o in paid_orders:
+        for i in o.items:
+            counts[i.product_name] = counts.get(i.product_name, 0) + i.quantity
+    top = sorted(({"name": k, "qty": v} for k, v in counts.items()), key=lambda x: x["qty"], reverse=True)[:8]
+    return jsonify(today_sales=round(sum(o.total for o in today), 2), month_sales=round(sum(o.total for o in month), 2),
+                   today_orders=len(today), month_orders=len(month), daily=daily, monthly=monthly, top_products=top)
+
+@main.get("/api/admin/ledger")
+def admin_ledger():
+    if not role_ok("admin"):
+        return jsonify(error="Forbidden"), 403
+    entries = LedgerEntry.query.order_by(LedgerEntry.created_at.desc()).limit(500).all()
+    balances = {}
+    for e in entries:
+        key = e.customer_mobile
+        item = balances.setdefault(key, {"mobile": key, "name": e.customer_name, "balance": 0, "entries": []})
+        item["balance"] += e.amount if e.entry_type == "debit" else -e.amount
+        item["entries"].append(dict(id=e.id, type=e.entry_type, amount=e.amount, note=e.note or "",
+                                    order_id=e.order_id, created=e.created_at.strftime("%d-%m-%Y %H:%M")))
+    return jsonify(customers=sorted(balances.values(), key=lambda x: x["balance"], reverse=True))
+
+@main.post("/api/admin/ledger")
+def add_ledger_entry():
+    if not role_ok("admin"):
+        return jsonify(error="Forbidden"), 403
+    d = request.json or {}
+    mobile = "".join(c for c in str(d.get("mobile") or "") if c.isdigit())
+    name = str(d.get("name") or "").strip() or "Customer"
+    typ = str(d.get("type") or "payment").lower()
+    try: amount = float(d.get("amount", 0))
+    except (TypeError, ValueError): return jsonify(error="Invalid amount"), 400
+    if len(mobile) < 10 or amount <= 0 or typ not in {"debit", "payment"}:
+        return jsonify(error="Enter valid customer and amount"), 400
+    e = LedgerEntry(customer_mobile=mobile, customer_name=name, entry_type=typ, amount=amount,
+                    note=str(d.get("note") or "").strip(), order_id=d.get("order_id") or None)
+    db.session.add(e); db.session.commit()
+    return jsonify(ok=True, id=e.id)
+
+@main.post("/api/admin/coupon")
+def create_coupon():
+    if not role_ok("admin"):
+        return jsonify(error="Forbidden"), 403
+    d = request.json or {}
+    code = str(d.get("code") or "").strip().upper()
+    typ = str(d.get("discount_type") or "percent").lower()
+    try:
+        value = float(d.get("discount_value", 0)); max_discount = d.get("max_discount")
+        max_discount = None if max_discount in (None, "",) else float(max_discount)
+        min_order = float(d.get("min_order", 0))
+    except (TypeError, ValueError): return jsonify(error="Invalid coupon values"), 400
+    if not re.match(r"^[A-Z0-9_-]{3,40}$", code) or typ not in {"percent", "fixed"} or value <= 0 or min_order < 0:
+        return jsonify(error="Invalid coupon"), 400
+    if typ == "percent" and value > 100: return jsonify(error="Percent cannot exceed 100"), 400
+    if Coupon.query.filter_by(code=code).first(): return jsonify(error="Coupon already exists"), 400
+    c=Coupon(code=code, discount_type=typ, discount_value=value, max_discount=max_discount, min_order=min_order, active=True)
+    db.session.add(c); db.session.commit()
+    return jsonify(ok=True, coupon=coupon_dict(c))
+
+@main.get("/api/admin/coupons")
+def admin_coupons():
+    if not role_ok("admin"): return jsonify(error="Forbidden"), 403
+    return jsonify(coupons=[coupon_dict(c) for c in Coupon.query.order_by(Coupon.id.desc()).all()])
+
+@main.put("/api/admin/coupon/<int:cid>")
+def update_coupon(cid):
+    if not role_ok("admin"): return jsonify(error="Forbidden"), 403
+    c=db.session.get(Coupon,cid)
+    if not c: return jsonify(error="Coupon not found"),404
+    d=request.json or {}
+    try:
+        if "active" in d: c.active=bool(d["active"])
+        if "discount_value" in d: c.discount_value=float(d["discount_value"])
+        if "max_discount" in d: c.max_discount=None if d["max_discount"] in (None,"") else float(d["max_discount"])
+        if "min_order" in d: c.min_order=float(d["min_order"])
+    except (TypeError,ValueError): return jsonify(error="Invalid values"),400
+    db.session.commit(); return jsonify(ok=True,coupon=coupon_dict(c))
+
+@main.post("/api/delivery/order/<int:oid>/whatsapp")
+def delivery_whatsapp(oid):
+    if not role_ok("delivery","admin"): return jsonify(error="Forbidden"),403
+    o=db.session.get(Order,oid)
+    if not o: return jsonify(error="Order not found"),404
+    if role_ok("delivery") and o.delivery_person_id != session.get("user_id"): return jsonify(error="Order not assigned to you"),403
+    status=str((request.json or {}).get("status") or o.status)
+    messages={
+        "Out for Delivery": f"Hello {o.customer_name}, your Chand Enterprises order {o.code} is out for delivery. Our delivery partner is on the way.",
+        "Delivered": f"Hello {o.customer_name}, your Chand Enterprises order {o.code} has been delivered. Thank you!",
+        "Confirmed": f"Hello {o.customer_name}, your Chand Enterprises order {o.code} is confirmed."
+    }
+    text=messages.get(status, f"Hello {o.customer_name}, update for order {o.code}: {status}.")
+    mobile="".join(c for c in o.mobile if c.isdigit())
+    mobile=mobile if len(mobile)>10 else "91"+mobile
+    return jsonify(ok=True, whatsapp_url=f"https://wa.me/{mobile}?text="+urllib.parse.quote(text))
+
+@main.post("/api/delivery/order/<int:oid>/cash")
+def delivery_cash(oid):
+    if not role_ok("delivery"): return jsonify(error="Forbidden"),403
+    o=db.session.get(Order,oid)
+    if not o or o.delivery_person_id != session.get("user_id"): return jsonify(error="Order not assigned to you"),404
+    if o.payment_method != "COD": return jsonify(error="Only COD orders can record cash"),400
+    try: amount=float((request.json or {}).get("cash_collected",0))
+    except (TypeError,ValueError): return jsonify(error="Invalid cash amount"),400
+    if amount < 0 or amount > o.total: return jsonify(error="Cash amount cannot exceed order total"),400
+    o.cash_collected=amount
+    if amount >= o.total:
+        o.payment_status="Paid"
+        pay=Payment.query.filter_by(order_id=o.id).order_by(Payment.id.desc()).first()
+        if pay: pay.status="Paid"
+    db.session.commit(); return jsonify(ok=True,cash_collected=o.cash_collected,payment_status=o.payment_status)
 
 
 # ---------- developer console ----------
@@ -1112,7 +1271,7 @@ def developer_save_settings():
     if not role_ok("developer"):
         return jsonify(error="Forbidden"), 403
     d = request.json or {}
-    for key in ["business_name", "business_mobile", "whatsapp", "business_location", "upi", "payment_name"]:
+    for key in ["business_name", "business_mobile", "whatsapp", "business_location", "upi", "payment_name", "business_lat", "business_lng", "delivery_base", "delivery_per_km", "delivery_free_above"]:
         if key in d:
             value = str(d.get(key) or "").strip()
             if key in {"business_name", "whatsapp", "upi"} and not value:
