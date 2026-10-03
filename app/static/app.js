@@ -373,7 +373,9 @@ function totals(coupon = "") {
   }
 
   const quote = DELIVERY_QUOTE;
-  const delivery = quote && quote.coupon === coupon && Number(quote.subtotal) === Number(subtotal)
+  const fresh = quote && quote.coupon === coupon && Number(quote.subtotal) === Number(subtotal);
+  if (fresh && typeof quote.discount === "number") discount = Number(quote.discount || 0);
+  const delivery = fresh
     ? Number(quote.delivery_charge || 0)
     : (subtotal - discount >= 500 ? 0 : 30);
 
@@ -381,7 +383,7 @@ function totals(coupon = "") {
     sub: subtotal,
     disc: discount,
     del: delivery,
-    distance: quote?.distance_km ?? null,
+    distance: fresh ? (quote?.distance_km ?? null) : null,
     total: Math.max(0, subtotal - discount + delivery)
   };
 }
@@ -405,6 +407,15 @@ async function refreshDeliveryQuote() {
   const total = totals(coupon);
   const el = $('#ctot');
   if (el) el.textContent = money(total.total);
+  const cm = $('#couponMsg');
+  if (cm) {
+    if (!coupon) { cm.textContent = ''; }
+    else {
+      const ok = result?.coupon_ok;
+      cm.textContent = (ok ? '✅ ' : '❌ ') + (result?.coupon_message || (ok ? 'Coupon applied' : 'Invalid or inactive coupon'));
+      cm.style.color = ok ? '#0a7a3b' : '#c0392b';
+    }
+  }
   const info = $('#deliveryInfo');
   if (info) info.textContent = total.distance != null
     ? `Delivery: ${total.del ? money(total.del) : 'Free'} · ${total.distance} km`
@@ -538,6 +549,9 @@ async function checkout() {
     ME = await api("/api/me");
   }
 
+  // pick up coupons the admin created after this page was opened
+  try { await refreshConfig(); } catch (e) { /* ignore */ }
+
   if (!ME.authenticated || ME.role !== "customer") {
     LOGIN_FROM_CHECKOUT = true;
 
@@ -584,9 +598,12 @@ async function checkout() {
             <input
                 id="cc"
                 oninput="cTot()"
+                autocapitalize="characters"
+                autocomplete="off"
             >
 
         </label>
+        <div id="couponMsg" class="muted" style="margin:-6px 0 8px;font-size:.9rem"></div>
 
 
         <label>
@@ -660,7 +677,8 @@ function cTot() {
   }
 
   element.textContent = money(totals($("#cc")?.value || "").total);
-  refreshDeliveryQuote();
+  clearTimeout(window.__quoteTimer);
+  window.__quoteTimer = setTimeout(refreshDeliveryQuote, 350);
 }
 
 /* =========================
