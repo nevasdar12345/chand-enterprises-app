@@ -13,11 +13,36 @@
             <p>Explore our three product collections — Nevas Package Drinking Water, Cold Drinks and Energy Drinks.</p>
 
             <div class="brochure-actions">
-                <a class="primary-btn{% if not brochure_pdf_exists %} disabled-btn{% endif %}" href="{{ url_for('static', filename='brochure.pdf') }}" {% if not brochure_pdf_exists %}aria-disabled="true"{% endif %}>📖 View PDF</a>
-                <a class="secondary-btn{% if not brochure_pdf_exists %} disabled-btn{% endif %}" href="{{ url_for('static', filename='brochure.pdf') }}" {% if not brochure_pdf_exists %}aria-disabled="true"{% else %}download{% endif %}>⬇ Download PDF</a>
+                {% if b and b.url %}
+                    <a class="primary-btn" href="{{ b.view }}" target="_blank" rel="noopener">📖 View brochure</a>
+                    {% if b.pdf %}<a class="secondary-btn" href="{{ b.pdf }}" target="_blank" rel="noopener">⬇ Download PDF</a>{% endif %}
+                    {% if b.docx %}<a class="secondary-btn" href="{{ b.docx }}" target="_blank" rel="noopener">⬇ Download DOCX</a>{% endif %}
+                {% elif brochure_pdf_exists %}
+                    <a class="primary-btn" href="{{ url_for('static', filename='brochure.pdf') }}" target="_blank">📖 View PDF</a>
+                    <a class="secondary-btn" href="{{ url_for('static', filename='brochure.pdf') }}" download>⬇ Download PDF</a>
+                {% else %}
+                    <span class="muted">Brochure coming soon — please check back shortly.</span>
+                {% endif %}
             </div>
         </div>
     </section>
+
+    {% if b and b.embed %}
+    <section class="brochure-section">
+        <iframe src="{{ b.embed }}" title="Chand Enterprises brochure" loading="lazy"
+                style="width:100%;height:80vh;min-height:420px;border:0;border-radius:14px;background:#fff"
+                allow="fullscreen"></iframe>
+        <p class="muted" style="text-align:center;margin-top:8px">
+            Not loading? <a href="{{ b.view }}" target="_blank" rel="noopener">Open the brochure in a new tab</a>.
+        </p>
+    </section>
+    {% elif brochure_pdf_exists and not (b and b.url) %}
+    <section class="brochure-section">
+        <iframe src="{{ url_for('static', filename='brochure.pdf') }}" title="Chand Enterprises brochure" loading="lazy"
+                style="width:100%;height:80vh;min-height:420px;border:0;border-radius:14px;background:#fff"></iframe>
+    </section>
+    {% endif %}
+
 
     <section class="brochure-section">
         <div class="brochure-section-head">
