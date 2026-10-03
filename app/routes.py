@@ -265,7 +265,7 @@ def whatsapp_page():
 
 
 
-@main.post("/logout")
+@main.route("/logout", methods=["GET", "POST"])
 
 def logout():
 
@@ -275,11 +275,37 @@ def logout():
 
 
 
+# ---------- fallbacks ----------
+
+def wants_json():
+    return request.path.startswith("/api/") or request.is_json
+
+
+@main.app_errorhandler(405)
+def method_not_allowed(e):
+    if wants_json():
+        return jsonify(ok=False, error="Wrong request method. Please refresh the page and try again."), 405
+    if request.path.startswith(("/staff", "/dashboard", "/admin", "/delivery", "/developer")):
+        return redirect(url_for("main.staff_login"))
+    return redirect(url_for("main.home"))
+
+
+@main.app_errorhandler(404)
+def not_found(e):
+    if wants_json() or request.path.startswith("/static/"):
+        return jsonify(ok=False, error="Not found"), 404
+    return redirect(url_for("main.home"))
+
+
 # ---------- auth ----------
 
-@main.post("/api/login")
+@main.route("/api/login", methods=["GET", "POST"])
 
 def login():
+
+    if request.method == "GET":
+
+        return redirect(url_for("main.staff_login"))
 
     d = request.json or {}
 
