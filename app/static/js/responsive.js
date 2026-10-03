@@ -159,6 +159,65 @@
     }
 
     /* =====================================================
+       LIGHT / DARK THEME
+       ===================================================== */
+
+    function applyTheme(theme) {
+
+        document.documentElement.setAttribute("data-theme", theme);
+
+        const meta = document.querySelector('meta[name="theme-color"]');
+        if (meta) {
+            meta.setAttribute("content", theme === "dark" ? "#0b141d" : "#ffffff");
+        }
+
+        const toggle = document.getElementById("themeToggle");
+        if (toggle) {
+            const icon = toggle.querySelector(".theme-icon");
+            if (icon) icon.textContent = theme === "dark" ? "\u2600\uFE0F" : "\uD83C\uDF19";
+
+            toggle.setAttribute(
+                "aria-label",
+                theme === "dark" ? "Switch to light theme" : "Switch to dark theme"
+            );
+            toggle.title = theme === "dark" ? "Light theme" : "Dark theme";
+        }
+    }
+
+    function toggleTheme() {
+
+        const current =
+            document.documentElement.getAttribute("data-theme") === "dark"
+                ? "dark"
+                : "light";
+
+        const next = current === "dark" ? "light" : "dark";
+
+        applyTheme(next);
+
+        try {
+            localStorage.setItem("ce_theme", next);
+        } catch (error) {
+            /* private mode: theme still changes for this visit */
+        }
+    }
+
+    function setupTheme() {
+
+        const toggle = document.getElementById("themeToggle");
+        if (!toggle || toggle.dataset.bound === "1") return;
+
+        toggle.dataset.bound = "1";
+        toggle.addEventListener("click", toggleTheme);
+
+        applyTheme(
+            document.documentElement.getAttribute("data-theme") === "dark"
+                ? "dark"
+                : "light"
+        );
+    }
+
+    /* =====================================================
        MOBILE VIEWPORT HEIGHT
        ===================================================== */
 
@@ -178,6 +237,7 @@
        ===================================================== */
 
     function init() {
+        setupTheme();
         setupMobileMenu();
         setViewportHeight();
         showWelcome();
@@ -195,6 +255,7 @@
         init();
     }
 
+    window.toggleTheme = toggleTheme;
     window.showUiModal = showUiModal;
     window.closeUiModal = closeUiModal;
 
