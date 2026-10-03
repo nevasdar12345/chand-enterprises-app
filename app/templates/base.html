@@ -27,6 +27,23 @@
     </title>
 
 
+    <!-- Theme: apply saved choice before first paint -->
+
+    <script>
+        (function () {
+            var theme = 'light';
+            try {
+                var saved = localStorage.getItem('ce_theme');
+                var isStore = (location.pathname === '/' || location.pathname === '');
+                if (isStore && (saved === 'dark' || saved === 'light')) { theme = saved; }
+            } catch (e) {}
+            document.documentElement.setAttribute('data-theme', theme);
+            var meta = document.querySelector('meta[name="theme-color"]');
+            if (meta) { meta.setAttribute('content', theme === 'dark' ? '#0b141d' : '#ffffff'); }
+        })();
+    </script>
+
+
     <!-- Premium font -->
 
     <link
@@ -53,7 +70,10 @@
         href="{{ url_for('static', filename='style.css') }}"
     >
 
-<link rel="stylesheet" href="{{ url_for('static', filename='responsive.css') }}">
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', filename='responsive.css') }}"
+    >
 
 
     <!-- Base styling -->
@@ -342,7 +362,7 @@
 
     </script>
 
-<script src="{{ url_for('static', filename='responsive.js') }}"></script>
+<script src="{{ url_for('static', filename='js/responsive.js') }}"></script>
 </body>
 
 </html>
