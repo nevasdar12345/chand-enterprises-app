@@ -12,98 +12,85 @@
        HAMBURGER MENU
        ===================================================== */
 
-    function setupMobileMenu() {
+   function setupMobileMenu() {
 
-        const nav =
-            document.querySelector(".nav");
-
-        if (!nav) {
-            return;
-        }
+    "use strict";
 
 
-        /*
-         * Different pages use different navigation
-         * action class names.
-         *
-         * Customer:
-         * .store-actions
-         *
-         * Developer:
-         * .nav-actions
-         *
-         * Admin:
-         * .admin-nav-right
-         *
-         * Delivery:
-         * .staff-nav-actions
-         */
+    /* =================================================
+       FIND NAVIGATION
+       ================================================= */
 
-        const navActions =
-            nav.querySelector(
-                ".nav-actions, " +
-                ".store-actions, " +
-                ".admin-nav-right, " +
-                ".staff-nav-actions"
-            );
+    const nav =
+        document.querySelector(".nav");
+
+    if (!nav) {
+        return;
+    }
 
 
-        if (!navActions) {
-            return;
-        }
+    /* =================================================
+       FIND NAVIGATION ACTIONS
+       ================================================= */
+
+    const navActions =
+        nav.querySelector(
+            ".nav-actions, " +
+            ".store-actions, " +
+            ".admin-nav-right, " +
+            ".staff-nav-actions"
+        );
+
+    if (!navActions) {
+        return;
+    }
 
 
-        /*
-         * Give every navigation action container
-         * the common responsive class.
-         *
-         * This allows responsive.css to control
-         * all navigation menus consistently.
-         */
+    /* =================================================
+       COMMON RESPONSIVE CLASS
+       ================================================= */
 
-        navActions.classList.add(
-            "nav-actions"
+    navActions.classList.add(
+        "nav-actions"
+    );
+
+
+    /* =================================================
+       FIND EXISTING HAMBURGER
+       ================================================= */
+
+    let button =
+        nav.querySelector(
+            ".nav-hamburger"
         );
 
 
-        /*
-         * Prevent duplicate hamburger
-         */
+    /* =================================================
+       FALLBACK FOR OTHER PAGES
+       ================================================= */
 
-        if (
-            nav.querySelector(
-                ".nav-hamburger"
-            )
-        ) {
-            return;
-        }
+    if (!button) {
 
+        button =
+            document.createElement(
+                "button"
+            );
 
-        /* =================================================
-           CREATE HAMBURGER
-           ================================================= */
-
-        const button =
-            document.createElement("button");
-
-
-        button.type = "button";
+        button.type =
+            "button";
 
         button.className =
             "nav-hamburger";
-
 
         button.setAttribute(
             "aria-label",
             "Open menu"
         );
 
-
         button.setAttribute(
             "aria-expanded",
             "false"
         );
-
 
         button.innerHTML = `
             <span></span>
@@ -111,193 +98,175 @@
             <span></span>
         `;
 
-
-        /*
-         * Put hamburger before navigation actions
-         */
-
         nav.insertBefore(
             button,
             navActions
         );
+    }
 
 
-        /* =================================================
-           CLOSE MENU
-           ================================================= */
+    /* =================================================
+       CLOSE MENU
+       ================================================= */
 
-        function closeMenu() {
+    function closeMenu() {
 
-            navActions.classList.remove(
+        navActions.classList.remove(
+            "open"
+        );
+
+        button.classList.remove(
+            "active"
+        );
+
+        button.setAttribute(
+            "aria-expanded",
+            "false"
+        );
+
+        button.setAttribute(
+            "aria-label",
+            "Open menu"
+        );
+    }
+
+
+    /* =================================================
+       TOGGLE MENU
+       ================================================= */
+
+    function toggleMenu() {
+
+        const isOpen =
+            navActions.classList.toggle(
                 "open"
             );
 
+        button.classList.toggle(
+            "active",
+            isOpen
+        );
 
-            button.classList.remove(
-                "active"
-            );
+        button.setAttribute(
+            "aria-expanded",
+            String(isOpen)
+        );
+
+        button.setAttribute(
+            "aria-label",
+            isOpen
+                ? "Close menu"
+                : "Open menu"
+        );
+    }
 
 
-            button.setAttribute(
-                "aria-expanded",
-                "false"
-            );
+    /* =================================================
+       HAMBURGER CLICK
+       ================================================= */
 
+    button.addEventListener(
+        "click",
+        function (event) {
 
-            button.setAttribute(
-                "aria-label",
-                "Open menu"
-            );
+            event.preventDefault();
+
+            event.stopPropagation();
+
+            toggleMenu();
+
         }
+    );
 
 
-        /* =================================================
-           TOGGLE MENU
-           ================================================= */
+    /* =================================================
+       MENU CLICK
+       ================================================= */
 
-        function toggleMenu() {
+    navActions.addEventListener(
+        "click",
+        function (event) {
 
-            const isOpen =
-                navActions.classList.toggle(
-                    "open"
+            const action =
+                event.target.closest(
+                    "a, button, input, select"
                 );
 
+            if (action) {
 
-            button.classList.toggle(
-                "active",
-                isOpen
-            );
+                setTimeout(
+                    closeMenu,
+                    80
+                );
 
+            }
 
-            button.setAttribute(
-                "aria-expanded",
-                String(isOpen)
-            );
-
-
-            button.setAttribute(
-                "aria-label",
-                isOpen
-                    ? "Close menu"
-                    : "Open menu"
-            );
         }
+    );
 
 
-        /* =================================================
-           HAMBURGER CLICK
-           ================================================= */
+    /* =================================================
+       CLICK OUTSIDE
+       ================================================= */
 
-        button.addEventListener(
-            "click",
-            function (event) {
+    document.addEventListener(
+        "click",
+        function (event) {
 
-                event.stopPropagation();
+            if (
+                !nav.contains(
+                    event.target
+                )
+            ) {
 
-                toggleMenu();
-
-            }
-        );
-
-
-        /* =================================================
-           CLICK INSIDE MENU
-           ================================================= */
-
-        navActions.addEventListener(
-            "click",
-            function (event) {
-
-                /*
-                 * Close after clicking:
-                 * links
-                 * buttons
-                 * form buttons
-                 * selects
-                 */
-
-                const action =
-                    event.target.closest(
-                        "a, button, input, select"
-                    );
-
-
-                if (action) {
-
-                    setTimeout(
-                        closeMenu,
-                        80
-                    );
-
-                }
+                closeMenu();
 
             }
-        );
+
+        }
+    );
 
 
-        /* =================================================
-           CLICK OUTSIDE
-           ================================================= */
+    /* =================================================
+       ESCAPE KEY
+       ================================================= */
 
-        document.addEventListener(
-            "click",
-            function (event) {
+    document.addEventListener(
+        "keydown",
+        function (event) {
 
-                if (
-                    !nav.contains(
-                        event.target
-                    )
-                ) {
+            if (
+                event.key === "Escape"
+            ) {
 
-                    closeMenu();
-
-                }
+                closeMenu();
 
             }
-        );
+
+        }
+    );
 
 
-        /* =================================================
-           ESCAPE KEY
-           ================================================= */
+    /* =================================================
+       DESKTOP RESET
+       ================================================= */
 
-        document.addEventListener(
-            "keydown",
-            function (event) {
+    window.addEventListener(
+        "resize",
+        function () {
 
-                if (
-                    event.key ===
-                    "Escape"
-                ) {
+            if (
+                window.innerWidth > 900
+            ) {
 
-                    closeMenu();
-
-                }
-
-            }
-        );
-
-
-        /* =================================================
-           DESKTOP RESET
-           ================================================= */
-
-        window.addEventListener(
-            "resize",
-            function () {
-
-                if (
-                    window.innerWidth > 900
-                ) {
-
-                    closeMenu();
-
-                }
+                closeMenu();
 
             }
-        );
 
-    }
+        }
+    );
+
+}
 
 
     /* =====================================================
