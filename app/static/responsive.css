@@ -680,3 +680,64 @@ td {
         padding-inline: 5vw;
     }
 }
+
+
+/* =========================================================
+   TEXT VISIBILITY FIX
+   ========================================================= */
+
+body {
+    color: #111827;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p,
+span,
+label,
+li,
+td,
+th,
+.card,
+.product-card {
+    color: #111827;
+}
+
+/* Keep links visible */
+a {
+    color: #111827;
+}
+
+/* Buttons */
+button,
+.btn,
+.button {
+    color: #111827;
+}
+
+/* Inputs */
+input,
+select,
+textarea {
+    color: #111827;
+    background: #ffffff;
+}
+
+/* Placeholder text */
+input::placeholder,
+textarea::placeholder {
+    color: #6b7280;
+}
+
+/* Hamburger */
+.nav-hamburger {
+    color: #111827 !important;
+}
+
+.nav-hamburger span {
+    background: #111827 !important;
+}
