@@ -16,7 +16,8 @@ class User(db.Model):
     mobile = db.Column(db.String(20), unique=True)
     username = db.Column(db.String(80), unique=True)
     password = db.Column(db.String(255))
-    role = db.Column(db.String(30), default="customer")
+    role = db.Column(db.String(30), default="customer", index=True)
+    active = db.Column(db.Boolean, default=True, nullable=False, index=True)
     address = db.Column(db.Text, default="")
     landmark = db.Column(db.String(160), default="")
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -24,12 +25,12 @@ class User(db.Model):
 class Product(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(160), nullable=False)
-    category = db.Column(db.String(80), nullable=False)
+    category = db.Column(db.String(80), nullable=False, index=True)
     price = db.Column(db.Float, nullable=False)
     stock = db.Column(db.Integer, default=0)
     low_stock_threshold = db.Column(db.Integer, default=10)
     icon = db.Column(db.String(10), default="🥤")
-    active = db.Column(db.Boolean, default=True)
+    active = db.Column(db.Boolean, default=True, index=True)
 
 class Order(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -41,15 +42,17 @@ class Order(db.Model):
     longitude = db.Column(db.Float, nullable=True)
     total = db.Column(db.Float, nullable=False)
     payment_method = db.Column(db.String(40))
-    payment_status = db.Column(db.String(30), default="Pending")
+    payment_status = db.Column(db.String(30), default="Pending", index=True)
     delivery_charge = db.Column(db.Float, default=0)
     cash_collected = db.Column(db.Float, default=0)
     delivery_person_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
     coupon_code = db.Column(db.String(40))
     discount = db.Column(db.Float, default=0)
-    status = db.Column(db.String(40), default="Confirmed")
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    status = db.Column(db.String(40), default="Confirmed", index=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
     items = db.relationship("OrderItem", backref="order", lazy=True)
+    payments = db.relationship("Payment", backref="order", lazy=True, order_by="Payment.id.desc()")
+    delivery_person = db.relationship("User", foreign_keys=[delivery_person_id], lazy=True)
 
     @property
     def map_url(self):
