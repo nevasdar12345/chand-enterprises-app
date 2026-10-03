@@ -1,10 +1,13 @@
 /* =========================================================
    CHAND ENTERPRISES
    RESPONSIVE CSS
-   Uses: %, rem, vw, vh, clamp()
+   CLEAN VERSION
    ========================================================= */
 
-/* ---------- GLOBAL ---------- */
+
+/* =========================================================
+   GLOBAL
+   ========================================================= */
 
 *,
 *::before,
@@ -20,7 +23,10 @@ html {
 body {
     width: 100%;
     max-width: 100%;
+    margin: 0;
     overflow-x: hidden;
+
+    color: #111827;
 }
 
 img,
@@ -39,6 +45,10 @@ textarea {
 
 button {
     max-width: 100%;
+}
+
+a {
+    text-decoration: none;
 }
 
 .container,
@@ -72,7 +82,10 @@ button {
     flex-shrink: 0;
 }
 
-.nav-actions {
+.nav-actions,
+.store-actions,
+.admin-nav-right,
+.staff-nav-actions {
     display: flex;
     align-items: center;
     justify-content: flex-end;
@@ -81,7 +94,9 @@ button {
 }
 
 
-/* ---------- HAMBURGER ---------- */
+/* =========================================================
+   HAMBURGER
+   ========================================================= */
 
 .nav-hamburger {
     display: none;
@@ -89,10 +104,13 @@ button {
     width: 2.75rem;
     height: 2.75rem;
 
+    padding: 0;
+
     border: 0;
     border-radius: 0.6rem;
 
     background: transparent;
+    color: #111827;
 
     cursor: pointer;
 
@@ -101,6 +119,11 @@ button {
 
     flex-direction: column;
     gap: 0.3rem;
+
+    flex-shrink: 0;
+
+    position: relative;
+    z-index: 1100;
 }
 
 .nav-hamburger span {
@@ -110,7 +133,8 @@ button {
     height: 0.125rem;
 
     border-radius: 999px;
-    background: currentColor;
+
+    background: #111827;
 
     transition:
         transform 0.25s ease,
@@ -131,7 +155,30 @@ button {
 
 
 /* =========================================================
-   HEADINGS / TYPOGRAPHY
+   NAV BUTTONS / LINKS
+   ========================================================= */
+
+.nav a,
+.nav button,
+.store-actions a,
+.store-actions button,
+.admin-nav-right a,
+.admin-nav-right button,
+.staff-nav-actions a,
+.staff-nav-actions button {
+    max-width: 100%;
+}
+
+.nav-actions > *,
+.store-actions > *,
+.admin-nav-right > *,
+.staff-nav-actions > * {
+    flex-shrink: 0;
+}
+
+
+/* =========================================================
+   TYPOGRAPHY
    ========================================================= */
 
 h1 {
@@ -146,6 +193,11 @@ h2 {
 
 h3 {
     font-size: clamp(1.15rem, 2.5vw, 1.75rem);
+    line-height: 1.2;
+}
+
+h4 {
+    font-size: clamp(1rem, 2vw, 1.35rem);
 }
 
 p {
@@ -153,9 +205,24 @@ p {
     line-height: 1.6;
 }
 
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p,
+span,
+label,
+li,
+td,
+th {
+    overflow-wrap: anywhere;
+}
+
 
 /* =========================================================
-   HERO / MAIN SECTIONS
+   HERO
    ========================================================= */
 
 .hero,
@@ -206,7 +273,7 @@ section {
 
 
 /* =========================================================
-   GRID SYSTEM
+   GRID
    ========================================================= */
 
 .grid,
@@ -317,11 +384,20 @@ textarea {
     padding-inline: clamp(0.75rem, 1.5vw, 1rem);
 
     border-radius: 0.5rem;
+
+    color: #111827;
+    background: #ffffff;
 }
 
 textarea {
     min-height: clamp(6rem, 15vh, 12rem);
+
     padding-block: 0.75rem;
+}
+
+input::placeholder,
+textarea::placeholder {
+    color: #6b7280;
 }
 
 
@@ -360,6 +436,7 @@ td {
 .admin-dashboard,
 .delivery-dashboard {
     width: min(94%, 90rem);
+
     margin-inline: auto;
 
     padding-block: clamp(1.5rem, 4vh, 3rem);
@@ -435,6 +512,7 @@ td {
 
 .ui-modal-title {
     font-size: clamp(1.25rem, 3vw, 1.75rem);
+
     margin-bottom: 0.75rem;
 }
 
@@ -471,6 +549,7 @@ td {
 .cart-item-info,
 .checkout-item-info {
     min-width: 0;
+
     flex: 1;
 }
 
@@ -501,7 +580,191 @@ td {
 
 
 /* =========================================================
-   MOBILE
+   PREMIUM STORE
+   ========================================================= */
+
+/*
+   Keep storefront text readable.
+   These rules intentionally do NOT override every element
+   globally, because the hero/cards may have dark backgrounds.
+*/
+
+.premium-hero {
+    color: #f5f9fc;
+}
+
+.premium-hero h1 {
+    color: #f5f9fc !important;
+}
+
+.premium-hero h1 em {
+    color: #6bdfff !important;
+}
+
+.premium-hero p {
+    color: #b8cedd !important;
+}
+
+.hero-eyebrow {
+    color: #a9c5d9 !important;
+}
+
+.hero-note {
+    color: #a9c5d9 !important;
+}
+
+
+/* =========================================================
+   PREMIUM PRODUCT GRID
+   ========================================================= */
+
+.premium-grid .card {
+    color: #111827;
+}
+
+.premium-grid .card b,
+.premium-grid .card strong {
+    color: #111827;
+}
+
+.premium-grid .card .price {
+    color: #087ea4 !important;
+}
+
+.premium-grid .card small,
+.premium-grid .card p {
+    color: #4b5563 !important;
+}
+
+.premium-grid .card .category,
+.premium-grid .card .muted {
+    color: #6b7280 !important;
+}
+
+
+/* =========================================================
+   SECTION HEADINGS
+   ========================================================= */
+
+.section-heading h2,
+.products-heading h2 {
+    color: #111827;
+}
+
+.section-heading p,
+.products-heading p {
+    color: #4b5563;
+}
+
+
+/* =========================================================
+   ENQUIRY
+   ========================================================= */
+
+.premium-enquiry {
+    color: #111827;
+}
+
+.premium-enquiry h2,
+.enquiry-content h2 {
+    color: #111827 !important;
+}
+
+.premium-enquiry p,
+.enquiry-content p {
+    color: #4b5563 !important;
+}
+
+
+/* =========================================================
+   FOOTER
+   ========================================================= */
+
+.premium-footer {
+    color: #4b5563 !important;
+}
+
+.footer-brand b {
+    color: #111827 !important;
+}
+
+.footer-brand small,
+.footer-location,
+.footer-staff {
+    color: #6b7280 !important;
+}
+
+
+/* =========================================================
+   SEARCH
+   ========================================================= */
+
+.premium-search input {
+    color: #111827 !important;
+
+    background: #ffffff;
+}
+
+.premium-search input::placeholder {
+    color: #6b7280 !important;
+}
+
+
+/* =========================================================
+   TRUST CARDS
+   ========================================================= */
+
+.trust-card {
+    color: #111827;
+}
+
+.trust-card b {
+    color: #111827 !important;
+}
+
+.trust-card small {
+    color: #6b7280 !important;
+}
+
+
+/* =========================================================
+   CATEGORY BUTTONS
+   ========================================================= */
+
+.category-card {
+    color: #111827 !important;
+}
+
+.category-card.on {
+    color: #ffffff !important;
+}
+
+
+/* =========================================================
+   GENERAL TEXT VISIBILITY
+   ========================================================= */
+
+body {
+    color: #111827;
+}
+
+.card,
+.product-card,
+.dashboard-card,
+.stat-card {
+    color: #111827;
+}
+
+label,
+li,
+td,
+th {
+    color: inherit;
+}
+
+
+/* =========================================================
+   MOBILE NAVIGATION
    ========================================================= */
 
 @media (max-width: 56.25rem) {
@@ -510,14 +773,26 @@ td {
         min-height: 4rem;
     }
 
+    /*
+       Show hamburger on mobile.
+    */
+
     .nav-hamburger {
         display: flex;
     }
 
-    .nav-actions {
+    /*
+       Hide desktop navigation.
+    */
+
+    .nav-actions,
+    .store-actions,
+    .admin-nav-right,
+    .staff-nav-actions {
         position: absolute;
 
-        top: 100%;
+        top: calc(100% + 0.5rem);
+
         right: clamp(0.75rem, 3vw, 1.5rem);
 
         width: min(90vw, 22rem);
@@ -527,33 +802,80 @@ td {
         flex-direction: column;
         align-items: stretch;
 
+        gap: 0.5rem;
+
         padding: 0.75rem;
 
         border-radius: 0.75rem;
 
         box-shadow:
             0 1rem 2.5rem rgb(0 0 0 / 18%);
+
+        z-index: 1050;
     }
 
-    .nav-actions.open {
+    /*
+       Open state.
+    */
+
+    .nav-actions.open,
+    .store-actions.open,
+    .admin-nav-right.open,
+    .staff-nav-actions.open {
         display: flex;
     }
 
-    .nav-actions > * {
+    /*
+       Full-width mobile menu items.
+    */
+
+    .nav-actions > *,
+    .store-actions > *,
+    .admin-nav-right > *,
+    .staff-nav-actions > * {
         width: 100%;
-       max-width: 100%;
+        max-width: 100%;
     }
+
+    /*
+       Better buttons/links inside mobile menu.
+    */
+
+    .nav-actions a,
+    .nav-actions button,
+    .store-actions a,
+    .store-actions button,
+    .admin-nav-right a,
+    .admin-nav-right button,
+    .staff-nav-actions a,
+    .staff-nav-actions button {
+        width: 100%;
+        min-height: 2.75rem;
+
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    /*
+       Mobile grid.
+    */
 
     .two-column,
     .two-col {
         grid-template-columns: 1fr;
     }
 
+    /*
+       Hero.
+    */
+
     .hero,
     .store-hero {
         min-height: clamp(28rem, 70vh, 40rem);
 
-        padding-block: clamp(2.5rem, 7vh, 5rem);
+        padding-block:
+            clamp(2.5rem, 7vh, 5rem);
     }
 }
 
@@ -573,7 +895,9 @@ td {
     }
 
     .section {
-        padding-block: clamp(2rem, 6vh, 3.5rem);
+        padding-block:
+            clamp(2rem, 6vh, 3.5rem);
+
         padding-inline: 4vw;
     }
 
@@ -613,6 +937,57 @@ td {
     .ui-modal-actions .btn {
         width: 100%;
     }
+
+    /*
+       Storefront mobile typography.
+    */
+
+    .premium-hero h1 {
+        font-size: 35px;
+
+        line-height: 1.08;
+
+        color: #f5f9fc !important;
+    }
+
+    .premium-hero p {
+        font-size: 15px;
+
+        line-height: 1.65;
+
+        color: #b8cedd !important;
+    }
+
+    .premium-grid .card b {
+        color: #111827 !important;
+
+        font-size: 18px;
+    }
+
+    .premium-grid .card .price {
+        color: #087ea4 !important;
+
+        font-size: 18px;
+
+        font-weight: 800;
+    }
+
+    .premium-grid .card p,
+    .premium-grid .card small {
+        color: #4b5563 !important;
+    }
+
+    .enquiry-content h2 {
+        color: #111827 !important;
+
+        font-size: 25px;
+    }
+
+    .enquiry-content p {
+        color: #4b5563 !important;
+
+        font-size: 15px;
+    }
 }
 
 
@@ -631,6 +1006,10 @@ td {
         height: 2.5rem;
     }
 
+    .nav-hamburger span {
+        width: 1.35rem;
+    }
+
     .hero-title {
         font-size: clamp(1.9rem, 10vw, 2.5rem);
     }
@@ -639,6 +1018,14 @@ td {
     .admin-dashboard,
     .delivery-dashboard {
         width: 92%;
+    }
+
+    .premium-hero h1 {
+        font-size: 30px;
+    }
+
+    .premium-hero p {
+        font-size: 14px;
     }
 }
 
@@ -658,6 +1045,15 @@ td {
 
     .ui-modal-box {
         max-height: 80vh;
+    }
+
+    .nav-actions,
+    .store-actions,
+    .admin-nav-right,
+    .staff-nav-actions {
+        max-height: 80vh;
+
+        overflow-y: auto;
     }
 }
 
@@ -683,257 +1079,69 @@ td {
 
 
 /* =========================================================
-   TEXT VISIBILITY FIX
+   ACCESSIBILITY / TOUCH
    ========================================================= */
 
-body {
-    color: #111827;
-}
-
-h1,
-h2,
-h3,
-h4,
-h5,
-h6,
-p,
-span,
-label,
-li,
-td,
-th,
-.card,
-.product-card {
-    color: #111827;
-}
-
-/* Keep links visible */
-a {
-    color: #111827;
-}
-
-/* Buttons */
 button,
-.btn,
-.button {
-    color: #111827;
-}
-
-/* Inputs */
+a,
 input,
 select,
 textarea {
-    color: #111827;
-    background: #ffffff;
+    -webkit-tap-highlight-color: transparent;
 }
 
-/* Placeholder text */
-input::placeholder,
-textarea::placeholder {
-    color: #6b7280;
-}
-
-/* Hamburger */
-.nav-hamburger {
-    color: #111827 !important;
-}
-
-.nav-hamburger span {
-    background: #111827 !important;
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+    outline: 2px solid #087ea4;
+    outline-offset: 2px;
 }
 
 
 /* =========================================================
-   FINAL CHAND ENTERPRISES TEXT / CONTRAST FIX
+   PREVENT HORIZONTAL OVERFLOW
    ========================================================= */
 
-/* ---------- GLOBAL DARK TEXT FIX ---------- */
-
-body {
-    color: #e8f0f7;
+.nav,
+.hero,
+.store-hero,
+.section,
+.dashboard,
+.admin-dashboard,
+.delivery-dashboard,
+.card,
+.product-card {
+    min-width: 0;
 }
 
 
-/* ---------- PRODUCT CARDS ---------- */
+/* =========================================================
+   FINAL MOBILE SAFETY
+   ========================================================= */
 
-.premium-grid .card,
-.premium-grid .card * {
-    color: #e8f0f7;
-}
+@media (max-width: 56.25rem) {
 
-.premium-grid .card b,
-.premium-grid .card strong {
-    color: #f5f9fc !important;
-}
-
-.premium-grid .card .price {
-    color: #6bdfff !important;
-}
-
-.premium-grid .card small,
-.premium-grid .card p {
-    color: #9fb5c6 !important;
-}
-
-
-/* Product category text */
-
-.premium-grid .card .category,
-.premium-grid .card .muted {
-    color: #9fb5c6 !important;
-}
-
-
-/* ---------- SECTION HEADINGS ---------- */
-
-.section-heading h2,
-.products-heading h2 {
-    color: #f5f9fc !important;
-}
-
-.section-heading p,
-.products-heading p {
-    color: #9fb5c6 !important;
-}
-
-
-/* ---------- HERO ---------- */
-
-.premium-hero {
-    color: #f5f9fc;
-}
-
-.premium-hero h1 {
-    color: #f5f9fc !important;
-}
-
-.premium-hero h1 em {
-    color: #6bdfff !important;
-}
-
-.premium-hero p {
-    color: #b8cedd !important;
-}
-
-.hero-eyebrow {
-    color: #a9c5d9 !important;
-}
-
-.hero-note {
-    color: #a9c5d9 !important;
-}
-
-
-/* ---------- ENQUIRY CARD ---------- */
-
-.premium-enquiry {
-    color: #e8f0f7;
-}
-
-.premium-enquiry h2,
-.enquiry-content h2 {
-    color: #f5f9fc !important;
-}
-
-.premium-enquiry p,
-.enquiry-content p {
-    color: #a9bdcc !important;
-}
-
-
-/* ---------- FOOTER ---------- */
-
-.premium-footer {
-    color: #9fb5c6 !important;
-}
-
-.footer-brand b {
-    color: #f5f9fc !important;
-}
-
-.footer-brand small,
-.footer-location,
-.footer-staff {
-    color: #9fb5c6 !important;
-}
-
-
-/* ---------- SEARCH ---------- */
-
-.premium-search input {
-    color: #e8f0f7 !important;
-}
-
-.premium-search input::placeholder {
-    color: #8fa6b8 !important;
-}
-
-
-/* ---------- TRUST CARDS ---------- */
-
-.trust-card {
-    color: #e8f0f7;
-}
-
-.trust-card b {
-    color: #f5f9fc !important;
-}
-
-.trust-card small {
-    color: #9fb5c6 !important;
-}
-
-
-/* ---------- CATEGORY BUTTONS ---------- */
-
-.category-card {
-    color: #e8f0f7 !important;
-}
-
-.category-card.on {
-    color: #fff !important;
-}
-
-
-/* ---------- MOBILE ---------- */
-
-@media (max-width: 600px) {
-
-    .premium-hero h1 {
-        font-size: 35px;
-        line-height: 1.08;
-        color: #f5f9fc !important;
+    .nav {
+        overflow: visible;
     }
 
-    .premium-hero p {
-        font-size: 15px;
-        line-height: 1.65;
-        color: #b8cedd !important;
+    .nav > *,
+    .nav-actions,
+    .store-actions,
+    .admin-nav-right,
+    .staff-nav-actions {
+        min-width: 0;
     }
 
-    .premium-grid .card b {
-        color: #f5f9fc !important;
-        font-size: 18px;
+    .logo {
+        max-width: 70%;
+        overflow: hidden;
     }
 
-    .premium-grid .card .price {
-        color: #6bdfff !important;
-        font-size: 18px;
-        font-weight: 800;
-    }
-
-    .premium-grid .card p,
-    .premium-grid .card small {
-        color: #9fb5c6 !important;
-    }
-
-    .enquiry-content h2 {
-        color: #f5f9fc !important;
-        font-size: 25px;
-    }
-
-    .enquiry-content p {
-        color: #a9bdcc !important;
-        font-size: 15px;
+    .logo img {
+        max-width: 100%;
+        height: auto;
     }
 }
