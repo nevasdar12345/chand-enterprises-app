@@ -1124,8 +1124,14 @@ async function developerRefresh() {
 
 function logout() {
 
-    window.location.href =
-        '/logout';
+    const form = document.createElement('form');
+
+    form.method = 'POST';
+    form.action = '/logout';
+
+    document.body.appendChild(form);
+
+    form.submit();
 }
 
 
