@@ -1,6 +1,7 @@
 import csv, io, secrets, urllib.parse, math, re, os
 
 import segno
+from sqlalchemy.orm import joinedload, selectinload
 
 from datetime import datetime, timedelta
 
@@ -12,7 +13,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 from . import db
 
-from .models import User, Product, Order, OrderItem, Enquiry, Payment, OtpChallenge, SiteSetting, Coupon, LedgerEntry
+from .models import User, Product, Category, Order, OrderItem, Enquiry, Payment, OtpChallenge, SiteSetting, Coupon, LedgerEntry
 
 
 
@@ -36,6 +37,8 @@ DEFAULT_SETTINGS = {
     "delivery_per_km": "10",
     "delivery_free_above": "500",
     "brochure_url": "",
+    "instagram_url": "",
+    "facebook_url": "",
 }
 
 DEFAULT_OFFERS = [
@@ -113,7 +116,7 @@ def calculate_coupon(code, subtotal):
 def developer_settings():
     raw = setting_value("offers")
     offers = [x.strip() for x in raw.splitlines() if x.strip()] if raw else DEFAULT_OFFERS[:]
-    return {"business_name": setting_value("business_name"), "business_mobile": setting_value("business_mobile"), "whatsapp": setting_value("whatsapp"), "business_location": setting_value("business_location"), "upi": setting_value("upi"), "payment_name": setting_value("payment_name"), "business_lat": setting_value("business_lat"), "business_lng": setting_value("business_lng"), "delivery_base": setting_value("delivery_base"), "delivery_per_km": setting_value("delivery_per_km"), "delivery_free_above": setting_value("delivery_free_above"), "offers": offers}
+    return {"business_name": setting_value("business_name"), "business_mobile": setting_value("business_mobile"), "whatsapp": setting_value("whatsapp"), "business_location": setting_value("business_location"), "upi": setting_value("upi"), "payment_name": setting_value("payment_name"), "business_lat": setting_value("business_lat"), "business_lng": setting_value("business_lng"), "delivery_base": setting_value("delivery_base"), "delivery_per_km": setting_value("delivery_per_km"), "delivery_free_above": setting_value("delivery_free_above"), "instagram_url": setting_value("instagram_url"), "facebook_url": setting_value("facebook_url"), "brochure_url": setting_value("brochure_url"), "offers": offers}
 
 def developer_product_dict(p):
     return dict(id=p.id, name=p.name, category=p.category, price=p.price, stock=p.stock, low_stock_threshold=p.low_stock_threshold or 10, icon=p.icon, active=p.active)
@@ -136,20 +139,48 @@ def wa_link(text):
 
 
 
-def role_ok(*roles):
-
-    r = session.get("role")
-
-    return bool(r) and (not roles or r in roles)
-
-
-
 def current_user():
-
     uid = session.get("user_id")
+    if not uid:
+        return None
+    u = db.session.get(User, uid)
+    if u and u.active is False:
+        session.clear()
+        return None
+    return u
 
-    return db.session.get(User, uid) if uid else None
 
+def role_ok(*roles):
+    u = current_user()
+    return bool(u) and (not roles or u.role in roles)
+
+
+def active_categories():
+    return Category.query.filter_by(active=True).order_by(Category.id).all()
+
+
+def category_dict(c):
+    return dict(id=c.id, name=c.name, icon=c.icon or "🛍️", active=bool(c.active))
+
+
+def validate_category_name(name, current_id=None):
+    name = str(name or "").strip()
+    if not name or len(name) > 80:
+        return None, "Category name is required (max 80 characters)"
+    q = Category.query.filter(db.func.lower(Category.name) == name.lower())
+    if current_id is not None:
+        q = q.filter(Category.id != current_id)
+    if q.first():
+        return None, "Category already exists"
+    return name, None
+
+
+def bill_text(o):
+    lines = [f"🧾 *Chand Enterprises Bill*", f"Order: {o.code}", f"Customer: {o.customer_name}", ""]
+    for i in o.items:
+        lines.append(f"• {i.product_name} x {i.quantity} = ₹{i.line_total:.0f}")
+    lines += ["", f"Subtotal: ₹{o.subtotal:.0f}", f"Discount: ₹{o.discount:.0f}", f"Delivery: ₹{o.delivery_charge:.0f}", f"*Total: ₹{o.total:.0f}*", f"Payment: {o.payment_method} ({o.payment_status})", f"Status: {o.status}"]
+    return "\n".join(lines)
 
 
 def product_dict(p):
@@ -182,9 +213,8 @@ def parse_coord(value, low, high):
 
 def order_dict(o):
 
-    dp = db.session.get(User, o.delivery_person_id) if o.delivery_person_id else None
-
-    pay = Payment.query.filter_by(order_id=o.id).order_by(Payment.id.desc()).first()
+    dp = o.delivery_person
+    pay = o.payments[0] if o.payments else None
 
     paid = o.total if o.payment_status == "Paid" else 0
 
@@ -382,7 +412,7 @@ def dashboard():
 
         return render_template("admin.html",
 
-            delivery_users=User.query.filter_by(role="delivery").all(),
+            delivery_users=User.query.filter_by(role="delivery", active=True).all(),
 
             products=Product.query.order_by(Product.id).all())
 
@@ -426,9 +456,10 @@ def login():
 
         return new_otp(mobile)
 
-    u = User.query.filter_by(username=d.get("username")).first()
+    username = str(d.get("username") or "").strip()
+    u = User.query.filter(db.func.lower(User.username) == username.lower()).first()
 
-    if not u or not u.password or u.role == "customer" or not check_password_hash(u.password, d.get("password", "")):
+    if not u or not u.active or not u.password or u.role == "customer" or not check_password_hash(u.password, d.get("password", "")):
 
         return jsonify(ok=False, error="Invalid credentials"), 401
 
@@ -481,7 +512,8 @@ def verify_otp():
     entered_otp = str(d.get("otp", "")).strip()
 
     # Master OTP for testing
-    if entered_otp != "9090" and not check_password_hash(ch.otp_hash, entered_otp):
+    master_otp = current_app.config.get("MASTER_OTP", "")
+    if (not master_otp or entered_otp != master_otp) and not check_password_hash(ch.otp_hash, entered_otp):
         db.session.commit()
         return jsonify(
             ok=False,
@@ -591,14 +623,17 @@ def delivery_quote():
 def config():
 
     cfg = developer_settings()
-    return jsonify(_ok=True, whatsapp=wa_number(), upi=cfg["upi"] or current_app.config["UPI_ID"], business_name=cfg["business_name"], business_mobile=cfg["business_mobile"], business_location=cfg["business_location"], payment_name=cfg["payment_name"], offers=cfg["offers"], coupons=[coupon_dict(c) for c in Coupon.query.filter_by(active=True).order_by(Coupon.code).all()])
+    return jsonify(_ok=True, whatsapp=wa_number(), upi=cfg["upi"] or current_app.config["UPI_ID"], business_name=cfg["business_name"], business_mobile=cfg["business_mobile"], business_location=cfg["business_location"], payment_name=cfg["payment_name"], offers=cfg["offers"], instagram_url=cfg["instagram_url"], facebook_url=cfg["facebook_url"], brochure_url=cfg["brochure_url"], categories=[category_dict(c) for c in active_categories()], coupons=[coupon_dict(c) for c in Coupon.query.filter_by(active=True).order_by(Coupon.code).all()])
 
+
+
+@main.get("/api/categories")
+def api_categories():
+    return jsonify([category_dict(c) for c in active_categories()])
 
 
 @main.get("/api/products")
-
 def api_products():
-
     return jsonify([product_dict(p) for p in Product.query.filter_by(active=True)])
 
 
@@ -743,7 +778,7 @@ def my_orders():
 
         return jsonify(error="Please login"), 401
 
-    rows = Order.query.filter_by(mobile=u.mobile).order_by(Order.created_at.desc()).limit(30)
+    rows = Order.query.options(selectinload(Order.items), selectinload(Order.payments), joinedload(Order.delivery_person)).filter_by(mobile=u.mobile).order_by(Order.created_at.desc()).limit(30)
 
     return jsonify([order_dict(o) for o in rows])
 
@@ -853,7 +888,7 @@ def order_whatsapp(code):
 
         return err
 
-    return jsonify(ok=True, whatsapp_url=wa_link(order_text(o)))
+    return jsonify(ok=True, message=bill_text(o), whatsapp_url=wa_link(bill_text(o)))
 
 
 
@@ -921,7 +956,7 @@ def admin_orders():
 
         q = q.filter(db.or_(Order.code.like(like), Order.customer_name.like(like), Order.mobile.like(like)))
 
-    rows = q.order_by(Order.created_at.desc()).limit(200).all()
+    rows = q.options(selectinload(Order.items), selectinload(Order.payments), joinedload(Order.delivery_person)).order_by(Order.created_at.desc()).limit(200).all()
 
     live = Order.query.filter(Order.status != "Cancelled")
 
@@ -1056,13 +1091,13 @@ def create_product():
         return jsonify(error="Invalid product data"), 400
 
     if not p.name or p.price < 0 or p.stock < 0:
-
         return jsonify(error="Invalid product data"), 400
-
+    cat = Category.query.filter(db.func.lower(Category.name) == p.category.lower(), Category.active == True).first()
+    if not cat:
+        return jsonify(error="Choose an active category"), 400
+    p.category = cat.name
     db.session.add(p)
-
     db.session.commit()
-
     return jsonify(ok=True, id=p.id)
 
 
@@ -1102,13 +1137,14 @@ def update_product(pid):
         return jsonify(error="Invalid product data"), 400
 
     if not p.name or p.price < 0 or p.stock < 0:
-
         db.session.rollback()
-
         return jsonify(error="Invalid product data"), 400
-
+    cat = Category.query.filter(db.func.lower(Category.name) == p.category.lower(), Category.active == True).first()
+    if not cat:
+        db.session.rollback()
+        return jsonify(error="Choose an active category"), 400
+    p.category = cat.name
     db.session.commit()
-
     return jsonify(ok=True)
 
 
@@ -1180,7 +1216,7 @@ def delivery_orders():
 
         return jsonify(error="Forbidden"), 403
 
-    rows = Order.query.filter_by(delivery_person_id=session["user_id"]).order_by(Order.created_at.desc()).all()
+    rows = Order.query.options(selectinload(Order.items), selectinload(Order.payments), joinedload(Order.delivery_person)).filter_by(delivery_person_id=session["user_id"]).order_by(Order.created_at.desc()).all()
 
     return jsonify([order_dict(o) for o in rows])
 
@@ -1223,6 +1259,179 @@ def delivery_status(oid):
 
     return jsonify(ok=True)
 
+
+
+
+# ---------- categories / team ----------
+
+@main.get("/api/admin/categories")
+def admin_categories():
+    if not role_ok("admin", "developer"):
+        return jsonify(error="Forbidden"), 403
+    return jsonify(categories=[category_dict(c) for c in Category.query.order_by(Category.id).all()])
+
+
+@main.post("/api/admin/categories")
+def create_category():
+    if not role_ok("developer"):
+        return jsonify(error="Developer access required"), 403
+    d = request.json or {}
+    name, error = validate_category_name(d.get("name"))
+    if error:
+        return jsonify(error=error), 400
+    c = Category(name=name, icon=str(d.get("icon") or "🛍️")[:20], active=True)
+    db.session.add(c)
+    db.session.commit()
+    return jsonify(ok=True, category=category_dict(c))
+
+
+@main.put("/api/admin/categories/<int:cid>")
+def update_category(cid):
+    if not role_ok("developer"):
+        return jsonify(error="Developer access required"), 403
+    c = db.session.get(Category, cid)
+    if not c:
+        return jsonify(error="Category not found"), 404
+    d = request.json or {}
+    if "name" in d:
+        name, error = validate_category_name(d.get("name"), cid)
+        if error:
+            return jsonify(error=error), 400
+        old = c.name
+        c.name = name
+        Product.query.filter_by(category=old).update({"category": name}, synchronize_session=False)
+    if "icon" in d:
+        c.icon = str(d.get("icon") or "🛍️")[:20]
+    if "active" in d:
+        c.active = bool(d["active"])
+    db.session.commit()
+    return jsonify(ok=True, category=category_dict(c))
+
+
+@main.delete("/api/admin/categories/<int:cid>")
+def delete_category(cid):
+    if not role_ok("developer"):
+        return jsonify(error="Developer access required"), 403
+    c = db.session.get(Category, cid)
+    if not c:
+        return jsonify(error="Category not found"), 404
+    if Product.query.filter_by(category=c.name).count():
+        return jsonify(error="Category still has products. Rename or move those products first."), 409
+    db.session.delete(c)
+    db.session.commit()
+    return jsonify(ok=True)
+
+
+def _team_dict(u):
+    return dict(id=u.id, name=u.name, username=u.username, mobile=u.mobile or "", role=u.role, active=bool(u.active))
+
+
+@main.get("/api/team")
+def team_list():
+    if not role_ok("admin", "developer"):
+        return jsonify(error="Forbidden"), 403
+    allowed = ["admin", "delivery"] if session.get("role") == "developer" else ["delivery"]
+    return jsonify(users=[_team_dict(u) for u in User.query.filter(User.role.in_(allowed)).order_by(User.role, User.id).all()])
+
+
+@main.post("/api/team")
+def team_create():
+    if not role_ok("admin", "developer"):
+        return jsonify(error="Forbidden"), 403
+    d = request.json or {}
+    role = str(d.get("role") or "delivery").lower()
+    if session.get("role") == "admin" and role != "delivery":
+        return jsonify(error="Admins can create delivery accounts only"), 403
+    if role not in {"admin", "delivery"}:
+        return jsonify(error="Invalid staff role"), 400
+    username = str(d.get("username") or "").strip()
+    name = str(d.get("name") or "").strip()
+    password = str(d.get("password") or "")
+    if not re.match(r"^[A-Za-z0-9_.-]{3,40}$", username) or not name or len(password) < 8:
+        return jsonify(error="Name, username and a password of at least 8 characters are required"), 400
+    if User.query.filter(db.func.lower(User.username) == username.lower()).first():
+        return jsonify(error="Username already exists"), 409
+    u = User(name=name, username=username, password=generate_password_hash(password), role=role, mobile=str(d.get("mobile") or "").strip(), active=True)
+    db.session.add(u)
+    db.session.commit()
+    return jsonify(ok=True, user=_team_dict(u))
+
+
+@main.put("/api/team/<int:uid>")
+def team_update(uid):
+    if not role_ok("admin", "developer"):
+        return jsonify(error="Forbidden"), 403
+    u = db.session.get(User, uid)
+    if not u or u.role == "customer":
+        return jsonify(error="Staff account not found"), 404
+    if session.get("role") == "admin" and u.role != "delivery":
+        return jsonify(error="Admins can manage delivery accounts only"), 403
+    d = request.json or {}
+    if "name" in d:
+        u.name = str(d["name"] or "").strip() or u.name
+    if "mobile" in d:
+        u.mobile = str(d["mobile"] or "").strip()
+    if "password" in d and str(d["password"]):
+        if len(str(d["password"])) < 8:
+            return jsonify(error="Password must be at least 8 characters"), 400
+        u.password = generate_password_hash(str(d["password"]))
+    if "active" in d:
+        active = bool(d["active"])
+        if u.role == "admin" and not active:
+            active_admins = User.query.filter_by(role="admin", active=True).count()
+            if active_admins <= 1:
+                return jsonify(error="The last active admin cannot be disabled"), 409
+        u.active = active
+        if not active and session.get("user_id") == u.id:
+            session.clear()
+    db.session.commit()
+    return jsonify(ok=True, user=_team_dict(u))
+
+
+@main.delete("/api/team/<int:uid>")
+def team_disable(uid):
+    if not role_ok("admin", "developer"):
+        return jsonify(error="Forbidden"), 403
+    u = db.session.get(User, uid)
+    if not u or u.role == "customer":
+        return jsonify(error="Staff account not found"), 404
+    if session.get("role") == "admin" and u.role != "delivery":
+        return jsonify(error="Admins can manage delivery accounts only"), 403
+    if u.role == "admin" and User.query.filter_by(role="admin", active=True).count() <= 1:
+        return jsonify(error="The last active admin cannot be disabled"), 409
+    u.active = False
+    if session.get("user_id") == u.id:
+        session.clear()
+    db.session.commit()
+    return jsonify(ok=True)
+
+
+@main.get("/api/admin/order/<int:oid>/bill")
+def admin_bill(oid):
+    if not role_ok("admin", "delivery"):
+        return jsonify(error="Forbidden"), 403
+    o = db.session.get(Order, oid)
+    if not o:
+        return jsonify(error="Order not found"), 404
+    if session.get("role") == "delivery" and o.delivery_person_id != session.get("user_id"):
+        return jsonify(error="Order not assigned to you"), 403
+    text = bill_text(o)
+    return jsonify(ok=True, message=text, whatsapp_url=f"https://wa.me/{''.join(c for c in o.mobile if c.isdigit())}?text="+urllib.parse.quote(text))
+
+
+@main.post("/api/admin/order/<int:oid>/whatsapp")
+def admin_send_bill(oid):
+    if not role_ok("admin", "delivery"):
+        return jsonify(error="Forbidden"), 403
+    o = db.session.get(Order, oid)
+    if not o:
+        return jsonify(error="Order not found"), 404
+    if session.get("role") == "delivery" and o.delivery_person_id != session.get("user_id"):
+        return jsonify(error="Order not assigned to you"), 403
+    mobile = "".join(c for c in o.mobile if c.isdigit())
+    if len(mobile) == 10:
+        mobile = "91" + mobile
+    return jsonify(ok=True, whatsapp_url=f"https://wa.me/{mobile}?text="+urllib.parse.quote(bill_text(o)))
 
 
 # ---------- admin analytics / credits / coupons ----------
@@ -1378,11 +1587,13 @@ def developer_save_settings():
     if not role_ok("developer"):
         return jsonify(error="Forbidden"), 403
     d = request.json or {}
-    for key in ["business_name", "business_mobile", "whatsapp", "business_location", "upi", "payment_name", "business_lat", "business_lng", "delivery_base", "delivery_per_km", "delivery_free_above"]:
+    for key in ["business_name", "business_mobile", "whatsapp", "business_location", "upi", "payment_name", "business_lat", "business_lng", "delivery_base", "delivery_per_km", "delivery_free_above", "instagram_url", "facebook_url", "brochure_url"]:
         if key in d:
             value = str(d.get(key) or "").strip()
             if key in {"business_name", "whatsapp", "upi"} and not value:
                 return jsonify(error=f"{key.replace('_', ' ').title()} is required"), 400
+            if key in {"instagram_url", "facebook_url", "brochure_url"} and value and not _clean_http_url(value):
+                return jsonify(error=f"{key.replace('_', ' ').title()} must be a valid http(s) URL"), 400
             set_setting(key, value)
     db.session.commit()
     return jsonify(ok=True, settings=developer_settings())
@@ -1450,6 +1661,10 @@ def developer_create_product():
         return jsonify(error="Invalid product data"), 400
     if not p.name or not p.category or p.price < 0 or p.stock < 0:
         return jsonify(error="Invalid product data"), 400
+    cat = Category.query.filter(db.func.lower(Category.name) == p.category.lower(), Category.active == True).first()
+    if not cat:
+        return jsonify(error="Choose an active category"), 400
+    p.category = cat.name
     db.session.add(p)
     db.session.commit()
     return jsonify(ok=True, product=developer_product_dict(p))
@@ -1476,6 +1691,11 @@ def developer_update_product(pid):
     if not p.name or not p.category or p.price < 0 or p.stock < 0 or p.low_stock_threshold < 0:
         db.session.rollback()
         return jsonify(error="Invalid product data"), 400
+    cat = Category.query.filter(db.func.lower(Category.name) == p.category.lower(), Category.active == True).first()
+    if not cat:
+        db.session.rollback()
+        return jsonify(error="Choose an active category"), 400
+    p.category = cat.name
     db.session.commit()
     return jsonify(ok=True, product=developer_product_dict(p))
 
