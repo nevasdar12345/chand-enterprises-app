@@ -95,7 +95,7 @@ header.nav .logo > span {
 /* hamburger lines */
 
 .nav-hamburger {
-    display: none;
+    display: inline-flex;
     flex-direction: column;
     gap: 5px;
 }
