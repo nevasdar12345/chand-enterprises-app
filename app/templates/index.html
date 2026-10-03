@@ -394,84 +394,13 @@
     </div>
 
 
-    <div
-        class="cats premium-cats"
-        id="cats"
-    >
-
-        <button
-            type="button"
-            class="on category-card"
-            onclick="category('All',this)"
-        >
-
-            <span>
-                🛍️
-            </span>
-
-            <b>
-                All
-            </b>
-
-        </button>
-
-
-        <button
-            type="button"
-            class="category-card"
-            onclick="category('Cold Drinks',this)"
-        >
-
-            <span>
-                🥤
-            </span>
-
-            <b>
-                Cold Drinks
-            </b>
-
-        </button>
-
-
-        <button
-            type="button"
-            class="category-card"
-            onclick="category('Energy Drinks',this)"
-        >
-
-            <span>
-                ⚡
-            </span>
-
-            <b>
-                Energy Drinks
-            </b>
-
-        </button>
-
-
-        <button
-            type="button"
-            class="category-card"
-            onclick="category('Premium Water',this)"
-        >
-
-            <span>
-                💧
-            </span>
-
-            <b>
-                Premium Water
-            </b>
-
-        </button>
-
+    <div class="cats premium-cats" id="cats">
+        <button type="button" class="on category-card" onclick="category('All',this)"><span>🛍️</span><b>All</b></button>
     </div>
 
 </section>
 
-
-<!-- ================= PRODUCTS ================= -->
+    <!-- ================= PRODUCTS ================= -->
 
 <section
     class="section products-section"
@@ -506,7 +435,7 @@
             <input
                 type="text"
                 id="search"
-                oninput="render(true)"
+                
                 placeholder="Search products..."
                 autocomplete="off"
             >
@@ -566,6 +495,18 @@
 </main>
 
 
+<!-- ================= CONTACT ================= -->
+<section class="enquiry premium-enquiry" id="contact">
+  <div class="enquiry-content">
+    <span class="pill">Contact us</span>
+    <h2>Need help with an order?</h2>
+    <p>Message Chand Enterprises on WhatsApp or follow our social pages.</p>
+    <div id="contactSocial" class="footer-social"></div>
+  </div>
+  <button type="button" class="primary enquiry-btn" onclick="enquiry()">WhatsApp enquiry <span>→</span></button>
+</section>
+
+
 <!-- ================= FOOTER ================= -->
 
 <footer class="premium-footer">
@@ -597,6 +538,8 @@
         📍 Darbhanga, Bihar
     </div>
 
+
+    <div id="socialLinks" class="footer-social" aria-label="Social links"></div>
 
     <a
         href="/staff"
