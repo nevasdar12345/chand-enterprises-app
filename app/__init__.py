@@ -72,9 +72,9 @@ def create_app():
         # Version 2: add location columns to an existing "order" table
         from sqlalchemy import inspect, text
         existing = {c["name"] for c in inspect(db.engine).get_columns("order")}
-        for col in ("latitude", "longitude"):
+        for col in ("latitude", "longitude", "cash_collected"):
             if col not in existing:
-                db.session.execute(text(f'ALTER TABLE "order" ADD COLUMN {col} FLOAT'))
+                db.session.execute(text(f'ALTER TABLE "order" ADD COLUMN {col} FLOAT DEFAULT 0'))
         db.session.commit()
 
         from .seed import seed
