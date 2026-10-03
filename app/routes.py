@@ -119,7 +119,17 @@ def developer_settings():
     return {"business_name": setting_value("business_name"), "business_mobile": setting_value("business_mobile"), "whatsapp": setting_value("whatsapp"), "business_location": setting_value("business_location"), "upi": setting_value("upi"), "payment_name": setting_value("payment_name"), "business_lat": setting_value("business_lat"), "business_lng": setting_value("business_lng"), "delivery_base": setting_value("delivery_base"), "delivery_per_km": setting_value("delivery_per_km"), "delivery_free_above": setting_value("delivery_free_above"), "instagram_url": setting_value("instagram_url"), "facebook_url": setting_value("facebook_url"), "brochure_url": setting_value("brochure_url"), "offers": offers}
 
 def developer_product_dict(p):
-    return dict(id=p.id, name=p.name, category=p.category, price=p.price, stock=p.stock, low_stock_threshold=p.low_stock_threshold or 10, icon=p.icon, active=p.active)
+    return dict(
+        id=p.id,
+        name=p.name,
+        category=p.category,
+        size=p.size or "",
+        price=p.price,
+        stock=p.stock,
+        low_stock_threshold=p.low_stock_threshold or 10,
+        icon=p.icon,
+        active=p.active,
+    )
 
 
 
@@ -176,10 +186,31 @@ def validate_category_name(name, current_id=None):
 
 
 def bill_text(o):
-    lines = [f"🧾 *Chand Enterprises Bill*", f"Order: {o.code}", f"Customer: {o.customer_name}", ""]
+    lines = [
+        "🧾 *Chand Enterprises Bill*",
+        f"Order: {o.code}",
+        f"Customer: {o.customer_name}",
+        "",
+    ]
+
     for i in o.items:
-        lines.append(f"• {i.product_name} x {i.quantity} = ₹{i.line_total:.0f}")
-    lines += ["", f"Subtotal: ₹{o.subtotal:.0f}", f"Discount: ₹{o.discount:.0f}", f"Delivery: ₹{o.delivery_charge:.0f}", f"*Total: ₹{o.total:.0f}*", f"Payment: {o.payment_method} ({o.payment_status})", f"Status: {o.status}"]
+        item_name = i.product_name
+        if i.product_size:
+            item_name += f" ({i.product_size})"
+        lines.append(
+            f"• {item_name} x {i.quantity} = ₹{i.line_total:.0f}"
+        )
+
+    lines += [
+        "",
+        f"Subtotal: ₹{o.subtotal:.0f}",
+        f"Discount: ₹{o.discount:.0f}",
+        f"Delivery: ₹{o.delivery_charge:.0f}",
+        f"*Total: ₹{o.total:.0f}*",
+        f"Payment: {o.payment_method} ({o.payment_status})",
+        f"Status: {o.status}",
+    ]
+
     return "\n".join(lines)
 
 
@@ -231,9 +262,25 @@ def order_dict(o):
 
                 delivery_person_id=o.delivery_person_id, delivery_person=dp.name if dp else "",
 
-                items=[f"{i.product_name} x {i.quantity}" for i in o.items],
+                items=[
+                    (
+                        f"{i.product_name} ({i.product_size}) x {i.quantity}"
+                        if i.product_size
+                        else f"{i.product_name} x {i.quantity}"
+                    )
+                    for i in o.items
+                ],
 
-                lines=[dict(name=i.product_name, qty=i.quantity, price=i.unit_price, total=i.line_total) for i in o.items],
+                lines=[
+                    dict(
+                        name=i.product_name,
+                        size=i.product_size or "",
+                        qty=i.quantity,
+                        price=i.unit_price,
+                        total=i.line_total,
+                    )
+                    for i in o.items
+                ],
 
                 coupon=o.coupon_code or "", paid=paid, due=0 if o.status == "Cancelled" else o.total - paid,
 
@@ -726,9 +773,16 @@ def create_order():
 
         p.stock -= qty
 
-        db.session.add(OrderItem(order_id=o.id, product_id=p.id, product_name=p.name,
-
-                                 quantity=qty, unit_price=p.price))
+        db.session.add(
+            OrderItem(
+                order_id=o.id,
+                product_id=p.id,
+                product_name=p.name,
+                product_size=p.size or "",
+                quantity=qty,
+                unit_price=p.price,
+            )
+        )
 
     db.session.add(Payment(order_id=o.id, method=method, amount=total))
 
@@ -866,7 +920,12 @@ def cancel_order(code):
 
 def order_text(o):
 
-    lines = "\n".join(f"- {i.product_name} x {i.quantity} = ₹{i.line_total:.0f}" for i in o.items)
+    lines = "\n".join(
+        f"- {i.product_name}"
+        + (f" ({i.product_size})" if i.product_size else "")
+        + f" x {i.quantity} = ₹{i.line_total:.0f}"
+        for i in o.items
+    )
 
     return (f"{setting_value('business_name') or 'Chand Enterprises'} - Order {o.code}\n\nCustomer: {o.customer_name}\nMobile: {o.mobile}\n"
 
@@ -1118,11 +1177,17 @@ def update_product(pid):
 
     try:
 
-        if "name" in d: p.name = d["name"].strip()
+        if "name" in d:
+            p.name = d["name"].strip()
 
-        if "category" in d: p.category = d["category"].strip()
+        if "category" in d:
+            p.category = d["category"].strip()
 
-        if "price" in d: p.price = float(d["price"])
+        if "size" in d:
+            p.size = str(d["size"] or "").strip()
+
+        if "price" in d:
+            p.price = float(d["price"])
 
         if "stock" in d: p.stock = int(d["stock"])
 
