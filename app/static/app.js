@@ -246,6 +246,7 @@ function render(anim = false) {
 
                             <b>
                                 ${esc(product.name)}
+                                ${product.size ? `<span class="product-size">${esc(product.size)}</span>` : ""}
                             </b>
 
 
@@ -483,6 +484,7 @@ function cart() {
                             <span>
                                 ${esc(product.icon)}
                                 ${esc(product.name)}
+                                ${product.size ? `(${esc(product.size)})` : ""}
                                 × ${CART[id]}
                             </span>
 
@@ -1125,6 +1127,7 @@ async function bill(code) {
 
                                 <span>
                                     ${esc(item.name)}
+                                    ${item.size ? `(${esc(item.size)})` : ""}
                                     × ${item.qty}
                                 </span>
 
