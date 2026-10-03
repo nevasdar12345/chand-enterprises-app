@@ -32,11 +32,9 @@ Developer · Chand Enterprises
         </button>
 
 
-        <button
-            onclick="developerOffers()"
-        >
-            📢 Offers
-        </button>
+        <button onclick="developerOffers()">📢 Offers</button>
+        <button onclick="developerCategories()">🏷️ Categories</button>
+        <button onclick="developerTeam()">👥 Team</button>
 
 
         <form method="post" action="{{ url_for('main.logout') }}">
@@ -177,6 +175,13 @@ Developer · Chand Enterprises
 
         </div>
 
+
+        <div class="card">
+            <div class="ic">🏷️</div>
+            <b>Categories</b>
+            <small>Create, rename, hide and delete categories.</small>
+            <button class="primary" onclick="developerCategories()">Manage</button>
+        </div>
 
     </section>
 
