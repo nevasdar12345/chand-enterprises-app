@@ -3808,3 +3808,67 @@ button:active,
     }
 
 }
+
+
+/* =========================
+   LOCATION PICKER (v2)
+   ========================= */
+
+.loc-box{
+    margin:6px 0 14px;
+    padding:10px;
+    border:1px dashed #b9c6d6;
+    border-radius:12px;
+    background:rgba(0,120,255,.04);
+}
+
+.loc-actions{
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+}
+
+.loc-actions button,
+.loc-search-row button{
+    flex:1;
+    min-width:140px;
+    padding:9px 10px;
+    border-radius:10px;
+    cursor:pointer;
+}
+
+.loc-search-row{
+    display:flex;
+    gap:8px;
+    margin-top:8px;
+}
+
+.loc-search-row input{
+    flex:2;
+    min-width:0;
+}
+
+.loc-search-row button{
+    flex:0 0 auto;
+    min-width:80px;
+}
+
+#loc-map{
+    height:240px;
+    margin-top:8px;
+    border-radius:10px;
+    z-index:0;
+}
+
+.loc-coords,
+.loc-status{
+    margin-top:6px;
+    font-size:13px;
+    word-break:break-word;
+}
+
+.loc-map-link{
+    display:inline-block;
+    margin-top:4px;
+    font-size:13px;
+}
