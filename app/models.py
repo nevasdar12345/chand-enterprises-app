@@ -37,6 +37,8 @@ class Order(db.Model):
     customer_name = db.Column(db.String(120), nullable=False)
     mobile = db.Column(db.String(20), nullable=False)
     address = db.Column(db.Text, nullable=False)
+    latitude = db.Column(db.Float, nullable=True)
+    longitude = db.Column(db.Float, nullable=True)
     total = db.Column(db.Float, nullable=False)
     payment_method = db.Column(db.String(40))
     payment_status = db.Column(db.String(30), default="Pending")
@@ -47,6 +49,12 @@ class Order(db.Model):
     status = db.Column(db.String(40), default="Confirmed")
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     items = db.relationship("OrderItem", backref="order", lazy=True)
+
+    @property
+    def map_url(self):
+        if self.latitude is None or self.longitude is None:
+            return ""
+        return f"https://www.google.com/maps?q={self.latitude:.6f},{self.longitude:.6f}"
 
     @property
     def subtotal(self):
