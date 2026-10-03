@@ -1385,8 +1385,11 @@ async function refreshMe() {
   ME = await api("/api/me");
 
   const accountButton = $("#accountBtn");
-
   const logoutButton = $("#logoutBtn");
+
+  // Hamburger menu auth controls
+  const menuAccountButton = $("#menuAccountBtn");
+  const menuLogoutButton = $("#menuLogoutBtn");
 
   if (ME && ME.authenticated) {
     if (accountButton) {
@@ -1396,13 +1399,31 @@ async function refreshMe() {
     if (logoutButton) {
       logoutButton.hidden = false;
     }
+
+    // Logged in: show Logout, hide Login in hamburger menu
+    if (menuAccountButton) {
+      menuAccountButton.hidden = true;
+    }
+
+    if (menuLogoutButton) {
+      menuLogoutButton.hidden = false;
+    }
   } else {
     if (accountButton) {
-      accountButton.textContent = "Account";
+      accountButton.textContent = "Login";
     }
 
     if (logoutButton) {
       logoutButton.hidden = true;
+    }
+
+    // Logged out: show Login, hide Logout in hamburger menu
+    if (menuAccountButton) {
+      menuAccountButton.hidden = false;
+    }
+
+    if (menuLogoutButton) {
+      menuLogoutButton.hidden = true;
     }
   }
 }
