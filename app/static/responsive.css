@@ -1,155 +1,234 @@
 /* =========================================================
-   PREMIUM NAV + MOBILE MENU FIX  (v2)
-   PASTE AT THE VERY END OF app/static/responsive.css
-   Uses stronger selectors + !important so older rules in
-   style.css cannot override it.
+   CHAND ENTERPRISES - responsive.css  (FINAL)
+   Loaded AFTER style.css.
+   Contains: mobile menu, theme toggle, light/dark theme,
+   order cards, small-screen polish.
    ========================================================= */
 
-/* hidden attribute must always win (Logout button bug) */
+
+/* ---------------------------------------------------------
+   GLOBAL SAFETY
+   --------------------------------------------------------- */
+
 [hidden] {
     display: none !important;
 }
 
-/* overflow-x:hidden on html AND body breaks sticky; clip doesn't */
 html,
 body {
-    overflow-x: clip !important;
+    max-width: 100%;
+    overflow-x: clip;
 }
 
-/* ---------- Premium sticky header ---------- */
+img,
+video,
+svg {
+    max-width: 100%;
+}
 
-header.nav.store-nav {
-    position: sticky !important;
+
+/* ---------------------------------------------------------
+   HEADER
+   --------------------------------------------------------- */
+
+header.nav {
+    position: sticky;
     top: 0;
-    z-index: 3000 !important;
-    background: rgb(255 255 255 / 94%) !important;
-    -webkit-backdrop-filter: blur(14px);
-    backdrop-filter: blur(14px);
-    border-bottom: 1px solid #e5e7eb;
+    z-index: 1000;
+    gap: 10px;
 }
 
-header.nav .store-logo {
+header.nav .logo {
+    min-width: 0;
+    flex-shrink: 1;
+}
+
+header.nav .logo > span {
+    min-width: 0;
+}
+
+/* tools = theme toggle + hamburger */
+
+.nav-tools {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
-    color: #111827 !important;
-    font-weight: 800;
+    gap: 8px;
+    margin-left: auto;
+    flex-shrink: 0;
 }
 
-header.nav .store-logo small {
-    display: block;
-    color: #6b7280 !important;
-    font-weight: 600;
-    font-size: 0.72rem;
-}
-
-header.nav .store-logo-mark {
-    width: 2.5rem;
-    height: 2.5rem;
-    display: grid;
-    place-items: center;
-    border-radius: 0.75rem;
-    background: linear-gradient(135deg, #0ea5e9, #087ea4);
-    color: #fff !important;
-    font-weight: 800;
-    box-shadow: 0 6px 16px rgb(8 126 164 / 35%);
-}
-
-/* ---------- Action buttons (desktop + mobile): always readable ---------- */
-
-header.nav .store-actions .nav-action,
-header.nav .store-actions .soft {
-    background: #f3f6f9 !important;
-    color: #111827 !important;
-    border: 1px solid #e5e7eb !important;
-    font-weight: 600;
+.theme-toggle,
+.nav-hamburger {
+    width: 42px;
+    height: 42px;
+    min-height: 0;
+    padding: 0;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 0.4rem;
-    transition: background 0.2s ease, transform 0.2s ease;
+    border-radius: 12px;
+    background: var(--card);
+    color: var(--ink);
+    border: 1px solid var(--line);
+    font-size: 19px;
+    line-height: 1;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
 }
 
-header.nav .store-actions .nav-action:hover {
-    background: #e6eef5 !important;
+.theme-toggle:hover,
+.nav-hamburger:hover {
+    border-color: var(--pri);
     transform: translateY(-1px);
 }
 
-header.nav .store-actions .nav-action[hidden] {
-    display: none !important;
+.theme-toggle .theme-icon {
+    display: inline-block;
+    transition: transform 0.35s ease;
 }
 
-header.nav .store-actions .premium-cart {
-    position: relative;
+.theme-toggle:active .theme-icon {
+    transform: rotate(35deg) scale(0.85);
+}
+
+/* hamburger lines */
+
+.nav-hamburger {
+    display: none;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.nav-hamburger span {
+    display: block;
+    width: 20px;
+    height: 2px;
+    border-radius: 99px;
+    background: var(--ink);
+    transition: transform 0.25s ease, opacity 0.25s ease;
+}
+
+.nav-hamburger.active span:nth-child(1) {
+    transform: translateY(7px) rotate(45deg);
+}
+
+.nav-hamburger.active span:nth-child(2) {
+    opacity: 0;
+}
+
+.nav-hamburger.active span:nth-child(3) {
+    transform: translateY(-7px) rotate(-45deg);
+}
+
+/* desktop buttons */
+
+.store-actions .nav-action {
     display: inline-flex;
     align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-    background: #087ea4 !important;
-    color: #fff !important;
-    border: 0 !important;
-    font-weight: 700;
+    gap: 6px;
+    font-weight: 600;
+    color: var(--ink);
 }
 
-header.nav .store-actions .premium-cart b {
-    position: static !important;
-    min-width: 1.4rem;
-    height: 1.4rem;
-    padding-inline: 0.3rem;
-    display: inline-grid;
-    place-items: center;
-    border-radius: 999px;
-    background: #fff !important;
-    color: #087ea4 !important;
-    font-size: 0.75rem;
+.store-actions .nav-action:hover {
+    background: var(--bg);
 }
 
-/* ---------- Mobile ---------- */
+.premium-cart {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
 
-@media (max-width: 56.25rem) {
+.cart-label {
+    display: none;
+}
+
+.premium-cart b {
+    background: #ff3b30;
+    color: #fff;
+}
+
+
+/* ---------------------------------------------------------
+   MOBILE MENU  (900px and below)
+   --------------------------------------------------------- */
+
+@media (max-width: 900px) {
 
     header.nav .nav-hamburger {
-        display: flex !important;
-        background: #f3f6f9 !important;
-        border: 1px solid #e5e7eb !important;
-        border-radius: 0.75rem;
+        display: inline-flex;
     }
 
-    header.nav .nav-hamburger span {
-        background: #111827 !important;
-    }
-
-    /* CLOSED by default */
-    header.nav .store-actions {
-        display: none !important;
-        position: absolute !important;
-        top: calc(100% + 0.5rem);
-        right: 0.75rem;
-        left: auto;
-        width: min(92vw, 22rem);
-        padding: 0.75rem;
+    /* closed by default */
+    header.nav :is(.store-actions, .nav-actions, .admin-nav-right, .staff-nav-actions) {
+        display: none;
+        position: absolute;
+        top: calc(100% + 8px);
+        right: 12px;
+        width: min(calc(100vw - 24px), 22rem);
+        padding: 12px;
         flex-direction: column;
         align-items: stretch;
-        gap: 0.5rem;
-        background: #ffffff !important;
-        border: 1px solid #e5e7eb;
-        border-radius: 1rem;
-        box-shadow: 0 1.25rem 3rem rgb(0 0 0 / 25%);
-        z-index: 3100 !important;
+        gap: 8px;
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        box-shadow: 0 22px 50px rgb(0 0 0 / 28%);
+        z-index: 1100;
     }
 
-    /* OPEN when JS adds .open */
-    header.nav .store-actions.open {
-        display: flex !important;
+    /* open when JS adds .open */
+    header.nav :is(.store-actions, .nav-actions, .admin-nav-right, .staff-nav-actions).open {
+        display: flex;
         animation: menuDrop 0.22s ease both;
     }
 
-    header.nav .store-actions .nav-action,
-    header.nav .store-actions .soft,
-    header.nav .store-actions .premium-cart {
+    /* every item: full width, label ALWAYS visible */
+    header.nav :is(.store-actions, .nav-actions, .admin-nav-right, .staff-nav-actions) > * {
         width: 100%;
-        min-height: 3rem;
-        font-size: 1rem;
+        min-height: 46px;
+        padding: 10px 14px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        font-size: 15px;
+        font-weight: 600;
+        color: var(--ink);
+        background: var(--bg);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        text-decoration: none;
+    }
+
+    header.nav .store-actions .nav-action span,
+    header.nav .store-actions .cart-label {
+        display: inline !important;
+    }
+
+    header.nav .store-actions .premium-cart {
+        position: relative;
+        background: var(--pri);
+        border-color: var(--pri);
+        color: #fff;
+        box-shadow: none;
+    }
+
+    header.nav .store-actions .premium-cart b {
+        position: static;
+        margin-left: 2px;
+        min-width: 22px;
+        height: 22px;
+        padding: 0 6px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 99px;
+        background: #fff;
+        color: var(--pri);
+        font-size: 12px;
     }
 }
 
@@ -161,5 +240,193 @@ header.nav .store-actions .premium-cart b {
     to {
         opacity: 1;
         transform: none;
+    }
+}
+
+
+/* ---------------------------------------------------------
+   DARK THEME  (<html data-theme="dark">)
+   --------------------------------------------------------- */
+
+:root[data-theme="dark"] .store-nav {
+    background: rgb(15 26 38 / 92%);
+    box-shadow: 0 4px 20px rgb(0 0 0 / 35%);
+}
+
+:root[data-theme="dark"] .premium-cart {
+    background: var(--pri);
+}
+
+:root[data-theme="dark"] .add {
+    background: #16314d;
+    color: #7fbcff;
+}
+
+:root[data-theme="dark"] .danger {
+    background: #3a1c20;
+    color: #ff8a8f;
+}
+
+:root[data-theme="dark"] .trust-icon.blue {
+    background: #12304d;
+}
+
+:root[data-theme="dark"] .trust-icon.green {
+    background: #12301f;
+}
+
+:root[data-theme="dark"] .trust-icon.purple {
+    background: #2a2347;
+}
+
+:root[data-theme="dark"] .premium-grid .card,
+:root[data-theme="dark"] .trust-card,
+:root[data-theme="dark"] .premium-enquiry {
+    box-shadow: 0 8px 24px rgb(0 0 0 / 30%);
+}
+
+:root[data-theme="dark"] .premium-grid .card:hover {
+    box-shadow: 0 16px 36px rgb(0 0 0 / 45%);
+}
+
+:root[data-theme="dark"] .category-card:hover {
+    border-color: var(--pri);
+}
+
+:root[data-theme="dark"] .footer-logo {
+    background: var(--pri);
+}
+
+:root[data-theme="dark"] #modal {
+    background: rgb(0 0 0 / 65%);
+}
+
+:root[data-theme="dark"] ::-webkit-scrollbar-thumb {
+    background: #3a4f62;
+}
+
+
+/* ---------------------------------------------------------
+   MY ORDERS CARDS (class "ordercard" had no style before)
+   --------------------------------------------------------- */
+
+.ordercard {
+    margin: 10px 0;
+    padding: 12px 14px;
+    background: var(--bg);
+    color: var(--ink);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+}
+
+.ordercard .row {
+    padding: 3px 0;
+}
+
+.ordercard button {
+    margin-top: 6px;
+    margin-right: 6px;
+}
+
+.box,
+.box h2,
+.box label,
+.box .muted {
+    color: var(--ink);
+}
+
+.box .muted {
+    color: var(--mut);
+}
+
+
+/* ---------------------------------------------------------
+   WELCOME / UI MODAL  (created by responsive.js)
+   --------------------------------------------------------- */
+
+#ui-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 3000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    background: rgb(0 0 0 / 55%);
+    backdrop-filter: blur(4px);
+}
+
+.ui-modal-box {
+    width: min(100%, 26rem);
+    padding: 24px;
+    background: var(--card);
+    color: var(--ink);
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    box-shadow: 0 24px 60px rgb(0 0 0 / 35%);
+    animation: menuDrop 0.25s ease both;
+}
+
+.ui-modal-title {
+    margin-bottom: 8px;
+    font-size: 20px;
+    font-weight: 800;
+    color: var(--ink);
+}
+
+.ui-modal-message {
+    color: var(--mut);
+    line-height: 1.6;
+}
+
+.ui-modal-actions {
+    margin-top: 18px;
+    display: flex;
+    justify-content: flex-end;
+}
+
+.ui-modal-close {
+    padding: 10px 18px;
+    background: var(--pri);
+    color: #fff;
+    border: 0;
+    border-radius: 10px;
+    font-weight: 700;
+}
+
+
+/* ---------------------------------------------------------
+   SMALL SCREENS
+   --------------------------------------------------------- */
+
+@media (max-width: 600px) {
+
+    .store-nav {
+        padding: 10px 12px;
+    }
+
+    .premium-ticker {
+        font-size: 12px;
+    }
+
+    .box {
+        padding: 16px;
+    }
+}
+
+@media (max-width: 380px) {
+
+    .store-logo span {
+        font-size: 12px;
+    }
+
+    .store-logo small {
+        display: none;
+    }
+
+    .theme-toggle,
+    .nav-hamburger {
+        width: 38px;
+        height: 38px;
     }
 }
