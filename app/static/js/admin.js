@@ -729,7 +729,7 @@ async function loadAdminProducts() {
     if (banner) {
         banner.hidden = !low.length;
         banner.innerHTML = low.length
-            ? `⚠️ <b>Low stock:</b> ${low.map(p => `${esc(p.name)} (${p.stock})`).join(', ')}`
+            ? `⚠️ <b>Low stock:</b> ${low.map(p => `${esc(p.name)}${p.size ? ` (${esc(p.size)})` : ''} (${p.stock})`).join(', ')}`
             : '';
     }
 
@@ -767,6 +767,10 @@ async function loadAdminProducts() {
                     </td>
 
                     <td>
+                        ${esc(product.size || '')}
+                    </td>
+
+                    <td>
                         ${money(product.price)}
                     </td>
 
@@ -798,7 +802,8 @@ function productForm(
     category = '',
     price = '',
     stock = '',
-    icon = '🥤'
+    icon = '🥤',
+    size = ''
 ) {
 
     const modal =
@@ -844,6 +849,13 @@ function productForm(
             );
 
 
+        const newSize =
+            prompt(
+                'Size (e.g. 750ml, 1L, 20L):',
+                size
+            );
+
+
         const newIcon =
             prompt(
                 'Icon:',
@@ -854,6 +866,7 @@ function productForm(
         const data = {
             name: newName,
             category: newCategory,
+            size: newSize || '',
             price: Number(newPrice || 0),
             stock: Number(newStock || 0),
             icon: newIcon || '🥤',
@@ -951,6 +964,24 @@ function productForm(
                     padding:11px;
                     box-sizing:border-box;
                 ">${ADMIN_CATEGORIES.filter(c=>c.active).map(c=>`<option value="${esc(c.name)}" ${c.name===category?'selected':''}>${esc(c.icon)} ${esc(c.name)}</option>`).join('')}</select>
+
+
+            <label>
+                Size
+            </label>
+
+            <input
+                id="adminProductSize"
+                type="text"
+                value="${esc(size)}"
+                placeholder="e.g. 250ml, 750ml, 1L, 20L"
+                style="
+                    width:100%;
+                    margin:6px 0 14px;
+                    padding:11px;
+                    box-sizing:border-box;
+                "
+            >
 
 
             <label>
@@ -1057,6 +1088,12 @@ async function saveProductForm(id) {
             .trim();
 
 
+    const size =
+        $('#adminProductSize')
+            ?.value
+            .trim() || '';
+
+
     const price =
         Number(
             $('#adminProductPrice')
@@ -1097,6 +1134,7 @@ async function saveProductForm(id) {
     const data = {
         name,
         category,
+        size,
         price,
         stock,
         icon,
@@ -1157,6 +1195,11 @@ async function createAdminProduct(
                 $('#pcategory')
                     ?.value
                     .trim(),
+
+            size:
+                $('#psize')
+                    ?.value
+                    .trim() || '',
 
             price:
                 Number(
