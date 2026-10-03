@@ -4264,3 +4264,9 @@ body.ce-menu-open{
         min-height:170px;
     }
 }
+
+
+/* Social/contact links */
+.footer-social { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+.footer-social a { color:var(--pri,#0a7cff); font-weight:700; text-decoration:none; }
+.footer-social a:hover { text-decoration:underline; }
