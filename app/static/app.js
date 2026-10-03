@@ -2186,3 +2186,53 @@ window.openCheckout = openCheckout;
 window.openEnquiry = openEnquiry;
 
 window.openWhatsApp = openWhatsApp;
+
+
+/* ================= MOBILE BROCHURE MENU ================= */
+
+(function initChandMobileMenu() {
+    const button = document.getElementById("mobileMenuButton");
+    const menu = document.getElementById("ceMobileMenu");
+    const backdrop = document.getElementById("ceMenuBackdrop");
+    const closeButton = document.getElementById("ceMenuClose");
+
+    if (!button || !menu || !backdrop) return;
+
+    function openMobileMenu() {
+        menu.classList.add("open");
+        backdrop.classList.add("open");
+        button.classList.add("active");
+        button.setAttribute("aria-expanded", "true");
+        menu.setAttribute("aria-hidden", "false");
+        backdrop.setAttribute("aria-hidden", "false");
+        document.body.classList.add("ce-menu-open");
+    }
+
+    window.closeMobileMenu = function () {
+        menu.classList.remove("open");
+        backdrop.classList.remove("open");
+        button.classList.remove("active");
+        button.setAttribute("aria-expanded", "false");
+        menu.setAttribute("aria-hidden", "true");
+        backdrop.setAttribute("aria-hidden", "true");
+        document.body.classList.remove("ce-menu-open");
+    };
+
+    button.addEventListener("click", function () {
+        if (menu.classList.contains("open")) {
+            window.closeMobileMenu();
+        } else {
+            openMobileMenu();
+        }
+    });
+
+    backdrop.addEventListener("click", window.closeMobileMenu);
+
+    if (closeButton) {
+        closeButton.addEventListener("click", window.closeMobileMenu);
+    }
+
+    document.addEventListener("keydown", function (event) {
+        if (event.key === "Escape") window.closeMobileMenu();
+    });
+})();
