@@ -15,61 +15,103 @@
         const nav = document.querySelector(".nav");
         if (!nav) return;
 
+        /* =================================================
+           Chand Enterprises custom side menu
+           ================================================= */
+        const sideMenu = document.getElementById("ceMobileMenu");
+        const backdrop = document.getElementById("ceMenuBackdrop");
+        const closeButton = document.getElementById("ceMenuClose");
+        const hamburger = nav.querySelector(".nav-hamburger");
+
+        if (sideMenu && backdrop && hamburger) {
+
+            if (hamburger.dataset.ceBound !== "1") {
+                hamburger.dataset.ceBound = "1";
+
+                function setSideMenu(open) {
+                    sideMenu.classList.toggle("open", open);
+                    backdrop.classList.toggle("open", open);
+                    document.body.classList.toggle("ce-menu-open", open);
+
+                    sideMenu.setAttribute("aria-hidden", String(!open));
+                    backdrop.setAttribute("aria-hidden", String(!open));
+                    hamburger.classList.toggle("active", open);
+                    hamburger.setAttribute("aria-expanded", String(open));
+                    hamburger.setAttribute(
+                        "aria-label",
+                        open ? "Close menu" : "Open menu"
+                    );
+                }
+
+                hamburger.addEventListener("click", function (event) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    setSideMenu(!sideMenu.classList.contains("open"));
+                });
+
+                if (closeButton) {
+                    closeButton.addEventListener("click", function () {
+                        setSideMenu(false);
+                    });
+                }
+
+                backdrop.addEventListener("click", function () {
+                    setSideMenu(false);
+                });
+
+                sideMenu.addEventListener("click", function (event) {
+                    const link = event.target.closest("a");
+                    if (link) setSideMenu(false);
+                });
+
+                document.addEventListener("keydown", function (event) {
+                    if (event.key === "Escape") setSideMenu(false);
+                });
+
+                window.closeMobileMenu = function () {
+                    setSideMenu(false);
+                };
+            }
+
+            return;
+        }
+
+        /* =================================================
+           Legacy staff/admin navigation fallback
+           ================================================= */
         const navActions = nav.querySelector(
             ".store-actions, .nav-actions, .admin-nav-right, .staff-nav-actions"
         );
-        if (!navActions) return;
+        if (!navActions || !hamburger) return;
 
-        let button = nav.querySelector(".nav-hamburger");
-
-        // Fallback for pages without a hamburger in their HTML
-        if (!button) {
-            button = document.createElement("button");
-            button.type = "button";
-            button.className = "nav-hamburger";
-            button.setAttribute("aria-label", "Open menu");
-            button.setAttribute("aria-expanded", "false");
-            button.innerHTML = "<span></span><span></span><span></span>";
-            nav.insertBefore(button, navActions);
-        }
-
-        // Avoid double-binding
-        if (button.dataset.bound === "1") return;
-        button.dataset.bound = "1";
+        if (hamburger.dataset.legacyBound === "1") return;
+        hamburger.dataset.legacyBound = "1";
 
         function setOpen(open) {
             navActions.classList.toggle("open", open);
-            button.classList.toggle("active", open);
-            button.setAttribute("aria-expanded", String(open));
-            button.setAttribute("aria-label", open ? "Close menu" : "Open menu");
+            hamburger.classList.toggle("active", open);
+            hamburger.setAttribute("aria-expanded", String(open));
+            hamburger.setAttribute("aria-label", open ? "Close menu" : "Open menu");
         }
 
-        button.addEventListener("click", function (event) {
+        hamburger.addEventListener("click", function (event) {
             event.preventDefault();
             event.stopPropagation();
             setOpen(!navActions.classList.contains("open"));
         });
 
-        // Close after choosing an item
         navActions.addEventListener("click", function (event) {
             if (event.target.closest("a, button, input, select")) {
                 setTimeout(function () { setOpen(false); }, 80);
             }
         });
 
-        // Close when tapping outside
         document.addEventListener("click", function (event) {
             if (!nav.contains(event.target)) setOpen(false);
         });
 
-        // Close with Escape
         document.addEventListener("keydown", function (event) {
             if (event.key === "Escape") setOpen(false);
-        });
-
-        // Reset on desktop width
-        window.addEventListener("resize", function () {
-            if (window.innerWidth > 900) setOpen(false);
         });
     }
 
