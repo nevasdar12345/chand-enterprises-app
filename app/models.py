@@ -116,12 +116,20 @@ class Product(db.Model):
         nullable=False
     )
 
-    # This intentionally remains a string because the
-    # existing product/order code stores the category name.
+    # Category name is kept as a string to remain compatible
+    # with the existing product/category system.
     category = db.Column(
         db.String(80),
         nullable=False,
         index=True
+    )
+
+    # Product size / quantity
+    # Examples: 250ml, 500ml, 750ml, 1L, 20L
+    size = db.Column(
+        db.String(40),
+        default="",
+        nullable=False
     )
 
     price = db.Column(
@@ -303,8 +311,17 @@ class OrderItem(db.Model):
         nullable=False
     )
 
+    # Snapshot of product name at the time of the order
     product_name = db.Column(
         db.String(160),
+        nullable=False
+    )
+
+    # Snapshot of product size at the time of the order
+    # This ensures old orders keep their original size.
+    product_size = db.Column(
+        db.String(40),
+        default="",
         nullable=False
     )
 
