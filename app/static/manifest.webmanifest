@@ -1,0 +1,17 @@
+{
+  "name": "Chand Enterprises",
+  "short_name": "Chand Enterprises",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f6f9fc",
+  "theme_color": "#0a7cff",
+  "description": "Chand Enterprises local drinks and premium water ordering",
+  "icons": [
+    {
+      "src": "/static/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
