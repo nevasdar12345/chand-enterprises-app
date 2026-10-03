@@ -298,6 +298,36 @@ async function developerSettings() {
             >
         </label>
 
+        <label>
+            Store latitude
+
+            <input id="ds_lat" value="${esc(settings.business_lat || '')}" placeholder="Example: 26.1542">
+        </label>
+
+        <label>
+            Store longitude
+
+            <input id="ds_lng" value="${esc(settings.business_lng || '')}" placeholder="Example: 85.8918">
+        </label>
+
+        <label>
+            Base delivery charge (₹)
+
+            <input id="ds_base" type="number" min="0" value="${esc(settings.delivery_base || '30')}">
+        </label>
+
+        <label>
+            Charge per km (₹)
+
+            <input id="ds_km" type="number" min="0" value="${esc(settings.delivery_per_km || '10')}">
+        </label>
+
+        <label>
+            Free delivery above (₹)
+
+            <input id="ds_free" type="number" min="0" value="${esc(settings.delivery_free_above || '500')}">
+        </label>
+
         <p
             class="err"
             id="ds_err"
@@ -359,7 +389,12 @@ async function saveDeveloperSettings() {
                 payment_name:
                     $('#ds_payment')
                         ?.value
-                        .trim()
+                        .trim(),
+                business_lat: $('#ds_lat')?.value.trim(),
+                business_lng: $('#ds_lng')?.value.trim(),
+                delivery_base: $('#ds_base')?.value,
+                delivery_per_km: $('#ds_km')?.value,
+                delivery_free_above: $('#ds_free')?.value
             }
         );
 
@@ -1124,14 +1159,8 @@ async function developerRefresh() {
 
 function logout() {
 
-    const form = document.createElement('form');
-
-    form.method = 'POST';
-    form.action = '/logout';
-
-    document.body.appendChild(form);
-
-    form.submit();
+    window.location.href =
+        '/logout';
 }
 
 
