@@ -149,6 +149,8 @@
             📖 Brochure
         </button>
 
+        <button onclick="showTab('team', this)">👥 Team</button>
+
     </div>
 
 
@@ -1141,6 +1143,20 @@
 
     </script>
 
+
+
+    <section id="tab-team" style="display:none">
+        <div class="premium-section-head">
+            <div><span class="section-kicker">STAFF</span><h2>Team accounts</h2><small>Manage delivery accounts. Developer accounts can also manage admins.</small></div>
+            <button class="primary" onclick="addTeam()">+ Add account</button>
+        </div>
+        <div class="table admin-table">
+            <table>
+                <thead><tr><th>Name</th><th>Username</th><th>Role</th><th>Mobile</th><th>Status</th><th>Actions</th></tr></thead>
+                <tbody id="teamRows"><tr><td colspan="6">Open Team to load accounts.</td></tr></tbody>
+            </table>
+        </div>
+    </section>
 
 </main>
 
