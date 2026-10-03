@@ -1,0 +1,94 @@
+{% extends 'base.html' %}
+
+{% block title %}Brochure · Chand Enterprises{% endblock %}
+
+{% block body %}
+
+<main class="brochure-page">
+
+    <section class="brochure-hero">
+        <div class="brochure-hero-content">
+            <span class="brochure-eyebrow">CHAND ENTERPRISES · DARBHANGA, BIHAR</span>
+            <h1>Premium Product Brochure</h1>
+            <p>Explore our three product collections — Nevas Package Drinking Water, Cold Drinks and Energy Drinks.</p>
+
+            <div class="brochure-actions">
+                <a class="primary-btn{% if not brochure_pdf_exists %} disabled-btn{% endif %}" href="{{ url_for('static', filename='brochure.pdf') }}" {% if not brochure_pdf_exists %}aria-disabled="true"{% endif %}>📖 View PDF</a>
+                <a class="secondary-btn{% if not brochure_pdf_exists %} disabled-btn{% endif %}" href="{{ url_for('static', filename='brochure.pdf') }}" {% if not brochure_pdf_exists %}aria-disabled="true"{% else %}download{% endif %}>⬇ Download PDF</a>
+            </div>
+        </div>
+    </section>
+
+    <section class="brochure-section">
+        <div class="brochure-section-head">
+            <div>
+                <span class="brochure-section-kicker">01 · WATER</span>
+                <h2>Nevas Package Drinking Water</h2>
+                <p>Premium packaged drinking water collection.</p>
+            </div>
+        </div>
+
+        <div class="brochure-grid">
+            <article class="brochure-product-card">
+                <div class="brochure-product-image">💧</div>
+                <div class="brochure-product-info">
+                    <h3>Nevas Premium Water</h3>
+                    <p>Product image and pack details can be added here.</p>
+                </div>
+            </article>
+            <article class="brochure-product-card">
+                <div class="brochure-product-image">🚰</div>
+                <div class="brochure-product-info">
+                    <h3>Packaged Drinking Water</h3>
+                    <p>Add the exact bottle or pack variant here.</p>
+                </div>
+            </article>
+            <article class="brochure-product-card">
+                <div class="brochure-product-image">💦</div>
+                <div class="brochure-product-info">
+                    <h3>Premium Collection</h3>
+                    <p>Replace this placeholder with the actual product image.</p>
+                </div>
+            </article>
+        </div>
+    </section>
+
+    <section class="brochure-section">
+        <div class="brochure-section-head">
+            <div>
+                <span class="brochure-section-kicker">02 · COLD DRINKS</span>
+                <h2>Cold Drinks</h2>
+                <p>Refreshing cold drink products available from Chand Enterprises.</p>
+            </div>
+        </div>
+
+        <div class="brochure-grid">
+            <article class="brochure-product-card"><div class="brochure-product-image">🥤</div><div class="brochure-product-info"><h3>Cold Drink</h3><p>Add product image, brand and size.</p></div></article>
+            <article class="brochure-product-card"><div class="brochure-product-image">🧊</div><div class="brochure-product-info"><h3>Refreshing Collection</h3><p>Add the actual product image here.</p></div></article>
+            <article class="brochure-product-card"><div class="brochure-product-image">🥤</div><div class="brochure-product-info"><h3>Available Variants</h3><p>Add pack sizes and product details.</p></div></article>
+        </div>
+    </section>
+
+    <section class="brochure-section">
+        <div class="brochure-section-head">
+            <div>
+                <span class="brochure-section-kicker">03 · ENERGY</span>
+                <h2>Energy Drinks</h2>
+                <p>Energy drink products and variants available for local delivery.</p>
+            </div>
+        </div>
+
+        <div class="brochure-grid">
+            <article class="brochure-product-card"><div class="brochure-product-image">⚡</div><div class="brochure-product-info"><h3>Energy Drink</h3><p>Add product image, brand and size.</p></div></article>
+            <article class="brochure-product-card"><div class="brochure-product-image">🔋</div><div class="brochure-product-info"><h3>Energy Collection</h3><p>Add the actual product image here.</p></div></article>
+            <article class="brochure-product-card"><div class="brochure-product-image">⚡</div><div class="brochure-product-info"><h3>Available Variants</h3><p>Add pack sizes and product details.</p></div></article>
+        </div>
+    </section>
+
+    <div class="brochure-note">
+        The online brochure layout is ready. The final premium PDF and real product images can be added next without changing the rest of the website.
+    </div>
+
+</main>
+
+{% endblock %}
