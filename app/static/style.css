@@ -3883,4 +3883,384 @@ button:active,
     color:#8a4b00;
 }
 .ledger-due{color:var(--bad)}
-\n\n/* =========================================================\n   CHAND ENTERPRISES — MOBILE MENU + BROCHURE\n   ========================================================= */\n\n.ce-menu-backdrop{\n    position:fixed;\n    inset:0;\n    z-index:9990;\n    background:rgba(7,18,29,.46);\n    backdrop-filter:blur(5px);\n    opacity:0;\n    visibility:hidden;\n    pointer-events:none;\n    transition:opacity .25s ease, visibility .25s ease;\n}\n\n.ce-menu-backdrop.open{\n    opacity:1;\n    visibility:visible;\n    pointer-events:auto;\n}\n\n.ce-menu{\n    position:fixed;\n    top:0;\n    right:0;\n    width:min(390px, 88vw);\n    height:100dvh;\n    z-index:9991;\n    padding:24px 18px;\n    display:flex;\n    flex-direction:column;\n    background:var(--card);\n    color:var(--ink);\n    border-left:1px solid var(--line);\n    box-shadow:-20px 0 60px rgba(7,18,29,.16);\n    transform:translateX(105%);\n    transition:transform .3s cubic-bezier(.22,.8,.24,1);\n}\n\n.ce-menu.open{\n    transform:translateX(0);\n}\n\n.ce-menu-head{\n    display:flex;\n    align-items:flex-start;\n    justify-content:space-between;\n    gap:16px;\n    padding:4px 4px 22px;\n    border-bottom:1px solid var(--line);\n}\n\n.ce-menu-kicker{\n    display:block;\n    margin-bottom:5px;\n    color:var(--pri);\n    font-size:10px;\n    font-weight:800;\n    letter-spacing:.16em;\n}\n\n.ce-menu-head h2{\n    margin:0;\n    font-size:27px;\n    letter-spacing:-.6px;\n}\n\n.ce-menu-close{\n    width:40px;\n    height:40px;\n    border:1px solid var(--line);\n    border-radius:12px;\n    background:var(--bg);\n    color:var(--ink);\n    font-size:27px;\n    line-height:1;\n    cursor:pointer;\n}\n\n.ce-menu-links{\n    display:flex;\n    flex-direction:column;\n    gap:8px;\n    padding-top:18px;\n}\n\n.ce-menu-link{\n    min-height:58px;\n    padding:10px 13px;\n    display:grid;\n    grid-template-columns:38px 1fr;\n    align-items:center;\n    column-gap:5px;\n    position:relative;\n    text-decoration:none;\n    color:var(--ink);\n    background:transparent;\n    border:1px solid transparent;\n    border-radius:15px;\n    font:inherit;\n    font-weight:700;\n    text-align:left;\n    cursor:pointer;\n    transition:background .2s ease, border-color .2s ease, transform .2s ease;\n}\n\n.ce-menu-link > span:first-child{\n    width:34px;\n    height:34px;\n    display:flex;\n    align-items:center;\n    justify-content:center;\n    border-radius:10px;\n    background:var(--bg);\n    font-size:18px;\n}\n\n.ce-menu-link:hover{\n    background:var(--bg);\n    border-color:var(--line);\n    transform:translateX(-2px);\n}\n\n.ce-menu-featured{\n    background:linear-gradient(135deg, #0a7cff10, #00c2d110);\n    border-color:#0a7cff25;\n}\n\n.ce-menu-featured small{\n    grid-column:2;\n    margin-top:-3px;\n    color:var(--muted);\n    font-size:11px;\n    font-weight:500;\n}\n\n.ce-menu-button{\n    width:100%;\n}\n\n.ce-menu-footer{\n    margin-top:auto;\n    padding:15px 5px 4px;\n    border-top:1px solid var(--line);\n    color:var(--muted);\n    font-size:12px;\n}\n\nbody.ce-menu-open{\n    overflow:hidden;\n}\n\n/* Brochure page */\n\n.brochure-page{\n    max-width:1180px;\n    margin:0 auto;\n    padding:24px 18px 60px;\n}\n\n.brochure-hero{\n    position:relative;\n    overflow:hidden;\n    min-height:360px;\n    padding:52px 42px;\n    display:flex;\n    align-items:center;\n    border-radius:30px;\n    background:linear-gradient(135deg,#0b1d2c,#123b52 58%,#087f8f);\n    color:#fff;\n    box-shadow:0 22px 60px rgba(11,29,44,.18);\n}\n\n.brochure-hero::before,\n.brochure-hero::after{\n    content:"";\n    position:absolute;\n    border-radius:999px;\n    pointer-events:none;\n}\n\n.brochure-hero::before{\n    width:330px;\n    height:330px;\n    right:-100px;\n    top:-120px;\n    background:#00c2d133;\n}\n\n.brochure-hero::after{\n    width:260px;\n    height:260px;\n    right:100px;\n    bottom:-190px;\n    background:#0a7cff35;\n}\n\n.brochure-hero-content{\n    position:relative;\n    z-index:1;\n    max-width:720px;\n}\n\n.brochure-eyebrow{\n    margin-bottom:12px;\n    font-size:11px;\n    font-weight:800;\n    letter-spacing:.18em;\n    color:#8deaf1;\n}\n\n.brochure-hero h1{\n    margin:0;\n    font-size:clamp(38px,6vw,68px);\n    line-height:1;\n    letter-spacing:-2.5px;\n}\n\n.brochure-hero p{\n    max-width:650px;\n    margin:18px 0 0;\n    color:#dceaf1;\n    font-size:15px;\n    line-height:1.7;\n}\n\n.brochure-actions{\n    display:flex;\n    flex-wrap:wrap;\n    gap:10px;\n    margin-top:24px;\n}\n\n.brochure-actions a{\n    display:inline-flex;\n    align-items:center;\n    justify-content:center;\n    min-height:44px;\n    padding:0 18px;\n    border-radius:12px;\n    text-decoration:none;\n    font-weight:700;\n}\n\n.brochure-actions .primary-btn{\n    background:#fff;\n    color:#0b1d2c;\n}\n\n.brochure-actions .secondary-btn{\n    border:1px solid #ffffff35;\n    background:#ffffff10;\n    color:#fff;\n}\n\n.brochure-actions .disabled-btn{\n    opacity:.6;\n    cursor:not-allowed;\n}\n\n.brochure-section{\n    margin-top:30px;\n    padding:28px;\n    border:1px solid var(--line);\n    border-radius:24px;\n    background:var(--card);\n    box-shadow:0 10px 30px rgba(15,34,51,.05);\n}\n\n.brochure-section-head{\n    display:flex;\n    align-items:flex-end;\n    justify-content:space-between;\n    gap:18px;\n    margin-bottom:20px;\n}\n\n.brochure-section-kicker{\n    display:block;\n    margin-bottom:5px;\n    color:var(--pri);\n    font-size:10px;\n    font-weight:800;\n    letter-spacing:.16em;\n}\n\n.brochure-section h2{\n    margin:0;\n    font-size:28px;\n    letter-spacing:-.7px;\n}\n\n.brochure-section p{\n    margin:7px 0 0;\n    color:var(--muted);\n    font-size:13px;\n    line-height:1.6;\n}\n\n.brochure-grid{\n    display:grid;\n    grid-template-columns:repeat(3,minmax(0,1fr));\n    gap:14px;\n}\n\n.brochure-product-card{\n    overflow:hidden;\n    border:1px solid var(--line);\n    border-radius:18px;\n    background:var(--bg);\n}\n\n.brochure-product-image{\n    min-height:190px;\n    display:flex;\n    align-items:center;\n    justify-content:center;\n    background:linear-gradient(145deg,#eef7fb,#dfeef4);\n    font-size:72px;\n}\n\n.brochure-product-info{\n    padding:16px;\n}\n\n.brochure-product-info h3{\n    margin:0;\n    font-size:17px;\n}\n\n.brochure-product-info p{\n    margin:6px 0 0;\n    font-size:12px;\n}\n\n.brochure-note{\n    margin-top:28px;\n    padding:14px 16px;\n    border-radius:14px;\n    background:var(--bg);\n    color:var(--muted);\n    font-size:12px;\n    line-height:1.6;\n}\n\n@media(max-width:700px){\n    .brochure-page{\n        padding:14px 12px 42px;\n    }\n\n    .brochure-hero{\n        min-height:390px;\n        padding:32px 22px;\n        border-radius:22px;\n    }\n\n    .brochure-hero h1{\n        letter-spacing:-1.5px;\n    }\n\n    .brochure-section{\n        padding:20px 16px;\n        border-radius:20px;\n    }\n\n    .brochure-section-head{\n        align-items:flex-start;\n        flex-direction:column;\n    }\n\n    .brochure-grid{\n        grid-template-columns:1fr;\n    }\n\n    .brochure-product-image{\n        min-height:170px;\n    }\n}\n
+
+
+/* =========================================================
+   CHAND ENTERPRISES — MOBILE MENU + BROCHURE
+   ========================================================= */
+
+.ce-menu-backdrop{
+    position:fixed;
+    inset:0;
+    z-index:9990;
+    background:rgba(7,18,29,.46);
+    backdrop-filter:blur(5px);
+    opacity:0;
+    visibility:hidden;
+    pointer-events:none;
+    transition:opacity .25s ease, visibility .25s ease;
+}
+
+.ce-menu-backdrop.open{
+    opacity:1;
+    visibility:visible;
+    pointer-events:auto;
+}
+
+.ce-menu{
+    position:fixed;
+    top:0;
+    right:0;
+    width:min(390px, 88vw);
+    height:100dvh;
+    z-index:9991;
+    padding:24px 18px;
+    display:flex;
+    flex-direction:column;
+    background:var(--card);
+    color:var(--ink);
+    border-left:1px solid var(--line);
+    box-shadow:-20px 0 60px rgba(7,18,29,.16);
+    transform:translateX(105%);
+    transition:transform .3s cubic-bezier(.22,.8,.24,1);
+}
+
+.ce-menu.open{
+    transform:translateX(0);
+}
+
+.ce-menu-head{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:16px;
+    padding:4px 4px 22px;
+    border-bottom:1px solid var(--line);
+}
+
+.ce-menu-kicker{
+    display:block;
+    margin-bottom:5px;
+    color:var(--pri);
+    font-size:10px;
+    font-weight:800;
+    letter-spacing:.16em;
+}
+
+.ce-menu-head h2{
+    margin:0;
+    font-size:27px;
+    letter-spacing:-.6px;
+}
+
+.ce-menu-close{
+    width:40px;
+    height:40px;
+    border:1px solid var(--line);
+    border-radius:12px;
+    background:var(--bg);
+    color:var(--ink);
+    font-size:27px;
+    line-height:1;
+    cursor:pointer;
+}
+
+.ce-menu-links{
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+    padding-top:18px;
+}
+
+.ce-menu-link{
+    min-height:58px;
+    padding:10px 13px;
+    display:grid;
+    grid-template-columns:38px 1fr;
+    align-items:center;
+    column-gap:5px;
+    position:relative;
+    text-decoration:none;
+    color:var(--ink);
+    background:transparent;
+    border:1px solid transparent;
+    border-radius:15px;
+    font:inherit;
+    font-weight:700;
+    text-align:left;
+    cursor:pointer;
+    transition:background .2s ease, border-color .2s ease, transform .2s ease;
+}
+
+.ce-menu-link > span:first-child{
+    width:34px;
+    height:34px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    border-radius:10px;
+    background:var(--bg);
+    font-size:18px;
+}
+
+.ce-menu-link:hover{
+    background:var(--bg);
+    border-color:var(--line);
+    transform:translateX(-2px);
+}
+
+.ce-menu-featured{
+    background:linear-gradient(135deg, #0a7cff10, #00c2d110);
+    border-color:#0a7cff25;
+}
+
+.ce-menu-featured small{
+    grid-column:2;
+    margin-top:-3px;
+    color:var(--muted);
+    font-size:11px;
+    font-weight:500;
+}
+
+.ce-menu-button{
+    width:100%;
+}
+
+.ce-menu-footer{
+    margin-top:auto;
+    padding:15px 5px 4px;
+    border-top:1px solid var(--line);
+    color:var(--muted);
+    font-size:12px;
+}
+
+body.ce-menu-open{
+    overflow:hidden;
+}
+
+/* Brochure page */
+
+.brochure-page{
+    max-width:1180px;
+    margin:0 auto;
+    padding:24px 18px 60px;
+}
+
+.brochure-hero{
+    position:relative;
+    overflow:hidden;
+    min-height:360px;
+    padding:52px 42px;
+    display:flex;
+    align-items:center;
+    border-radius:30px;
+    background:linear-gradient(135deg,#0b1d2c,#123b52 58%,#087f8f);
+    color:#fff;
+    box-shadow:0 22px 60px rgba(11,29,44,.18);
+}
+
+.brochure-hero::before,
+.brochure-hero::after{
+    content:"";
+    position:absolute;
+    border-radius:999px;
+    pointer-events:none;
+}
+
+.brochure-hero::before{
+    width:330px;
+    height:330px;
+    right:-100px;
+    top:-120px;
+    background:#00c2d133;
+}
+
+.brochure-hero::after{
+    width:260px;
+    height:260px;
+    right:100px;
+    bottom:-190px;
+    background:#0a7cff35;
+}
+
+.brochure-hero-content{
+    position:relative;
+    z-index:1;
+    max-width:720px;
+}
+
+.brochure-eyebrow{
+    margin-bottom:12px;
+    font-size:11px;
+    font-weight:800;
+    letter-spacing:.18em;
+    color:#8deaf1;
+}
+
+.brochure-hero h1{
+    margin:0;
+    font-size:clamp(38px,6vw,68px);
+    line-height:1;
+    letter-spacing:-2.5px;
+}
+
+.brochure-hero p{
+    max-width:650px;
+    margin:18px 0 0;
+    color:#dceaf1;
+    font-size:15px;
+    line-height:1.7;
+}
+
+.brochure-actions{
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px;
+    margin-top:24px;
+}
+
+.brochure-actions a{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    min-height:44px;
+    padding:0 18px;
+    border-radius:12px;
+    text-decoration:none;
+    font-weight:700;
+}
+
+.brochure-actions .primary-btn{
+    background:#fff;
+    color:#0b1d2c;
+}
+
+.brochure-actions .secondary-btn{
+    border:1px solid #ffffff35;
+    background:#ffffff10;
+    color:#fff;
+}
+
+.brochure-actions .disabled-btn{
+    opacity:.6;
+    cursor:not-allowed;
+}
+
+.brochure-section{
+    margin-top:30px;
+    padding:28px;
+    border:1px solid var(--line);
+    border-radius:24px;
+    background:var(--card);
+    box-shadow:0 10px 30px rgba(15,34,51,.05);
+}
+
+.brochure-section-head{
+    display:flex;
+    align-items:flex-end;
+    justify-content:space-between;
+    gap:18px;
+    margin-bottom:20px;
+}
+
+.brochure-section-kicker{
+    display:block;
+    margin-bottom:5px;
+    color:var(--pri);
+    font-size:10px;
+    font-weight:800;
+    letter-spacing:.16em;
+}
+
+.brochure-section h2{
+    margin:0;
+    font-size:28px;
+    letter-spacing:-.7px;
+}
+
+.brochure-section p{
+    margin:7px 0 0;
+    color:var(--muted);
+    font-size:13px;
+    line-height:1.6;
+}
+
+.brochure-grid{
+    display:grid;
+    grid-template-columns:repeat(3,minmax(0,1fr));
+    gap:14px;
+}
+
+.brochure-product-card{
+    overflow:hidden;
+    border:1px solid var(--line);
+    border-radius:18px;
+    background:var(--bg);
+}
+
+.brochure-product-image{
+    min-height:190px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background:linear-gradient(145deg,#eef7fb,#dfeef4);
+    font-size:72px;
+}
+
+.brochure-product-info{
+    padding:16px;
+}
+
+.brochure-product-info h3{
+    margin:0;
+    font-size:17px;
+}
+
+.brochure-product-info p{
+    margin:6px 0 0;
+    font-size:12px;
+}
+
+.brochure-note{
+    margin-top:28px;
+    padding:14px 16px;
+    border-radius:14px;
+    background:var(--bg);
+    color:var(--muted);
+    font-size:12px;
+    line-height:1.6;
+}
+
+@media(max-width:700px){
+    .brochure-page{
+        padding:14px 12px 42px;
+    }
+
+    .brochure-hero{
+        min-height:390px;
+        padding:32px 22px;
+        border-radius:22px;
+    }
+
+    .brochure-hero h1{
+        letter-spacing:-1.5px;
+    }
+
+    .brochure-section{
+        padding:20px 16px;
+        border-radius:20px;
+    }
+
+    .brochure-section-head{
+        align-items:flex-start;
+        flex-direction:column;
+    }
+
+    .brochure-grid{
+        grid-template-columns:1fr;
+    }
+
+    .brochure-product-image{
+        min-height:170px;
+    }
+}
