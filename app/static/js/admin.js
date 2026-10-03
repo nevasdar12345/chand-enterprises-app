@@ -65,6 +65,33 @@ async function api(url, method = 'GET', body = undefined) {
 
 
 /* =========================================================
+   MODAL (shared popup used by coupon / credit / brochure forms)
+   The admin page had no global modal() / closeModal(), which is why
+   "Create coupon" and "Record payment" did nothing.
+   ========================================================= */
+
+function modal(html) {
+    const element = document.getElementById('modal');
+    if (!element) { alert('Popup area missing on this page'); return; }
+    element.innerHTML = `<div class="box">${html}</div>`;
+    element.style.display = '';
+    element.classList.add('open');
+    element.onclick = event => { if (event.target === element) closeModal(); };
+}
+
+function closeModal() {
+    const element = document.getElementById('modal');
+    if (!element) return;
+    element.classList.remove('open');
+    element.style.display = '';
+    element.innerHTML = '';
+}
+
+window.modal = modal;
+window.closeModal = closeModal;
+
+
+/* =========================================================
    STATE
    ========================================================= */
 
@@ -79,7 +106,7 @@ let ADMIN_PRODUCTS = [];
 
 function showTab(tab, button) {
 
-    const tabs = ['orders','products','stock','sales','ledger','coupons'];
+    const tabs = ['orders','products','stock','sales','ledger','coupons','brochure'];
 
     tabs.forEach(name => {
 
@@ -123,6 +150,7 @@ function showTab(tab, button) {
     if (tab === 'sales') loadSalesDashboard();
     if (tab === 'ledger') loadLedger();
     if (tab === 'coupons') loadCoupons();
+    if (tab === 'brochure') loadBrochure();
 }
 
 
@@ -1518,15 +1546,75 @@ function couponForm() {
       <button class="primary" onclick="saveCoupon()">Create</button><button onclick="closeModal()">Cancel</button>`);
 }
 async function saveCoupon() {
-    const result=await api('/api/admin/coupon','POST',{code:$('#cpCode').value,discount_type:$('#cpType').value,discount_value:Number($('#cpValue').value),max_discount:$('#cpMax').value,min_order:Number($('#cpMin').value)});
-    if(!result._ok) return $('#cpErr').textContent=result.error||'Could not create coupon';
-    closeModal(); loadCoupons();
+    const err = $('#cpErr');
+    const code = ($('#cpCode')?.value || '').trim().toUpperCase();
+    const value = Number($('#cpValue')?.value);
+    if (!/^[A-Z0-9_-]{3,40}$/.test(code)) { err.textContent = 'Code: 3-40 letters/numbers (e.g. SUMMER10)'; return; }
+    if (!(value > 0)) { err.textContent = 'Enter a discount value greater than 0'; return; }
+    const result = await api('/api/admin/coupon', 'POST', {
+        code,
+        discount_type: $('#cpType').value,
+        discount_value: value,
+        max_discount: $('#cpMax').value,
+        min_order: Number($('#cpMin').value || 0)
+    });
+    if (!result._ok) { err.textContent = result.error || 'Could not create coupon'; return; }
+    closeModal();
+    loadCoupons();
 }
 async function toggleCoupon(id, active) {
     const result=await api(`/api/admin/coupon/${id}`,'PUT',{active});
     if(!result._ok) return alert(result.error||'Could not update coupon');
     loadCoupons();
 }
+
+/* =========================================================
+   BROCHURE LINK  (paste a Google Drive / Docs / PDF / DOCX link)
+   ========================================================= */
+
+async function loadBrochure() {
+    const box = $('#brochureBox');
+    if (!box) return;
+    const result = await api('/api/admin/brochure');
+    if (!result._ok) {
+        box.innerHTML = `<p class="err">${esc(result.error || 'Could not load brochure settings')}</p>`;
+        return;
+    }
+    const links = result.links || {};
+    const current = result.url
+        ? `<p>Current brochure: <a href="${esc(links.view || result.url)}" target="_blank" rel="noopener">open link</a>
+             &nbsp;·&nbsp; <a href="/brochure" target="_blank">see it on the website</a></p>`
+        : '<p class="muted">No brochure link saved yet.</p>';
+    box.innerHTML = `
+        ${current}
+        <label>Brochure link (Google Drive, Google Docs, or a direct .pdf / .docx link)
+            <input id="brochureUrl" type="url" placeholder="https://drive.google.com/file/d/..." value="${esc(result.url || '')}">
+        </label>
+        <p class="muted"><small>For Google Drive / Docs, set sharing to <b>“Anyone with the link – Viewer”</b>, otherwise customers will see a “request access” page.</small></p>
+        <p class="err" id="brochureErr"></p>
+        <button class="primary" onclick="saveBrochure()">Save brochure</button>
+        ${result.url ? '<button class="danger" onclick="removeBrochure()">Remove</button>' : ''}`;
+}
+
+async function saveBrochure() {
+    const url = ($('#brochureUrl')?.value || '').trim();
+    const result = await api('/api/admin/brochure', 'POST', { url });
+    if (!result._ok) { $('#brochureErr').textContent = result.error || 'Could not save'; return; }
+    await loadBrochure();
+    alert('Brochure saved. Customers can now open it from the Brochure page.');
+}
+
+async function removeBrochure() {
+    if (!confirm('Remove the brochure link?')) return;
+    const result = await api('/api/admin/brochure', 'POST', { url: '' });
+    if (!result._ok) return alert(result.error || 'Could not remove');
+    loadBrochure();
+}
+
+window.loadBrochure = loadBrochure;
+window.saveBrochure = saveBrochure;
+window.removeBrochure = removeBrochure;
+
 
 /* =========================================================
    DASHBOARD STARTUP
