@@ -61,6 +61,31 @@ def create_app():
     from .routes import main
     app.register_blueprint(main)
 
+    # ---- Friendly fallbacks -------------------------------------------
+    # Wrong URL (404) or wrong method (405):
+    #   * /api/... calls get a clean JSON error (the JS code reads this)
+    #   * everything else (a page the user opened) goes back to the home page
+    from flask import jsonify, redirect, request, url_for
+
+    def _fallback(status, message):
+        if request.path.startswith("/api/"):
+            return jsonify(error=message), status
+        return redirect(url_for("main.home"))
+
+    @app.errorhandler(404)
+    def not_found(_e):
+        return _fallback(404, "Not found")
+
+    @app.errorhandler(405)
+    def method_not_allowed(_e):
+        return _fallback(405, "Method not allowed")
+
+    @app.errorhandler(500)
+    def server_error(_e):
+        if request.path.startswith("/api/"):
+            return jsonify(error="Something went wrong. Please try again."), 500
+        return redirect(url_for("main.home"))
+
     # UptimeRobot / Render health check
     @app.route("/health")
     def health():
