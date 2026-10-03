@@ -66,6 +66,10 @@ let ORD = {};
 /* Remember if login was started from checkout */
 let LOGIN_FROM_CHECKOUT = false;
 
+let DELIVERY_QUOTE = null;
+
+let deferredInstallPrompt = null;
+
 let CFG = {
   whatsapp: "919304285574",
 
@@ -80,6 +84,7 @@ let CFG = {
   payment_name: "Chand Enterprises",
 
   offers: [],
+  coupons: [],
 };
 
 /* =========================
@@ -351,39 +356,61 @@ function chg(id, change) {
 
 function totals(coupon = "") {
   let subtotal = 0;
-
   for (const id in CART) {
     const product = find(id);
-
-    if (!product) {
-      continue;
-    }
-
-    subtotal += product.price * CART[id];
+    if (product) subtotal += product.price * CART[id];
   }
-
-  let discount = 0;
 
   coupon = coupon.trim().toUpperCase();
-
-  if (coupon === "WELCOME10") {
-    discount = Math.min(subtotal * 0.1, 100);
-  } else if (coupon === "WATER50" && subtotal >= 500) {
-    discount = 50;
+  const c = (CFG.coupons || []).find(x => x.code === coupon && x.active);
+  let discount = 0;
+  if (c && subtotal >= Number(c.min_order || 0)) {
+    discount = c.discount_type === "fixed"
+      ? Number(c.discount_value || 0)
+      : subtotal * Number(c.discount_value || 0) / 100;
+    if (c.max_discount != null) discount = Math.min(discount, Number(c.max_discount));
+    discount = Math.min(discount, subtotal);
   }
 
-  const delivery = subtotal - discount >= 500 ? 0 : 30;
+  const quote = DELIVERY_QUOTE;
+  const delivery = quote && quote.coupon === coupon && Number(quote.subtotal) === Number(subtotal)
+    ? Number(quote.delivery_charge || 0)
+    : (subtotal - discount >= 500 ? 0 : 30);
 
   return {
     sub: subtotal,
-
     disc: discount,
-
     del: delivery,
-
-    total: Math.max(0, subtotal - discount + delivery),
+    distance: quote?.distance_km ?? null,
+    total: Math.max(0, subtotal - discount + delivery)
   };
 }
+
+async function refreshDeliveryQuote() {
+  const subtotal = Object.entries(CART).reduce((sum, [id, qty]) => {
+    const p = find(id);
+    return sum + (p ? p.price * qty : 0);
+  }, 0);
+  const coupon = ($('#cc')?.value || '').trim().toUpperCase();
+  if (!subtotal) { DELIVERY_QUOTE = null; return; }
+  const loc = typeof LocPicker !== 'undefined' ? LocPicker.get() : {};
+  const result = await api('/api/delivery/quote', 'POST', {
+    subtotal, coupon, latitude: loc.latitude, longitude: loc.longitude
+  });
+  if (result?._ok) {
+    DELIVERY_QUOTE = Object.assign(result, {coupon});
+  } else if (result?.error) {
+    DELIVERY_QUOTE = null;
+  }
+  const total = totals(coupon);
+  const el = $('#ctot');
+  if (el) el.textContent = money(total.total);
+  const info = $('#deliveryInfo');
+  if (info) info.textContent = total.distance != null
+    ? `Delivery: ${total.del ? money(total.del) : 'Free'} · ${total.distance} km`
+    : `Delivery: ${total.del ? money(total.del) : 'Free'}`;
+}
+
 
 /* =========================
    CART MODAL
@@ -547,6 +574,8 @@ async function checkout() {
 
         </label>
 
+        ${LocPicker.html()}
+
 
         <label>
 
@@ -578,6 +607,8 @@ async function checkout() {
 
         </label>
 
+
+        <div id="deliveryInfo" class="muted">Delivery charge will be calculated from your location.</div>
 
         <div class="row">
 
@@ -614,7 +645,11 @@ async function checkout() {
 
     `);
 
+  LocPicker.mount();
+  DELIVERY_QUOTE = null;
+  window.onlocationchange = refreshDeliveryQuote;
   cTot();
+  refreshDeliveryQuote();
 }
 
 function cTot() {
@@ -625,6 +660,7 @@ function cTot() {
   }
 
   element.textContent = money(totals($("#cc")?.value || "").total);
+  refreshDeliveryQuote();
 }
 
 /* =========================
@@ -641,6 +677,8 @@ async function placeOrder() {
     name: $("#cn").value,
 
     address: $("#ca").value,
+
+    ...LocPicker.get(),
 
     coupon: $("#cc").value,
 
@@ -1041,6 +1079,7 @@ async function bill(code) {
 
                 <span>
                     ${esc(order.address)}
+                    ${order.map_url ? `<br><a class="loc-map-link" target="_blank" rel="noopener" href="${esc(order.map_url)}">📍 View on map</a>` : ""}
                 </span>
 
             </div>
@@ -2004,6 +2043,28 @@ function openEnquiry() {
 function openWhatsApp() {
   return whatsappMessage();
 }
+
+
+window.addEventListener("beforeinstallprompt", event => {
+  event.preventDefault();
+  deferredInstallPrompt = event;
+  const btn = document.getElementById("installApp");
+  if (btn) btn.hidden = false;
+});
+window.addEventListener("appinstalled", () => {
+  deferredInstallPrompt = null;
+  const btn = document.getElementById("installApp");
+  if (btn) btn.hidden = true;
+});
+async function installApp() {
+  if (!deferredInstallPrompt) return;
+  deferredInstallPrompt.prompt();
+  await deferredInstallPrompt.userChoice;
+  deferredInstallPrompt = null;
+  const btn = document.getElementById("installApp");
+  if (btn) btn.hidden = true;
+}
+window.installApp = installApp;
 
 /* =========================
    INITIALIZATION
