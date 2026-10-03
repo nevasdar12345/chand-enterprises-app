@@ -156,10 +156,23 @@
             <span>WhatsApp Enquiry</span>
         </button>
 
+        <!-- Shows Login when logged out, Logout when logged in -->
+        <button
+            type="button"
+            class="ce-menu-link ce-menu-button"
+            id="menuAccountBtn"
+            onclick="account(); closeMobileMenu();"
+        >
+            <span>🔐</span>
+            <span>Login</span>
+        </button>
+
         <button
             type="button"
             class="ce-menu-link ce-menu-button ce-menu-logout"
+            id="menuLogoutBtn"
             onclick="logout(); closeMobileMenu();"
+            hidden
         >
             <span>🚪</span>
             <span>Logout</span>
