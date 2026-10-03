@@ -9,14 +9,15 @@
     --line:#e3eaf1
 }
 
-@media(prefers-color-scheme:dark){
-    :root{
-        --bg:#0d1620;
-        --card:#15222f;
-        --ink:#e8f0f7;
-        --mut:#8ea3b5;
-        --line:#243546
-    }
+/* Dark theme is switched by the toggle button (data-theme on <html>) */
+:root[data-theme="dark"]{
+    --bg:#0b141d;
+    --card:#14212e;
+    --ink:#e8f0f7;
+    --mut:#93a8ba;
+    --line:#243546;
+    --pri:#3b9bff;
+    color-scheme:dark
 }
 
 *{
