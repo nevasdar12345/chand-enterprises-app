@@ -41,17 +41,7 @@
     <!-- ================= NAVIGATION ACTIONS ================= -->
 
     <div class="store-actions">
-
-        <button
-            type="button"
-            class="soft nav-action"
-            id="installApp"
-            onclick="installApp()"
-        >
-            📲 <span>Install</span>
-        </button>
-
-        <button
+<button
             type="button"
             class="soft nav-action"
             onclick="orders()"
@@ -80,21 +70,20 @@
         >
             Logout
         </button>
-
-
-        <button
-            type="button"
-            class="cart premium-cart"
-            onclick="cart()"
-            aria-label="Shopping cart"
-        >
-            🛒
-            <span class="cart-label">Cart</span>
-            <b id="count">0</b>
-        </button>
-
-
     </div>
+
+
+    <!-- Cart stays visible in mobile header -->
+    <button
+        type="button"
+        class="cart premium-cart"
+        onclick="cart()"
+        aria-label="Shopping cart"
+    >
+        🛒
+        <span class="cart-label">Cart</span>
+        <b id="count">0</b>
+    </button>
 
     <!-- Hamburger is outside the collapsible action group so it remains visible on mobile -->
     <button
@@ -130,6 +119,16 @@
     </div>
 
     <nav class="ce-menu-links" aria-label="Mobile menu">
+
+        <button
+            type="button"
+            class="ce-menu-link ce-menu-button"
+            id="menuInstallApp"
+            onclick="installApp(); closeMobileMenu();"
+        >
+            <span>📲</span>
+            <span>Install App</span>
+        </button>
         <a href="/" class="ce-menu-link">
             <span>🏠</span>
             <span>Home</span>
