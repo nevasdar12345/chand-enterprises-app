@@ -35,6 +35,7 @@ DEFAULT_SETTINGS = {
     "delivery_base": "30",
     "delivery_per_km": "10",
     "delivery_free_above": "500",
+    "brochure_url": "",
 }
 
 DEFAULT_OFFERS = [
@@ -278,10 +279,83 @@ def home():
 
 
 
+def _clean_http_url(value):
+    """Return a safe http(s) URL or '' (blocks javascript:, data:, etc.)."""
+    value = (value or "").strip()
+    try:
+        parts = urllib.parse.urlsplit(value)
+    except ValueError:
+        return ""
+    if parts.scheme not in ("http", "https") or not parts.netloc or any(ch in value for ch in " \t\r\n<>\"'"):
+        return ""
+    return value
+
+
+def brochure_links(url):
+    """
+    Turn whatever link the admin pasted (Google Drive, Google Docs/Slides,
+    or a direct .pdf/.docx link) into links the brochure page can use.
+    Returns dict: embed, view, pdf, docx, kind  (empty strings when unknown)
+    """
+    url = _clean_http_url(url)
+    out = dict(url=url, embed="", view=url, pdf="", docx="", kind="")
+    if not url:
+        return out
+    q = urllib.parse.quote
+    m = re.search(r"drive\.google\.com/(?:file/d/|open\?id=|uc\?(?:[^#]*&)?id=)([\w-]+)", url)
+    if m:
+        fid = m.group(1)
+        out.update(kind="drive", embed=f"https://drive.google.com/file/d/{fid}/preview",
+                   view=f"https://drive.google.com/file/d/{fid}/view",
+                   pdf=f"https://drive.google.com/uc?export=download&id={fid}")
+        return out
+    m = re.search(r"docs\.google\.com/document/d/([\w-]+)", url)
+    if m:
+        did = m.group(1)
+        base = f"https://docs.google.com/document/d/{did}"
+        out.update(kind="gdoc", embed=f"{base}/preview", view=f"{base}/preview",
+                   pdf=f"{base}/export?format=pdf", docx=f"{base}/export?format=docx")
+        return out
+    m = re.search(r"docs\.google\.com/presentation/d/([\w-]+)", url)
+    if m:
+        did = m.group(1)
+        base = f"https://docs.google.com/presentation/d/{did}"
+        out.update(kind="gslides", embed=f"{base}/embed", view=f"{base}/preview",
+                   pdf=f"{base}/export/pdf")
+        return out
+    path = urllib.parse.urlsplit(url).path.lower()
+    if path.endswith(".pdf"):
+        out.update(kind="pdf", pdf=url, embed=f"https://docs.google.com/gview?embedded=1&url={q(url, safe='')}")
+    elif path.endswith((".docx", ".doc")):
+        out.update(kind="docx", docx=url,
+                   embed=f"https://view.officeapps.live.com/op/embed.aspx?src={q(url, safe='')}")
+    return out
+
+
 @main.route("/brochure")
 def brochure():
     pdf_path = os.path.join(current_app.static_folder, "brochure.pdf")
-    return render_template("brochure.html", brochure_pdf_exists=os.path.exists(pdf_path))
+    links = brochure_links(setting_value("brochure_url"))
+    return render_template("brochure.html", brochure_pdf_exists=os.path.exists(pdf_path), b=links)
+
+
+@main.get("/api/admin/brochure")
+def admin_get_brochure():
+    if not role_ok("admin", "developer"):
+        return jsonify(error="Forbidden"), 403
+    return jsonify(url=setting_value("brochure_url"), links=brochure_links(setting_value("brochure_url")))
+
+
+@main.post("/api/admin/brochure")
+def admin_save_brochure():
+    if not role_ok("admin", "developer"):
+        return jsonify(error="Forbidden"), 403
+    raw = str((request.json or {}).get("url") or "").strip()
+    if raw and not _clean_http_url(raw):
+        return jsonify(error="Please paste a full link starting with https://"), 400
+    set_setting("brochure_url", raw)
+    db.session.commit()
+    return jsonify(ok=True, url=raw, links=brochure_links(raw))
 
 
 @main.route("/staff")
@@ -326,12 +400,10 @@ def whatsapp_page():
 
 
 
-@main.post("/logout")
-
+@main.route("/logout", methods=["GET", "POST"])
 def logout():
-
+    # GET as well as POST, so a plain link / address-bar visit never gives 405
     session.clear()
-
     return redirect(url_for("main.home"))
 
 
@@ -484,6 +556,35 @@ def update_profile():
 
 
 # ---------- shop ----------
+
+@main.post("/api/delivery/quote")
+def delivery_quote():
+    """Live total preview for checkout: coupon discount + distance-based delivery."""
+    d = request.json or {}
+    try:
+        subtotal = float(d.get("subtotal") or 0)
+    except (TypeError, ValueError):
+        return jsonify(error="Invalid subtotal"), 400
+    code = str(d.get("coupon") or "").strip().upper()
+    lat = parse_coord(d.get("latitude"), -90, 90)
+    lng = parse_coord(d.get("longitude"), -180, 180)
+    if lat is None or lng is None:
+        lat = lng = None
+    row, discount = calculate_coupon(code, subtotal)
+    coupon_msg, coupon_ok = "", False
+    if code:
+        if not row:
+            coupon_msg = "Invalid or inactive coupon"
+        elif discount <= 0:
+            coupon_msg = f"Minimum order for {row.code} is \u20b9{(row.min_order or 0):.0f}"
+        else:
+            coupon_ok = True
+            coupon_msg = f"{row.code} applied: \u2212\u20b9{discount:.0f}"
+    delivery, distance = calculate_delivery(subtotal - discount, lat, lng)
+    return jsonify(ok=True, subtotal=subtotal, discount=discount, delivery_charge=delivery,
+                   distance_km=None if distance is None else round(distance, 1),
+                   coupon_ok=coupon_ok, coupon_message=coupon_msg)
+
 
 @main.get("/api/config")
 
