@@ -116,6 +116,14 @@ def upi_uri(o):
 
 
 
+def parse_coord(value, low, high):
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    return number if low <= number <= high else None
+
+
 def order_dict(o):
 
     dp = db.session.get(User, o.delivery_person_id) if o.delivery_person_id else None
@@ -126,7 +134,8 @@ def order_dict(o):
 
     return dict(id=o.id, code=o.code, customer=o.customer_name, mobile=o.mobile,
 
-                address=o.address, total=o.total, subtotal=o.subtotal, discount=o.discount,
+                address=o.address, latitude=o.latitude, longitude=o.longitude,
+                map_url=o.map_url, total=o.total, subtotal=o.subtotal, discount=o.discount,
 
                 delivery_charge=o.delivery_charge, payment=o.payment_method,
 
@@ -450,6 +459,14 @@ def create_order():
 
     method = d.get("payment_method", "COD")
 
+    lat = parse_coord(d.get("latitude"), -90, 90)
+
+    lng = parse_coord(d.get("longitude"), -180, 180)
+
+    if lat is None or lng is None:
+
+        lat = lng = None
+
     coupon = (d.get("coupon") or "").strip().upper()
 
     items = d.get("items") or []
@@ -506,7 +523,7 @@ def create_order():
 
     code = "CE" + datetime.now().strftime("%y%m%d%H%M%S") + secrets.token_hex(1).upper()
 
-    o = Order(code=code, customer_name=name, mobile=u.mobile, address=address, total=total,
+    o = Order(code=code, customer_name=name, mobile=u.mobile, address=address, latitude=lat, longitude=lng, total=total,
 
               delivery_charge=delivery, payment_method=method, payment_status="Pending",
 
@@ -664,7 +681,7 @@ def order_text(o):
 
     return (f"{setting_value('business_name') or 'Chand Enterprises'} - Order {o.code}\n\nCustomer: {o.customer_name}\nMobile: {o.mobile}\n"
 
-            f"Address: {o.address}\n\nItems:\n{lines}\n\nSubtotal: ₹{o.subtotal:.0f}\n"
+            f"Address: {o.address}\n" + (f"Location: {o.map_url}\n" if o.map_url else "") + f"\nItems:\n{lines}\n\nSubtotal: ₹{o.subtotal:.0f}\n"
 
             f"Discount: ₹{o.discount:.0f}\nDelivery: ₹{o.delivery_charge:.0f}\nTotal: ₹{o.total:.0f}\n"
 
@@ -978,7 +995,8 @@ def export_csv():
 
     w.writerow(["Order", "Date", "Customer", "Mobile", "Address", "Items", "Subtotal", "Discount",
 
-                "Delivery", "Total", "Payment", "Payment Status", "Status", "Delivery Person"])
+                "Delivery", "Total", "Payment", "Payment Status", "Status", "Delivery Person",
+                "Latitude", "Longitude", "Google Maps"])
 
     for o in Order.query.order_by(Order.created_at.desc()):
 
@@ -988,7 +1006,9 @@ def export_csv():
 
                     o.subtotal, o.discount, o.delivery_charge, o.total, o.payment_method,
 
-                    o.payment_status, o.status, d["delivery_person"]])
+                    o.payment_status, o.status, d["delivery_person"],
+                    o.latitude if o.latitude is not None else "",
+                    o.longitude if o.longitude is not None else "", o.map_url])
 
     return Response(out.getvalue(), mimetype="text/csv",
 
