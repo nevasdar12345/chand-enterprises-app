@@ -743,6 +743,19 @@ async function loadDeveloperProducts() {
 
                     <td>
 
+                        <input
+                            id="dp_size_${product.id}"
+                            value="${esc(
+                                product.size || ''
+                            )}"
+                            placeholder="e.g. 750ml"
+                            maxlength="40"
+                        >
+
+                    </td>
+
+                    <td>
+
                         <select id="dp_cat_${product.id}">
                             ${categoryOptions(product.category)}
                         </select>
@@ -857,6 +870,15 @@ async function addDeveloperProduct() {
         </label>
 
         <label>
+            Size
+            <input
+                id="new_dp_size"
+                placeholder="e.g. 250ml, 750ml, 1L, 20L"
+                maxlength="40"
+            >
+        </label>
+
+        <label>
             Category
             <select id="new_dp_category">${categoryOptions()}</select>
         </label>
@@ -936,6 +958,11 @@ async function saveNewDeveloperProduct() {
                         ?.value
                         .trim(),
 
+                size:
+                    $('#new_dp_size')
+                        ?.value
+                        .trim(),
+
                 price:
                     $('#new_dp_price')
                         ?.value,
@@ -989,6 +1016,11 @@ async function saveDeveloperProduct(id) {
 
                 category:
                     $(`#dp_cat_${id}`)
+                        ?.value
+                        .trim(),
+
+                size:
+                    $(`#dp_size_${id}`)
                         ?.value
                         .trim(),
 
