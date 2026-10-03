@@ -324,8 +324,19 @@ async function developerSettings() {
 
         <label>
             Free delivery above (₹)
-
             <input id="ds_free" type="number" min="0" value="${esc(settings.delivery_free_above || '500')}">
+        </label>
+
+        <label>Instagram page URL
+            <input id="ds_instagram" type="url" placeholder="https://instagram.com/yourpage" value="${esc(settings.instagram_url || '')}">
+        </label>
+
+        <label>Facebook page URL
+            <input id="ds_facebook" type="url" placeholder="https://facebook.com/yourpage" value="${esc(settings.facebook_url || '')}">
+        </label>
+
+        <label>Brochure PDF / document URL
+            <input id="ds_brochure" type="url" placeholder="https://..." value="${esc(settings.brochure_url || '')}">
         </label>
 
         <p
@@ -394,7 +405,10 @@ async function saveDeveloperSettings() {
                 business_lng: $('#ds_lng')?.value.trim(),
                 delivery_base: $('#ds_base')?.value,
                 delivery_per_km: $('#ds_km')?.value,
-                delivery_free_above: $('#ds_free')?.value
+                delivery_free_above: $('#ds_free')?.value,
+                instagram_url: $('#ds_instagram')?.value.trim(),
+                facebook_url: $('#ds_facebook')?.value.trim(),
+                brochure_url: $('#ds_brochure')?.value.trim()
             }
         );
 
@@ -683,6 +697,7 @@ async function deleteDeveloperOffer(index) {
    ========================================================= */
 
 async function loadDeveloperProducts() {
+    await loadDeveloperCategories();
 
     const result =
         await api(
@@ -728,12 +743,9 @@ async function loadDeveloperProducts() {
 
                     <td>
 
-                        <input
-                            id="dp_cat_${product.id}"
-                            value="${esc(
-                                product.category
-                            )}"
-                        >
+                        <select id="dp_cat_${product.id}">
+                            ${categoryOptions(product.category)}
+                        </select>
 
                     </td>
 
@@ -828,7 +840,7 @@ async function loadDeveloperProducts() {
    ========================================================= */
 
 async function addDeveloperProduct() {
-
+    await loadDeveloperCategories();
     modal(`
 
         <h2>
@@ -846,11 +858,7 @@ async function addDeveloperProduct() {
 
         <label>
             Category
-
-            <input
-                id="new_dp_category"
-                placeholder="Cold Drinks"
-            >
+            <select id="new_dp_category">${categoryOptions()}</select>
         </label>
 
         <label>
@@ -1048,6 +1056,135 @@ async function toggleDeveloperProduct(
 
 
 /* =========================================================
+   CATEGORIES
+   ========================================================= */
+let DEV_CATEGORIES = [];
+
+async function loadDeveloperCategories() {
+  const result = await api('/api/admin/categories');
+  if (!result._ok) return [];
+  DEV_CATEGORIES = (result.categories || []).filter(c => c.active);
+  return DEV_CATEGORIES;
+}
+
+function categoryOptions(selected='') {
+  return DEV_CATEGORIES.map(c =>
+    `<option value="${esc(c.name)}" ${c.name === selected ? 'selected' : ''}>${esc(c.icon)} ${esc(c.name)}</option>`
+  ).join('');
+}
+
+async function developerCategories() {
+  const result = await api('/api/admin/categories');
+  if (!result._ok) return alert(result.error || 'Could not load categories');
+  const categories = result.categories || [];
+  DEV_CATEGORIES = categories.filter(c => c.active);
+  modal(`
+    <h2>Category manager</h2>
+    <label>New category
+      <input id="cat_name" maxlength="80" placeholder="e.g. Sports Drinks">
+    </label>
+    <label>Icon
+      <input id="cat_icon" maxlength="10" value="🛍️">
+    </label>
+    <button class="primary" onclick="createDeveloperCategory()">Add category</button>
+    <div style="margin-top:16px">
+      ${categories.map(c => `
+        <div class="row" style="gap:8px;margin:8px 0;align-items:center">
+          <span>${esc(c.icon)}</span>
+          <input id="cat_${c.id}" value="${esc(c.name)}" style="flex:1">
+          <button onclick="saveDeveloperCategory(${c.id})">Save</button>
+          <button onclick="toggleDeveloperCategory(${c.id},${!c.active})">${c.active ? 'Hide' : 'Show'}</button>
+          <button class="danger" onclick="deleteDeveloperCategory(${c.id})">Delete</button>
+        </div>
+      `).join('') || '<p class="muted">No categories yet.</p>'}
+    </div>
+    <button onclick="closeModal()">Close</button>
+  `);
+}
+
+async function createDeveloperCategory() {
+  const result = await api('/api/admin/categories', 'POST', {
+    name: $('#cat_name')?.value.trim(),
+    icon: $('#cat_icon')?.value.trim()
+  });
+  if (!result._ok) return alert(result.error || 'Could not create category');
+  await loadDeveloperCategories();
+  developerCategories();
+}
+
+async function saveDeveloperCategory(id) {
+  const result = await api(`/api/admin/categories/${id}`, 'PUT', {
+    name: $(`#cat_${id}`)?.value.trim()
+  });
+  if (!result._ok) return alert(result.error || 'Could not rename category');
+  await loadDeveloperCategories();
+  developerCategories();
+}
+
+async function toggleDeveloperCategory(id, active) {
+  const result = await api(`/api/admin/categories/${id}`, 'PUT', {active});
+  if (!result._ok) return alert(result.error || 'Could not change category');
+  await loadDeveloperCategories();
+  developerCategories();
+}
+
+async function deleteDeveloperCategory(id) {
+  if (!confirm('Delete this empty category?')) return;
+  const result = await api(`/api/admin/categories/${id}`, 'DELETE');
+  if (!result._ok) return alert(result.error || 'Could not delete category');
+  await loadDeveloperCategories();
+  developerCategories();
+}
+
+/* =========================================================
+   TEAM
+   ========================================================= */
+async function developerTeam() {
+  const result = await api('/api/team');
+  if (!result._ok) return alert(result.error || 'Could not load team');
+  const users = result.users || [];
+  modal(`
+    <h2>Team accounts</h2>
+    <button class="primary" onclick="developerAddTeam()">+ Add account</button>
+    <div style="margin-top:14px">
+      ${users.map(u=>`
+        <div class="row" style="gap:8px;margin:8px 0;align-items:center">
+          <b>${esc(u.name)}</b><span>${esc(u.username)}</span><span>${esc(u.role)}</span><span>${u.active?'Active':'Disabled'}</span>
+          <button onclick="developerEditTeam(${u.id})">Edit</button>
+          <button onclick="developerToggleTeam(${u.id},${!u.active})">${u.active?'Disable':'Enable'}</button>
+        </div>`).join('')}
+    </div>
+    <button onclick="closeModal()">Close</button>
+  `);
+}
+function developerAddTeam(){ developerTeamForm(); }
+async function developerEditTeam(id){
+  const r=await api('/api/team'); const u=(r.users||[]).find(x=>x.id==id); if(u) developerTeamForm(u);
+}
+function developerTeamForm(u=null){
+  modal(`<h2>${u?'Edit':'Add'} staff account</h2>
+    <label>Name<input id="dev_team_name" value="${esc(u?.name||'')}"></label>
+    <label>Username<input id="dev_team_username" value="${esc(u?.username||'')}" ${u?'disabled':''}></label>
+    <label>Role<select id="dev_team_role" ${u?'disabled':''}><option value="delivery" ${u?.role==='delivery'?'selected':''}>Delivery</option><option value="admin" ${u?.role==='admin'?'selected':''}>Admin</option></select></label>
+    <label>Mobile<input id="dev_team_mobile" value="${esc(u?.mobile||'')}"></label>
+    <label>${u?'New password (optional)':'Password'}<input id="dev_team_password" type="password"></label>
+    <p class="err" id="dev_team_err"></p>
+    <button class="primary" onclick="developerSaveTeam(${u?.id||'null'})">Save</button><button onclick="developerTeam()">Cancel</button>`);
+}
+async function developerSaveTeam(id){
+  const body={name:$('#dev_team_name')?.value.trim(),username:$('#dev_team_username')?.value.trim(),role:$('#dev_team_role')?.value,mobile:$('#dev_team_mobile')?.value.trim(),password:$('#dev_team_password')?.value};
+  if(!body.password) delete body.password;
+  const r=await api(id?`/api/team/${id}`:'/api/team',id?'PUT':'POST',body);
+  if(!r._ok){$('#dev_team_err').textContent=r.error||'Could not save account';return;}
+  developerTeam();
+}
+async function developerToggleTeam(id,active){
+  const r=await api(`/api/team/${id}`,'PUT',{active});
+  if(!r._ok) return alert(r.error||'Could not change account');
+  developerTeam();
+}
+
+/* =========================================================
    DEVELOPER DASHBOARD
    ========================================================= */
 
@@ -1239,3 +1376,11 @@ document.addEventListener(
 
     }
 );
+
+window.developerCategories = developerCategories;
+window.createDeveloperCategory = createDeveloperCategory;
+window.saveDeveloperCategory = saveDeveloperCategory;
+window.toggleDeveloperCategory = toggleDeveloperCategory;
+window.deleteDeveloperCategory = deleteDeveloperCategory;
+
+window.developerTeam=developerTeam; window.developerAddTeam=developerAddTeam; window.developerEditTeam=developerEditTeam; window.developerSaveTeam=developerSaveTeam; window.developerToggleTeam=developerToggleTeam;
