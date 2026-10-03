@@ -5,6 +5,9 @@
 
     <meta charset="utf-8">
 
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.webmanifest') }}">
+    <link rel="icon" href="{{ url_for('static', filename='icons/icon.svg') }}">
+
     <meta
         name="viewport"
         content="width=device-width, initial-scale=1"
@@ -376,6 +379,11 @@
     </script>
 
 <script src="{{ url_for('static', filename='js/responsive.js') }}"></script>
+<script>
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => navigator.serviceWorker.register("/static/sw.js").catch(console.error));
+}
+</script>
 </body>
 
 </html>
