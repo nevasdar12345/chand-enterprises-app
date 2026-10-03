@@ -106,7 +106,7 @@ let ADMIN_PRODUCTS = [];
 
 function showTab(tab, button) {
 
-    const tabs = ['orders','products','stock','sales','ledger','coupons','brochure'];
+    const tabs = ['orders','products','stock','sales','ledger','coupons','brochure','team'];
 
     tabs.forEach(name => {
 
@@ -151,6 +151,7 @@ function showTab(tab, button) {
     if (tab === 'ledger') loadLedger();
     if (tab === 'coupons') loadCoupons();
     if (tab === 'brochure') loadBrochure();
+    if (tab === 'team') loadTeam();
 }
 
 
@@ -488,6 +489,7 @@ function renderAdminOrders() {
 
                         <td>
                             ${deliveryHTML}
+                            <button class="add" onclick="sendOrderBill(${order.id})">🧾 WhatsApp bill</button>
                         </td>
 
                     </tr>
@@ -943,18 +945,12 @@ function productForm(
                 Category
             </label>
 
-            <input
-                id="adminProductCategory"
-                type="text"
-                value="${esc(category)}"
-                placeholder="Category"
-                style="
+            <select id="adminProductCategory" style="
                     width:100%;
                     margin:6px 0 14px;
                     padding:11px;
                     box-sizing:border-box;
-                "
-            >
+                ">${ADMIN_CATEGORIES.filter(c=>c.active).map(c=>`<option value="${esc(c.name)}" ${c.name===category?'selected':''}>${esc(c.icon)} ${esc(c.name)}</option>`).join('')}</select>
 
 
             <label>
@@ -1621,6 +1617,7 @@ window.removeBrochure = removeBrochure;
    ========================================================= */
 
 async function adminStartup() {
+    await loadAdminCategories();
 
     try {
 
@@ -1721,4 +1718,77 @@ document.addEventListener(
         }
 
     }
-);
+);async function sendOrderBill(id) {
+  const r = await api(`/api/admin/order/${id}/whatsapp`, 'POST');
+  if (!r._ok) return alert(r.error || 'Could not create bill');
+  window.open(r.whatsapp_url, '_blank', 'noopener');
+}
+
+/* =========================================================
+   CATEGORIES / TEAM
+   ========================================================= */
+let ADMIN_CATEGORIES = [];
+
+async function loadAdminCategories() {
+  const result = await api('/api/admin/categories');
+  if (!result._ok) return [];
+  ADMIN_CATEGORIES = result.categories || [];
+  window.ADMIN_CATEGORIES_HTML = ADMIN_CATEGORIES.filter(c => c.active)
+    .map(c => `<option value="${esc(c.name)}">${esc(c.icon)} ${esc(c.name)}</option>`).join('');
+  return ADMIN_CATEGORIES;
+}
+
+async function loadTeam() {
+  const rows = $('#teamRows');
+  if (!rows) return;
+  const result = await api('/api/team');
+  if (!result._ok) {
+    rows.innerHTML = `<tr><td colspan="6">${esc(result.error || 'Could not load team')}</td></tr>`;
+    return;
+  }
+  rows.innerHTML = (result.users || []).map(u => `
+    <tr>
+      <td>${esc(u.name)}</td><td>${esc(u.username)}</td><td>${esc(u.role)}</td><td>${esc(u.mobile)}</td>
+      <td>${u.active ? 'Active' : 'Disabled'}</td>
+      <td>
+        <button onclick="editTeam(${u.id})">Edit</button>
+        <button class="${u.active ? 'danger' : 'add'}" onclick="toggleTeam(${u.id},${!u.active})">${u.active ? 'Disable' : 'Enable'}</button>
+      </td>
+    </tr>`).join('') || '<tr><td colspan="6">No staff accounts.</td></tr>';
+}
+
+function teamForm(user=null) {
+  modal(`
+    <h2>${user ? 'Edit staff account' : 'Add staff account'}</h2>
+    <label>Name<input id="team_name" value="${esc(user?.name || '')}"></label>
+    <label>Username<input id="team_username" value="${esc(user?.username || '')}" ${user ? 'disabled' : ''}></label>
+    <label>Role<select id="team_role" ${user ? 'disabled' : ''}><option value="delivery" ${user?.role==='delivery'?'selected':''}>Delivery</option><option value="admin" ${user?.role==='admin'?'selected':''}>Admin</option></select></label>
+    <label>Mobile<input id="team_mobile" maxlength="10" value="${esc(user?.mobile || '')}"></label>
+    <label>${user ? 'New password (leave blank to keep)' : 'Password'}<input id="team_password" type="password" minlength="8"></label>
+    <p class="err" id="team_err"></p>
+    <button class="primary" onclick="saveTeam(${user?.id || 'null'})">Save</button>
+    <button onclick="closeModal()">Cancel</button>
+  `);
+}
+async function addTeam(){ teamForm(); }
+async function editTeam(id){
+  const r=await api('/api/team'); const u=(r.users||[]).find(x=>x.id==id); if(u) teamForm(u);
+}
+async function saveTeam(id){
+  const body={name:$('#team_name')?.value.trim(),username:$('#team_username')?.value.trim(),role:$('#team_role')?.value,mobile:$('#team_mobile')?.value.trim(),password:$('#team_password')?.value};
+  if(!body.password) delete body.password;
+  const r=await api(id?`/api/team/${id}`:'/api/team',id?'PUT':'POST',body);
+  if(!r._ok){$('#team_err').textContent=r.error||'Could not save account';return;}
+  closeModal(); loadTeam();
+}
+async function toggleTeam(id,active){
+  const r=await api(`/api/team/${id}`,'PUT',{active});
+  if(!r._ok) return alert(r.error||'Could not change account');
+  loadTeam();
+}
+
+
+
+window.addTeam=addTeam; window.editTeam=editTeam; window.saveTeam=saveTeam; window.toggleTeam=toggleTeam; window.loadTeam=loadTeam;
+
+window.sendOrderBill=sendOrderBill;
