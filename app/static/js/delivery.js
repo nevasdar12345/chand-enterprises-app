@@ -112,48 +112,9 @@ let DELIVERY_ORDERS = [];
    ========================= */
 
 function deliveryItems(order) {
-
-    const items =
-        Array.isArray(order.items)
-            ? order.items
-            : [];
-
-
-    if (!items.length) {
-
-        return `
-            <span class="muted">
-                No item details
-            </span>
-        `;
-    }
-
-
-    return items
-        .map(item => {
-
-            const name =
-                item.name ||
-                item.product_name ||
-                'Product';
-
-
-            const quantity =
-                Number(
-                    item.quantity || 0
-                );
-
-
-            return `
-                <div>
-                    ${esc(name)}
-                    ×
-                    ${quantity}
-                </div>
-            `;
-
-        })
-        .join('');
+    const items = Array.isArray(order.lines) ? order.lines : [];
+    if (!items.length) return '<span class="muted">No item details</span>';
+    return items.map(item => `<div>${esc(item.name || 'Product')} × ${Number(item.qty || 0)}</div>`).join('');
 }
 
 
@@ -426,6 +387,10 @@ function renderDeliveryOrders() {
                             ''
                         )}
 
+                        ${order.map_url
+                            ? `<br><a class="loc-map-link" target="_blank" rel="noopener" href="${esc(order.map_url)}">📍 Navigate</a>`
+                            : ''}
+
                     </td>
 
 
@@ -483,69 +448,16 @@ function renderDeliveryOrders() {
    ========================= */
 
 function deliveryAction(order) {
-
-    if (
-        order.status ===
-        'Delivered'
-    ) {
-
-        return `
-            <span>
-                ✓ Delivered
-            </span>
-        `;
+    if (order.status === 'Cancelled') return '<span>Cancelled</span>';
+    let html = `<a class="primary" href="tel:${esc(order.mobile || '')}">📞 Call</a>
+                <button onclick="deliveryWhatsApp(${order.id}, '${esc(order.status || 'Confirmed')}')">💬 WhatsApp</button>`;
+    if (order.payment === 'COD') {
+        html += `<div style="margin-top:6px"><input id="cash_${order.id}" type="number" min="0" max="${Number(order.total||0)}" value="${Number(order.cash_collected||0)}" placeholder="Cash collected" style="max-width:130px">
+                 <button onclick="saveCash(${order.id})">Save cash</button></div>`;
     }
-
-
-    if (
-        order.status ===
-        'Cancelled'
-    ) {
-
-        return `
-            <span>
-                Cancelled
-            </span>
-        `;
-    }
-
-
-    if (
-        order.status ===
-        'Out for Delivery'
-    ) {
-
-        return `
-
-            <button
-                class="primary"
-                onclick="
-                    deliveryStatus(
-                        ${order.id},
-                        'Delivered'
-                    )
-                "
-            >
-                ✓ Delivered
-            </button>
-        `;
-    }
-
-
-    return `
-
-        <button
-            class="primary"
-            onclick="
-                deliveryStatus(
-                    ${order.id},
-                    'Out for Delivery'
-                )
-            "
-        >
-            🚚 Start delivery
-        </button>
-    `;
+    if (order.status === 'Delivered') return html + '<div style="margin-top:6px">✓ Delivered</div>';
+    if (order.status === 'Out for Delivery') return html + `<button class="primary" onclick="deliveryStatus(${order.id}, 'Delivered')">✓ Delivered</button>`;
+    return html + `<button class="primary" onclick="deliveryStatus(${order.id}, 'Out for Delivery')">🚚 Start delivery</button>`;
 }
 
 
@@ -586,6 +498,19 @@ async function deliveryStatus(
 }
 
 
+
+async function deliveryWhatsApp(id, status) {
+    const result=await api(`/api/delivery/order/${id}/whatsapp`,'POST',{status});
+    if(!result._ok) return alert(result.error||'Could not open WhatsApp');
+    window.open(result.whatsapp_url,'_blank','noopener');
+}
+async function saveCash(id) {
+    const input=document.getElementById(`cash_${id}`);
+    const result=await api(`/api/delivery/order/${id}/cash`,'POST',{cash_collected:Number(input?.value||0)});
+    if(!result._ok) return alert(result.error||'Could not save cash');
+    await loadDelivery();
+}
+
 /* =========================
    DELIVERY STARTUP
    ========================= */
@@ -618,8 +543,9 @@ window.deliveryStatus =
     deliveryStatus;
 
 
-window.renderDeliveryOrders =
-    renderDeliveryOrders;
+window.renderDeliveryOrders = renderDeliveryOrders;
+window.deliveryWhatsApp = deliveryWhatsApp;
+window.saveCash = saveCash;
 
 
 /* =========================
