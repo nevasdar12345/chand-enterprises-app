@@ -123,7 +123,7 @@ def developer_product_dict(p):
         id=p.id,
         name=p.name,
         category=p.category,
-        size=p.size or "",
+        size=p.size or "1L",
         price=p.price,
         stock=p.stock,
         low_stock_threshold=p.low_stock_threshold or 10,
@@ -216,7 +216,7 @@ def bill_text(o):
 
 def product_dict(p):
 
-    return dict(id=p.id, name=p.name, category=p.category, price=p.price,
+    return dict(id=p.id, name=p.name, category=p.category, size=p.size or "1L", price=p.price,
 
                 stock=p.stock, icon=p.icon, low=p.stock <= (p.low_stock_threshold or 10))
 
@@ -274,7 +274,7 @@ def order_dict(o):
                 lines=[
                     dict(
                         name=i.product_name,
-                        size=i.product_size or "",
+                        size=i.product_size or "1L",
                         qty=i.quantity,
                         price=i.unit_price,
                         total=i.line_total,
@@ -778,7 +778,7 @@ def create_order():
                 order_id=o.id,
                 product_id=p.id,
                 product_name=p.name,
-                product_size=p.size or "",
+                product_size=p.size or "1L",
                 quantity=qty,
                 unit_price=p.price,
             )
@@ -1143,7 +1143,7 @@ def create_product():
 
                     price=float(d.get("price", 0)), stock=int(d.get("stock", 0)),
 
-                    icon=d.get("icon") or "🥤", active=bool(d.get("active", True)))
+                    icon=d.get("icon") or "🥤", size=str(d.get("size") or "1L").strip() or "1L", active=bool(d.get("active", True)))
 
     except (TypeError, ValueError):
 
@@ -1184,7 +1184,7 @@ def update_product(pid):
             p.category = d["category"].strip()
 
         if "size" in d:
-            p.size = str(d["size"] or "").strip()
+            p.size = str(d["size"] or "1L").strip() or "1L"
 
         if "price" in d:
             p.price = float(d["price"])
@@ -1721,7 +1721,7 @@ def developer_create_product():
         return jsonify(error="Forbidden"), 403
     d = request.json or {}
     try:
-        p = Product(name=str(d.get("name") or "").strip(), category=str(d.get("category") or "Cold Drinks").strip(), price=float(d.get("price", 0)), stock=int(d.get("stock", 0)), low_stock_threshold=int(d.get("low_stock_threshold", 10)), icon=str(d.get("icon") or "🥤"), active=bool(d.get("active", True)))
+        p = Product(name=str(d.get("name") or "").strip(), category=str(d.get("category") or "Cold Drinks").strip(), price=float(d.get("price", 0)), stock=int(d.get("stock", 0)), low_stock_threshold=int(d.get("low_stock_threshold", 10)), icon=str(d.get("icon") or "🥤"), size=str(d.get("size") or "1L").strip() or "1L", active=bool(d.get("active", True)))
     except (TypeError, ValueError):
         return jsonify(error="Invalid product data"), 400
     if not p.name or not p.category or p.price < 0 or p.stock < 0:
@@ -1749,6 +1749,7 @@ def developer_update_product(pid):
         if "stock" in d: p.stock = int(d["stock"])
         if "low_stock_threshold" in d: p.low_stock_threshold = int(d["low_stock_threshold"])
         if "icon" in d: p.icon = str(d["icon"] or "🥤")
+        if "size" in d: p.size = str(d["size"] or "1L").strip() or "1L"
         if "active" in d: p.active = bool(d["active"])
     except (TypeError, ValueError):
         db.session.rollback()
