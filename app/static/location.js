@@ -76,16 +76,26 @@ const LocPicker = (() => {
         geoTimer = setTimeout(() => reverseGeocode(picked.lat, picked.lng), 700);
     }
 
-    function openMap() {
+    let leafletPromise = null;
+    function ensureLeaflet() {
+        if (typeof L !== 'undefined') return Promise.resolve();
+        if (leafletPromise) return leafletPromise;
+        leafletPromise = new Promise((resolve, reject) => {
+            if (!document.getElementById('leaflet-css')) {
+                const css = document.createElement('link'); css.id='leaflet-css'; css.rel='stylesheet'; css.href='https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css'; document.head.appendChild(css);
+            }
+            const script = document.createElement('script');
+            script.src='https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js';
+            script.onload=resolve; script.onerror=reject; document.head.appendChild(script);
+        });
+        return leafletPromise;
+    }
+
+    async function openMap() {
         const wrap = el('loc-map-wrap');
         if (!wrap) return;
         wrap.style.display = 'block';
-
-        if (typeof L === 'undefined') {
-            setStatus('Map could not load. Check your internet connection.', true);
-            return;
-        }
-
+        try { await ensureLeaflet(); } catch (e) { setStatus('Map could not load. Check your internet connection.', true); return; }
         if (!map) {
             map = L.map('loc-map').setView(picked ? [picked.lat, picked.lng] : DEFAULT_CENTER, 15);
             L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -104,8 +114,7 @@ const LocPicker = (() => {
         setStatus('Finding your location…');
         navigator.geolocation.getCurrentPosition(
             pos => {
-                openMap();
-                setPoint(pos.coords.latitude, pos.coords.longitude, { recenter: true });
+                openMap().then(() => setPoint(pos.coords.latitude, pos.coords.longitude, { recenter: true }));
             },
             err => setStatus(
                 err.code === 1
@@ -127,8 +136,7 @@ const LocPicker = (() => {
             const res = await fetch(url, { headers: { Accept: 'application/json' } });
             const data = await res.json();
             if (!data.length) return setStatus('Place not found. Try a nearby landmark.', true);
-            openMap();
-            setPoint(parseFloat(data[0].lat), parseFloat(data[0].lon), { recenter: true });
+            openMap().then(() => setPoint(parseFloat(data[0].lat), parseFloat(data[0].lon), { recenter: true }));
         } catch (e) {
             setStatus('Search failed. Try again.', true);
         }
