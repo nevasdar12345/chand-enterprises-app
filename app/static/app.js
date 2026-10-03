@@ -85,6 +85,10 @@ let CFG = {
 
   offers: [],
   coupons: [],
+  categories: [],
+  instagram_url: "",
+  facebook_url: "",
+  brochure_url: "",
 };
 
 /* =========================
@@ -106,6 +110,13 @@ const DEFAULT_OFFERS = [
 ];
 
 let OFFERS = [...DEFAULT_OFFERS];
+
+function renderCategories() {
+  const wrap = $("#cats");
+  if (!wrap) return;
+  const cats = Array.isArray(CFG.categories) ? CFG.categories : [];
+  wrap.innerHTML = `<button type="button" class="on category-card" onclick="category('All',this)"><span>🛍️</span><b>All</b></button>` + cats.map(c => `<button type="button" class="category-card" onclick="category(${JSON.stringify(c.name)},this)"><span>${esc(c.icon || "🛍️")}</span><b>${esc(c.name)}</b></button>`).join("");
+}
 
 function ticker() {
   const track = $("#track");
@@ -1986,6 +1997,13 @@ function updateBusinessUI() {
   document.querySelectorAll("[data-business-whatsapp]").forEach((element) => {
     element.textContent = CFG.whatsapp || "";
   });
+
+  renderCategories();
+  const socialHtml = [
+    CFG.instagram_url ? `<a href="${esc(CFG.instagram_url)}" target="_blank" rel="noopener">Instagram</a>` : "",
+    CFG.facebook_url ? `<a href="${esc(CFG.facebook_url)}" target="_blank" rel="noopener">Facebook</a>` : ""
+  ].filter(Boolean).join(" · ");
+  ["#socialLinks", "#contactSocial"].forEach(sel => { const social = $(sel); if (social) social.innerHTML = socialHtml; });
 }
 
 /* =========================
@@ -2126,6 +2144,20 @@ document.addEventListener("DOMContentLoaded", async () => {
   /* Customer/storefront */
 
   if ($("#grid")) {
+    const searchInput = $("#search");
+    if (searchInput) {
+      let searchTimer;
+      searchInput.addEventListener("input", () => {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(() => render(true), 180);
+      });
+    }
+    const heroEm = document.querySelector(".premium-hero h1 em");
+    if (heroEm) {
+      const words = ["delivered to your door.", "ready for your order.", "freshly delivered."];
+      let wi = 0;
+      setInterval(() => { wi = (wi + 1) % words.length; heroEm.animate([{opacity:.25},{opacity:1}], {duration:300}); heroEm.textContent = words[wi]; }, 3500);
+    }
     save(true);
 
     ticker();
