@@ -79,11 +79,7 @@ let ADMIN_PRODUCTS = [];
 
 function showTab(tab, button) {
 
-    const tabs = [
-        'orders',
-        'products',
-        'stock'
-    ];
+    const tabs = ['orders','products','stock','sales','ledger','coupons'];
 
     tabs.forEach(name => {
 
@@ -123,9 +119,10 @@ function showTab(tab, button) {
         loadAdminProducts();
     }
 
-    if (tab === 'stock') {
-        filterStock();
-    }
+    if (tab === 'stock') filterStock();
+    if (tab === 'sales') loadSalesDashboard();
+    if (tab === 'ledger') loadLedger();
+    if (tab === 'coupons') loadCoupons();
 }
 
 
@@ -697,6 +694,14 @@ async function loadAdminProducts() {
 
     updateOrderMetrics();
 
+    const low = ADMIN_PRODUCTS.filter(p => Number(p.stock || 0) <= Number(p.low_stock_threshold || 10));
+    const banner = $('#lowStockBanner');
+    if (banner) {
+        banner.hidden = !low.length;
+        banner.innerHTML = low.length
+            ? `⚠️ <b>Low stock:</b> ${low.map(p => `${esc(p.name)} (${p.stock})`).join(', ')}`
+            : '';
+    }
 
     /*
        The current admin.html already renders
@@ -1435,6 +1440,94 @@ function filterStock() {
 }
 
 
+
+/* =========================================================
+   SALES / LEDGER / COUPONS
+   ========================================================= */
+
+let salesChart = null;
+
+async function loadSalesDashboard() {
+    const result = await api('/api/admin/sales');
+    if (!result._ok) return;
+    if ($('#salesToday')) $('#salesToday').textContent = money(result.today_sales);
+    if ($('#salesMonth')) $('#salesMonth').textContent = money(result.month_sales);
+    if ($('#ordersToday')) $('#ordersToday').textContent = `${result.today_orders} orders`;
+    if ($('#ordersMonth')) $('#ordersMonth').textContent = `${result.month_orders} orders`;
+    const canvas = $('#salesChart');
+    if (canvas && window.Chart) {
+        if (salesChart) salesChart.destroy();
+        salesChart = new Chart(canvas, {
+            type: 'line',
+            data: { labels: result.daily.map(x=>x.label), datasets: [{ label:'Paid sales', data:result.daily.map(x=>x.sales), tension:.3 }] },
+            options: { responsive:true, plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true}} }
+        });
+    }
+    if ($('#topProducts')) {
+        $('#topProducts').innerHTML = result.top_products.length
+            ? result.top_products.map((x,i)=>`<div class="row"><span>${i+1}. ${esc(x.name)}</span><b>${x.qty} sold</b></div>`).join('')
+            : '<p class="muted">No paid sales yet.</p>';
+    }
+}
+
+async function loadLedger() {
+    const result=await api('/api/admin/ledger');
+    const rows=$('#ledgerRows');
+    if (!rows) return;
+    if (!result._ok) { rows.innerHTML=`<tr><td colspan="4">${esc(result.error||'Could not load ledger')}</td></tr>`; return; }
+    rows.innerHTML=result.customers.length ? result.customers.map(c=>`
+      <tr><td><b>${esc(c.name)}</b></td><td>${esc(c.mobile)}</td>
+      <td><strong class="${Number(c.balance)>0?'ledger-due':''}">${money(c.balance)}</strong></td>
+      <td><button class="add" onclick="ledgerEntryForm('payment','${esc(c.mobile)}','${esc(c.name)}')">Record payment</button></td></tr>`).join('')
+      : '<tr><td colspan="4">No credit entries yet.</td></tr>';
+}
+
+function ledgerEntryForm(type='payment', mobile='', name='') {
+    modal(`<h2>${type==='payment'?'Record payment':'Add credit'}</h2>
+      <label>Customer name<input id="lgName" value="${esc(name)}"></label>
+      <label>Mobile<input id="lgMobile" value="${esc(mobile)}" maxlength="10"></label>
+      <label>Amount<input id="lgAmount" type="number" min="1"></label>
+      <label>Note<input id="lgNote" placeholder="${type==='payment'?'Payment received':'Credit sale'}"></label>
+      <p class="err" id="lgErr"></p>
+      <button class="primary" onclick="saveLedger('${type}')">Save</button>
+      <button onclick="closeModal()">Cancel</button>`);
+}
+async function saveLedger(type) {
+    const result=await api('/api/admin/ledger','POST',{name:$('#lgName').value,mobile:$('#lgMobile').value,amount:Number($('#lgAmount').value),note:$('#lgNote').value,type});
+    if(!result._ok) return $('#lgErr').textContent=result.error||'Could not save';
+    closeModal(); loadLedger();
+}
+
+async function loadCoupons() {
+    const result=await api('/api/admin/coupons'), rows=$('#couponRows');
+    if(!rows) return;
+    if(!result._ok) return rows.innerHTML=`<tr><td colspan="5">${esc(result.error||'Could not load coupons')}</td></tr>`;
+    rows.innerHTML=result.coupons.map(c=>`<tr><td><b>${esc(c.code)}</b></td>
+      <td>${c.discount_type==='percent'?esc(c.discount_value)+'%':money(c.discount_value)}${c.max_discount!=null?` <small>max ${money(c.max_discount)}</small>`:''}</td>
+      <td>${money(c.min_order)}</td><td>${c.active?'Active':'Off'}</td>
+      <td><button class="${c.active?'danger':'add'}" onclick="toggleCoupon(${c.id},${!c.active})">${c.active?'Switch off':'Switch on'}</button></td></tr>`).join('');
+}
+function couponForm() {
+    modal(`<h2>Create coupon</h2>
+      <label>Code<input id="cpCode" maxlength="40" placeholder="SUMMER10"></label>
+      <label>Type<select id="cpType"><option value="percent">Percent</option><option value="fixed">Fixed ₹</option></select></label>
+      <label>Discount value<input id="cpValue" type="number" min="0"></label>
+      <label>Maximum discount (optional)<input id="cpMax" type="number" min="0"></label>
+      <label>Minimum order<input id="cpMin" type="number" min="0" value="0"></label>
+      <p class="err" id="cpErr"></p>
+      <button class="primary" onclick="saveCoupon()">Create</button><button onclick="closeModal()">Cancel</button>`);
+}
+async function saveCoupon() {
+    const result=await api('/api/admin/coupon','POST',{code:$('#cpCode').value,discount_type:$('#cpType').value,discount_value:Number($('#cpValue').value),max_discount:$('#cpMax').value,min_order:Number($('#cpMin').value)});
+    if(!result._ok) return $('#cpErr').textContent=result.error||'Could not create coupon';
+    closeModal(); loadCoupons();
+}
+async function toggleCoupon(id, active) {
+    const result=await api(`/api/admin/coupon/${id}`,'PUT',{active});
+    if(!result._ok) return alert(result.error||'Could not update coupon');
+    loadCoupons();
+}
+
 /* =========================================================
    DASHBOARD STARTUP
    ========================================================= */
@@ -1508,8 +1601,15 @@ window.hideAdminProduct =
 window.deactivateProduct =
     deactivateProduct;
 
-window.activateProduct =
-    activateProduct;
+window.activateProduct = activateProduct;
+window.loadSalesDashboard = loadSalesDashboard;
+window.loadLedger = loadLedger;
+window.ledgerEntryForm = ledgerEntryForm;
+window.saveLedger = saveLedger;
+window.loadCoupons = loadCoupons;
+window.couponForm = couponForm;
+window.saveCoupon = saveCoupon;
+window.toggleCoupon = toggleCoupon;
 
 
 /* =========================================================
