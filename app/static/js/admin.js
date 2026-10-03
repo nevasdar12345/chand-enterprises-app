@@ -434,6 +434,15 @@ function renderAdminOrders() {
                                 ${esc(order.mobile || '')}
                             </small>
 
+                            <small style="display:block;margin-top:4px">
+                                🏠 ${esc(order.address || '')}
+                            </small>
+
+                            ${order.map_url
+                                ? `<a class="loc-map-link" target="_blank" rel="noopener" href="${esc(order.map_url)}">📍 Open in Google Maps</a>
+                                   <small style="display:block">${Number(order.latitude).toFixed(6)}, ${Number(order.longitude).toFixed(6)}</small>`
+                                : ''}
+
                         </td>
 
 
