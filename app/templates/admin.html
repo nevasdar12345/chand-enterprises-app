@@ -96,7 +96,7 @@
 
     </section>
 
-
+    <div id="lowStockBanner" class="low-stock-banner" hidden></div>
 
     <!-- =========================
          TABS
@@ -123,6 +123,24 @@
             onclick="showTab('stock', this)"
         >
             📊 Stock
+        </button>
+
+        <button
+            onclick="showTab('sales', this)"
+        >
+            📈 Sales
+        </button>
+
+        <button
+            onclick="showTab('ledger', this)"
+        >
+            💳 Credit
+        </button>
+
+        <button
+            onclick="showTab('coupons', this)"
+        >
+            🎟️ Coupons
         </button>
 
     </div>
@@ -414,6 +432,29 @@
     </section>
 
 
+
+
+    <section id="tab-sales" style="display:none">
+        <div class="premium-section-head">
+            <div>
+                <span class="section-kicker">SALES</span>
+                <h2>Sales dashboard</h2>
+                <small>Daily and monthly performance with top products.</small>
+            </div>
+        </div>
+        <div class="metrics admin-metrics">
+            <div class="metric-card"><div class="metric-icon blue">₹</div><div class="metric-content"><small>Today</small><b id="salesToday">—</b><span id="ordersToday">— orders</span></div></div>
+            <div class="metric-card"><div class="metric-icon green">₹</div><div class="metric-content"><small>This month</small><b id="salesMonth">—</b><span id="ordersMonth">— orders</span></div></div>
+        </div>
+        <div class="table admin-table">
+            <div class="table-header"><div><h2>Sales trend</h2><small>Paid orders only.</small></div></div>
+            <div style="padding:16px"><canvas id="salesChart" height="110"></canvas></div>
+        </div>
+        <div class="table admin-table">
+            <div class="table-header"><div><h2>Top products</h2></div></div>
+            <div id="topProducts" style="padding:16px"></div>
+        </div>
+    </section>
 
     <!-- =========================
          PRODUCTS
@@ -964,6 +1005,33 @@
 
 
 
+
+    <section id="tab-ledger" style="display:none">
+        <div class="premium-section-head">
+            <div><span class="section-kicker">CREDIT</span><h2>Customer credit ledger</h2><small>Track outstanding credit and record payments.</small></div>
+            <button class="add" onclick="ledgerEntryForm('debit')">+ Add credit</button><button class="primary" onclick="ledgerEntryForm('payment')">+ Record payment</button>
+        </div>
+        <div class="table admin-table">
+            <table>
+                <thead><tr><th>Customer</th><th>Mobile</th><th>Outstanding</th><th>Action</th></tr></thead>
+                <tbody id="ledgerRows"></tbody>
+            </table>
+        </div>
+    </section>
+
+    <section id="tab-coupons" style="display:none">
+        <div class="premium-section-head">
+            <div><span class="section-kicker">OFFERS</span><h2>Coupon management</h2><small>Create coupons and switch them on or off without editing code.</small></div>
+            <button class="primary" onclick="couponForm()">+ Create coupon</button>
+        </div>
+        <div class="table admin-table">
+            <table>
+                <thead><tr><th>Code</th><th>Discount</th><th>Minimum</th><th>Status</th><th>Action</th></tr></thead>
+                <tbody id="couponRows"></tbody>
+            </table>
+        </div>
+    </section>
+
     <!-- =========================
          FOOTER
          ========================= -->
@@ -1062,5 +1130,7 @@
 
 
 </main>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 
 {% endblock %}
