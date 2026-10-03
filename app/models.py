@@ -43,6 +43,7 @@ class Order(db.Model):
     payment_method = db.Column(db.String(40))
     payment_status = db.Column(db.String(30), default="Pending")
     delivery_charge = db.Column(db.Float, default=0)
+    cash_collected = db.Column(db.Float, default=0)
     delivery_person_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
     coupon_code = db.Column(db.String(40))
     discount = db.Column(db.Float, default=0)
@@ -95,3 +96,25 @@ class SiteSetting(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     key = db.Column(db.String(80), unique=True, nullable=False)
     value = db.Column(db.Text, default="")
+
+
+class Coupon(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    code = db.Column(db.String(40), unique=True, nullable=False)
+    discount_type = db.Column(db.String(20), default="percent")  # percent or fixed
+    discount_value = db.Column(db.Float, default=0)
+    max_discount = db.Column(db.Float, nullable=True)
+    min_order = db.Column(db.Float, default=0)
+    active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class LedgerEntry(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    customer_mobile = db.Column(db.String(20), nullable=False, index=True)
+    customer_name = db.Column(db.String(120), nullable=False)
+    entry_type = db.Column(db.String(20), nullable=False)  # debit or payment
+    amount = db.Column(db.Float, nullable=False)
+    note = db.Column(db.String(255), default="")
+    order_id = db.Column(db.Integer, db.ForeignKey("order.id"), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
