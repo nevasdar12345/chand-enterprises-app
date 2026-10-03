@@ -4270,3 +4270,46 @@ body.ce-menu-open{
 .footer-social { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
 .footer-social a { color:var(--pri,#0a7cff); font-weight:700; text-decoration:none; }
 .footer-social a:hover { text-decoration:underline; }
+
+
+/* =========================================================
+   MODAL SCROLL FIX
+   Fixes tall Admin / Developer product forms on desktop
+   and mobile screens.
+   ========================================================= */
+
+#modal{
+    align-items:flex-start;
+    overflow-y:auto;
+    overflow-x:hidden;
+    -webkit-overflow-scrolling:touch;
+}
+
+#modal > div{
+    max-height:calc(100vh - 40px);
+    overflow-y:auto;
+    overflow-x:hidden;
+    margin-top:20px !important;
+    margin-bottom:20px !important;
+    box-sizing:border-box;
+    -webkit-overflow-scrolling:touch;
+}
+
+#modal > .box{
+    margin-top:0 !important;
+    margin-bottom:0 !important;
+}
+
+@media(max-width:600px){
+
+    #modal{
+        padding:10px;
+    }
+
+    #modal > div{
+        max-height:calc(100vh - 20px);
+        margin-top:10px !important;
+        margin-bottom:10px !important;
+    }
+
+}
