@@ -113,6 +113,58 @@
 </header>
 
 
+<!-- ================= MOBILE MENU ================= -->
+
+<div class="ce-menu-backdrop" id="ceMenuBackdrop" aria-hidden="true"></div>
+
+<aside class="ce-menu" id="ceMobileMenu" aria-hidden="true">
+
+    <div class="ce-menu-head">
+        <div>
+            <span class="ce-menu-kicker">CHAND ENTERPRISES</span>
+            <h2>Menu</h2>
+        </div>
+
+        <button type="button" class="ce-menu-close" id="ceMenuClose" aria-label="Close menu">
+            ×
+        </button>
+    </div>
+
+    <nav class="ce-menu-links" aria-label="Mobile menu">
+        <a href="/" class="ce-menu-link">
+            <span>🏠</span>
+            <span>Home</span>
+        </a>
+
+        <a href="/#shop" class="ce-menu-link">
+            <span>🛒</span>
+            <span>Products</span>
+        </a>
+
+        <a href="/brochure" class="ce-menu-link ce-menu-featured">
+            <span>📖</span>
+            <span>Brochure</span>
+            <small>Premium product catalogue</small>
+        </a>
+
+        <button type="button" class="ce-menu-link ce-menu-button" onclick="orders(); closeMobileMenu();">
+            <span>📦</span>
+            <span>My Orders</span>
+        </button>
+
+        <button type="button" class="ce-menu-link ce-menu-button" onclick="enquiry(); closeMobileMenu();">
+            <span>💬</span>
+            <span>WhatsApp Enquiry</span>
+        </button>
+    </nav>
+
+    <div class="ce-menu-footer">
+        <span>📍</span> Darbhanga, Bihar
+    </div>
+
+</aside>
+
+
 <!-- ================= OFFER TICKER ================= -->
 
 <div
