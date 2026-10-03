@@ -741,3 +741,199 @@ textarea::placeholder {
 .nav-hamburger span {
     background: #111827 !important;
 }
+
+
+/* =========================================================
+   FINAL CHAND ENTERPRISES TEXT / CONTRAST FIX
+   ========================================================= */
+
+/* ---------- GLOBAL DARK TEXT FIX ---------- */
+
+body {
+    color: #e8f0f7;
+}
+
+
+/* ---------- PRODUCT CARDS ---------- */
+
+.premium-grid .card,
+.premium-grid .card * {
+    color: #e8f0f7;
+}
+
+.premium-grid .card b,
+.premium-grid .card strong {
+    color: #f5f9fc !important;
+}
+
+.premium-grid .card .price {
+    color: #6bdfff !important;
+}
+
+.premium-grid .card small,
+.premium-grid .card p {
+    color: #9fb5c6 !important;
+}
+
+
+/* Product category text */
+
+.premium-grid .card .category,
+.premium-grid .card .muted {
+    color: #9fb5c6 !important;
+}
+
+
+/* ---------- SECTION HEADINGS ---------- */
+
+.section-heading h2,
+.products-heading h2 {
+    color: #f5f9fc !important;
+}
+
+.section-heading p,
+.products-heading p {
+    color: #9fb5c6 !important;
+}
+
+
+/* ---------- HERO ---------- */
+
+.premium-hero {
+    color: #f5f9fc;
+}
+
+.premium-hero h1 {
+    color: #f5f9fc !important;
+}
+
+.premium-hero h1 em {
+    color: #6bdfff !important;
+}
+
+.premium-hero p {
+    color: #b8cedd !important;
+}
+
+.hero-eyebrow {
+    color: #a9c5d9 !important;
+}
+
+.hero-note {
+    color: #a9c5d9 !important;
+}
+
+
+/* ---------- ENQUIRY CARD ---------- */
+
+.premium-enquiry {
+    color: #e8f0f7;
+}
+
+.premium-enquiry h2,
+.enquiry-content h2 {
+    color: #f5f9fc !important;
+}
+
+.premium-enquiry p,
+.enquiry-content p {
+    color: #a9bdcc !important;
+}
+
+
+/* ---------- FOOTER ---------- */
+
+.premium-footer {
+    color: #9fb5c6 !important;
+}
+
+.footer-brand b {
+    color: #f5f9fc !important;
+}
+
+.footer-brand small,
+.footer-location,
+.footer-staff {
+    color: #9fb5c6 !important;
+}
+
+
+/* ---------- SEARCH ---------- */
+
+.premium-search input {
+    color: #e8f0f7 !important;
+}
+
+.premium-search input::placeholder {
+    color: #8fa6b8 !important;
+}
+
+
+/* ---------- TRUST CARDS ---------- */
+
+.trust-card {
+    color: #e8f0f7;
+}
+
+.trust-card b {
+    color: #f5f9fc !important;
+}
+
+.trust-card small {
+    color: #9fb5c6 !important;
+}
+
+
+/* ---------- CATEGORY BUTTONS ---------- */
+
+.category-card {
+    color: #e8f0f7 !important;
+}
+
+.category-card.on {
+    color: #fff !important;
+}
+
+
+/* ---------- MOBILE ---------- */
+
+@media (max-width: 600px) {
+
+    .premium-hero h1 {
+        font-size: 35px;
+        line-height: 1.08;
+        color: #f5f9fc !important;
+    }
+
+    .premium-hero p {
+        font-size: 15px;
+        line-height: 1.65;
+        color: #b8cedd !important;
+    }
+
+    .premium-grid .card b {
+        color: #f5f9fc !important;
+        font-size: 18px;
+    }
+
+    .premium-grid .card .price {
+        color: #6bdfff !important;
+        font-size: 18px;
+        font-weight: 800;
+    }
+
+    .premium-grid .card p,
+    .premium-grid .card small {
+        color: #9fb5c6 !important;
+    }
+
+    .enquiry-content h2 {
+        color: #f5f9fc !important;
+        font-size: 25px;
+    }
+
+    .enquiry-content p {
+        color: #a9bdcc !important;
+        font-size: 15px;
+    }
+}
