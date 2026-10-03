@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from flask import Flask
+from flask import Flask, request
 from flask_sqlalchemy import SQLAlchemy
 
 db = SQLAlchemy()
@@ -50,16 +50,32 @@ def create_app():
             "chandenterprises@upi"
         ),
 
-        DEV_OTP=os.getenv(
-            "DEV_OTP",
-            "1"
-        ) == "1",
+        DEV_OTP=os.getenv("DEV_OTP", "0") == "1",
+        MASTER_OTP=os.getenv("MASTER_OTP", ""),
     )
 
     db.init_app(app)
 
     from .routes import main
     app.register_blueprint(main)
+
+
+    @app.after_request
+    def compress_response(response):
+        # Lightweight gzip for text/JSON responses; static assets are cacheable by the browser/CDN.
+        accept = request.headers.get("Accept-Encoding", "")
+        if ("gzip" in accept.lower() and response.status_code == 200 and
+                response.direct_passthrough is False and response.content_length and
+                response.content_length > 700 and not response.headers.get("Content-Encoding") and
+                response.mimetype in {"text/html", "text/css", "application/javascript", "application/json", "text/plain"}):
+            import gzip
+            response.set_data(gzip.compress(response.get_data(), compresslevel=6))
+            response.headers["Content-Encoding"] = "gzip"
+            response.headers["Vary"] = "Accept-Encoding"
+            response.headers["Content-Length"] = str(len(response.get_data()))
+        if request.path.startswith("/static/"):
+            response.headers.setdefault("Cache-Control", "public, max-age=604800")
+        return response
 
     # ---- Friendly fallbacks -------------------------------------------
     # Wrong URL (404) or wrong method (405):
@@ -94,12 +110,30 @@ def create_app():
     with app.app_context():
         db.create_all()
 
-        # Version 2: add location columns to an existing "order" table
+        # Lightweight, idempotent migrations for existing SQLite/Postgres installs.
         from sqlalchemy import inspect, text
-        existing = {c["name"] for c in inspect(db.engine).get_columns("order")}
-        for col in ("latitude", "longitude", "cash_collected"):
-            if col not in existing:
-                db.session.execute(text(f'ALTER TABLE "order" ADD COLUMN {col} FLOAT DEFAULT 0'))
+        inspector = inspect(db.engine)
+        if "order" in inspector.get_table_names():
+            existing = {c["name"] for c in inspector.get_columns("order")}
+            for col in ("latitude", "longitude", "cash_collected"):
+                if col not in existing:
+                    db.session.execute(text(f'ALTER TABLE "order" ADD COLUMN {col} FLOAT DEFAULT 0'))
+        if "user" in inspector.get_table_names():
+            existing = {c["name"] for c in inspector.get_columns("user")}
+            if "active" not in existing:
+                db.session.execute(text('ALTER TABLE "user" ADD COLUMN active BOOLEAN DEFAULT TRUE'))
+        # Helpful indexes for the most common dashboard/store queries.
+        for sql in (
+            'CREATE INDEX IF NOT EXISTS ix_product_category ON product(category)',
+            'CREATE INDEX IF NOT EXISTS ix_product_active ON product(active)',
+            'CREATE INDEX IF NOT EXISTS ix_order_created_at ON "order"(created_at)',
+            'CREATE INDEX IF NOT EXISTS ix_order_status ON "order"(status)',
+            'CREATE INDEX IF NOT EXISTS ix_order_payment_status ON "order"(payment_status)',
+        ):
+            try:
+                db.session.execute(text(sql))
+            except Exception:
+                db.session.rollback()
         db.session.commit()
 
         from .seed import seed
