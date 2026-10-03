@@ -1,4 +1,4 @@
-import csv, io, secrets, urllib.parse, math, re
+import csv, io, secrets, urllib.parse, math, re, os
 
 import segno
 
@@ -276,6 +276,12 @@ def home():
 
     return render_template("index.html", products=prods)
 
+
+
+@main.route("/brochure")
+def brochure():
+    pdf_path = os.path.join(current_app.static_folder, "brochure.pdf")
+    return render_template("brochure.html", brochure_pdf_exists=os.path.exists(pdf_path))
 
 
 @main.route("/staff")
