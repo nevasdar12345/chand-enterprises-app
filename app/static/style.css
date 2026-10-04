@@ -4707,3 +4707,110 @@ h1,h2,h3{
         padding:10px 14px;
     }
 }
+
+
+/* =========================================================
+   DEVELOPER PRODUCT TABLE — SIZE COLUMN / ALIGNMENT FIX
+   ========================================================= */
+
+.table-wrap {
+    width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+}
+
+.admin-table {
+    width: 100%;
+    min-width: 1180px;
+    table-layout: fixed;
+    border-collapse: collapse;
+}
+
+.admin-table th,
+.admin-table td {
+    box-sizing: border-box;
+    vertical-align: middle;
+}
+
+/* Keep every column directly under its heading. */
+.admin-table th:nth-child(1),
+.admin-table td:nth-child(1) { width: 50px; }
+
+.admin-table th:nth-child(2),
+.admin-table td:nth-child(2) { width: 135px; }
+
+.admin-table th:nth-child(3),
+.admin-table td:nth-child(3) { width: 120px; }
+
+.admin-table th:nth-child(4),
+.admin-table td:nth-child(4) { width: 105px; }
+
+.admin-table th:nth-child(5),
+.admin-table td:nth-child(5) { width: 155px; }
+
+.admin-table th:nth-child(6),
+.admin-table td:nth-child(6) { width: 90px; }
+
+.admin-table th:nth-child(7),
+.admin-table td:nth-child(7) { width: 90px; }
+
+.admin-table th:nth-child(8),
+.admin-table td:nth-child(8) { width: 110px; }
+
+.admin-table th:nth-child(9),
+.admin-table td:nth-child(9) { width: 90px; }
+
+.admin-table th:nth-child(10),
+.admin-table td:nth-child(10) { width: 145px; }
+
+/* Inputs and selects must stay inside their own cells. */
+.admin-table td input,
+.admin-table td select {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+}
+
+/* Product image + image button stay inside the Image column. */
+.admin-table td:nth-child(3) img {
+    width: 48px !important;
+    height: 48px !important;
+    object-fit: cover;
+    display: block;
+    margin: 0 0 6px;
+    border-radius: 8px;
+}
+
+.admin-table td:nth-child(3) button {
+    white-space: nowrap;
+}
+
+/* Actions stay together in the Actions column. */
+.admin-table td:nth-child(10) {
+    white-space: nowrap;
+}
+
+.admin-table td:nth-child(10) button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin: 2px 3px 2px 0;
+    white-space: nowrap;
+}
+
+/* Prevent long product/category text from pushing columns around. */
+.admin-table td {
+    overflow: hidden;
+}
+
+@media (max-width: 900px) {
+    .table-wrap {
+        margin-right: -4px;
+    }
+
+    .admin-table {
+        min-width: 1180px;
+    }
+}
