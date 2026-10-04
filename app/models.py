@@ -152,6 +152,15 @@ class Product(db.Model):
         default="🥤"
     )
 
+    # Public product image URL. Images uploaded from Admin/Developer
+    # are stored in a public GitHub repository so Render restarts do not
+    # remove them. A normal public image URL can also be pasted here.
+    image_url = db.Column(
+        db.Text,
+        default="",
+        nullable=False
+    )
+
     active = db.Column(
         db.Boolean,
         default=True,
