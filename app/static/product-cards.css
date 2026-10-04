@@ -354,3 +354,53 @@
 .premium-grid .card:hover .ic.product-image-box {
     transform: none;
 }
+
+/* =========================================================
+   HERO PICTURES - real product photos, no emoji
+   ========================================================= */
+
+.hero-visual .hero-card {
+    overflow: hidden;
+    padding: 0;
+    border-radius: 24px;
+    border: 1px solid rgb(255 255 255 / 22%);
+    box-shadow: 0 30px 60px -18px rgb(0 0 0 / 65%), 0 0 0 6px rgb(255 255 255 / 4%);
+    animation: none;
+}
+
+.hero-visual .hero-card-main {
+    width: 190px;
+    height: 253px;
+    left: 50px;
+    top: 14px;
+    transform: rotate(-5deg);
+}
+
+.hero-visual .hero-card-water {
+    width: 124px;
+    height: 165px;
+    right: -6px;
+    bottom: 0;
+    transform: rotate(7deg);
+    z-index: 2;
+}
+
+.hero-visual .hero-card img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* drawn bottle/can fallback when a product has no photo */
+.hero-visual .hero-card:not(.has-photo) .pa-svg {
+    width: 70%;
+    height: 82%;
+    overflow: visible;
+}
+
+@media (max-width: 850px) {
+    .hero-visual .hero-card {
+        box-shadow: none;
+    }
+}
