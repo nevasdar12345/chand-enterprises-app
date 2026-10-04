@@ -1909,3 +1909,81 @@ async function toggleTeam(id,active){
 window.addTeam=addTeam; window.editTeam=editTeam; window.saveTeam=saveTeam; window.toggleTeam=toggleTeam; window.loadTeam=loadTeam;
 
 window.sendOrderBill=sendOrderBill;
+
+/* =========================================================
+   ADMIN THEME + HAMBURGER MENU
+   Safe UI-only controls. Does not touch business/API logic.
+   ========================================================= */
+
+function applyAdminTheme(theme) {
+    const selected = theme === 'dark' ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', selected);
+    localStorage.setItem('admin-theme', selected);
+
+    const button = document.getElementById('adminThemeToggle');
+    if (button) {
+        button.textContent = selected === 'dark' ? '☀️' : '🌙';
+        button.setAttribute(
+            'aria-label',
+            selected === 'dark'
+                ? 'Switch to light theme'
+                : 'Switch to dark theme'
+        );
+        button.title = selected === 'dark'
+            ? 'Light theme'
+            : 'Dark theme';
+    }
+}
+
+function toggleAdminTheme() {
+    const current =
+        document.documentElement.getAttribute('data-theme') === 'dark'
+            ? 'dark'
+            : 'light';
+
+    applyAdminTheme(current === 'dark' ? 'light' : 'dark');
+}
+
+function toggleAdminMenu(force) {
+    const open =
+        typeof force === 'boolean'
+            ? force
+            : !document.body.classList.contains('admin-menu-open');
+
+    document.body.classList.toggle('admin-menu-open', open);
+
+    const button = document.getElementById('adminMenuToggle');
+    if (button) {
+        button.setAttribute('aria-expanded', open ? 'true' : 'false');
+        button.textContent = open ? '✕' : '☰';
+        button.setAttribute(
+            'aria-label',
+            open ? 'Close admin menu' : 'Open admin menu'
+        );
+    }
+}
+
+/* Close the mobile menu after selecting a tab. */
+const originalShowTab = window.showTab;
+if (typeof originalShowTab === 'function') {
+    window.showTab = function(tab, button) {
+        const result = originalShowTab(tab, button);
+        toggleAdminMenu(false);
+        return result;
+    };
+}
+
+function initAdminThemeAndMenu() {
+    let saved = 'light';
+    try {
+        saved = localStorage.getItem('admin-theme') || 'light';
+    } catch (e) {}
+
+    applyAdminTheme(saved);
+    toggleAdminMenu(false);
+}
+
+document.addEventListener('DOMContentLoaded', initAdminThemeAndMenu);
+
+window.toggleAdminTheme = toggleAdminTheme;
+window.toggleAdminMenu = toggleAdminMenu;
