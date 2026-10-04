@@ -4834,3 +4834,22 @@ h1,h2,h3{
         min-width: 1180px;
     }
 }
+
+.orders-table-scroll {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+}
+
+.orders-table-scroll table {
+    min-width: 1250px;
+    width: max-content;
+    border-collapse: collapse;
+}
+
+.orders-table-scroll th,
+.orders-table-scroll td {
+    white-space: nowrap;
+}
