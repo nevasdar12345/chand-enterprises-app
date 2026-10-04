@@ -3,6 +3,9 @@ from pathlib import Path
 
 import segno
 from sqlalchemy import case
+
+from openpyxl import Workbook
+from openpyxl.styles import Font, PatternFill, Alignment
 from sqlalchemy.orm import joinedload, selectinload
 
 from datetime import datetime, timedelta
@@ -1131,6 +1134,116 @@ def delete_product(pid):
     p.active = False
     db.session.commit()
     return jsonify(ok=True)
+
+
+
+def _xlsx_response(workbook, filename):
+    out = io.BytesIO()
+    workbook.save(out)
+    out.seek(0)
+    return Response(
+        out.getvalue(),
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
+
+def _style_xlsx_sheet(ws):
+    header_fill = PatternFill("solid", fgColor="DCEEFF")
+    for cell in ws[1]:
+        cell.font = Font(bold=True)
+        cell.fill = header_fill
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+    ws.freeze_panes = "A2"
+    ws.auto_filter.ref = ws.dimensions
+    for column_cells in ws.columns:
+        width = min(max(max(len(str(c.value or "")) for c in column_cells) + 2, 10), 40)
+        ws.column_dimensions[column_cells[0].column_letter].width = width
+
+
+@main.get("/admin/export-stock.xlsx")
+def export_stock_xlsx():
+    if not role_ok("admin"):
+        return redirect(url_for("main.staff_login"))
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Stock"
+    ws.append(["ID", "Product", "Size", "Category", "Price", "Current Stock", "Alert At", "Status"])
+    for p in Product.query.order_by(Product.category, Product.name, Product.id).all():
+        ws.append([p.id, p.name, p.size or "1L", p.category, p.price, p.stock,
+                   p.low_stock_threshold or 10, "Active" if p.active else "Inactive"])
+    _style_xlsx_sheet(ws)
+    return _xlsx_response(wb, "chand-stock.xlsx")
+
+
+@main.get("/admin/export-sales.xlsx")
+def export_sales_xlsx():
+    if not role_ok("admin"):
+        return redirect(url_for("main.staff_login"))
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Sales"
+    ws.append(["Order", "Date", "Customer", "Mobile", "Product", "Size", "Qty", "Unit Price",
+               "Line Total", "Order Total", "Payment Method", "Payment Status", "Order Status"])
+
+    orders = (Order.query
+              .options(selectinload(Order.items))
+              .filter(Order.status != "Cancelled", Order.payment_status == "Paid")
+              .order_by(Order.created_at.desc()).all())
+    for o in orders:
+        if o.items:
+            for item in o.items:
+                ws.append([o.code, o.created_at.strftime("%d-%m-%Y %H:%M"), o.customer_name, o.mobile,
+                           item.product_name, item.product_size or "1L", item.quantity, item.unit_price,
+                           item.line_total, o.total, o.payment_method or "", o.payment_status, o.status])
+        else:
+            ws.append([o.code, o.created_at.strftime("%d-%m-%Y %H:%M"), o.customer_name, o.mobile,
+                       "", "", 0, 0, 0, o.total, o.payment_method or "", o.payment_status, o.status])
+    _style_xlsx_sheet(ws)
+
+    top = wb.create_sheet("Top Products")
+    top.append(["Product", "Quantity Sold"])
+    qty_sum = db.func.sum(OrderItem.quantity)
+    top_rows = (db.session.query(OrderItem.product_name, qty_sum)
+                .join(Order, Order.id == OrderItem.order_id)
+                .filter(Order.status != "Cancelled", Order.payment_status == "Paid")
+                .group_by(OrderItem.product_name)
+                .order_by(qty_sum.desc(), db.func.min(OrderItem.id)).all())
+    for name, qty in top_rows:
+        top.append([name, int(qty)])
+    _style_xlsx_sheet(top)
+    return _xlsx_response(wb, "chand-sales.xlsx")
+
+
+@main.get("/admin/export-credit.xlsx")
+def export_credit_xlsx():
+    if not role_ok("admin"):
+        return redirect(url_for("main.staff_login"))
+
+    entries = LedgerEntry.query.order_by(LedgerEntry.created_at.desc()).all()
+    balances = {}
+    for e in entries:
+        key = e.customer_mobile
+        item = balances.setdefault(key, {"mobile": key, "name": e.customer_name, "balance": 0})
+        item["balance"] += e.amount if e.entry_type == "debit" else -e.amount
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Credit Summary"
+    ws.append(["Customer", "Mobile", "Outstanding Credit"])
+    for item in sorted(balances.values(), key=lambda x: x["balance"], reverse=True):
+        ws.append([item["name"], item["mobile"], item["balance"]])
+    _style_xlsx_sheet(ws)
+
+    tx = wb.create_sheet("Transactions")
+    tx.append(["Date", "Customer", "Mobile", "Type", "Amount", "Note", "Order ID"])
+    for e in entries:
+        tx.append([e.created_at.strftime("%d-%m-%Y %H:%M"), e.customer_name, e.customer_mobile,
+                   "Credit" if e.entry_type == "debit" else "Payment", e.amount, e.note or "", e.order_id or ""])
+    _style_xlsx_sheet(tx)
+    return _xlsx_response(wb, "chand-credit.xlsx")
 
 
 @main.get("/admin/export.csv")
