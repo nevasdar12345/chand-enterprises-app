@@ -1493,3 +1493,84 @@ window.uploadProductImage = uploadProductImage;
 window.saveProductImageUrl = saveProductImageUrl;
 window.removeProductImage = removeProductImage;
 
+
+/* =========================================================
+   ORDER ARCHIVE
+   ========================================================= */
+
+async function loadDeveloperArchive() {
+    const result = await api('/api/developer/archive/settings');
+    if (!result._ok) return;
+    const s = result.settings || {};
+    const days = document.getElementById('archiveDays');
+    const method = document.getElementById('archiveMethod');
+    const email = document.getElementById('archiveEmail');
+    const wa = document.getElementById('archiveWhatsApp');
+    if (days) days.value = s.archive_days || 7;
+    if (method) method.value = s.archive_method || 'email';
+    if (email) email.value = s.archive_email || '';
+    if (wa) wa.value = s.archive_whatsapp || '';
+    toggleArchiveRecipient();
+    await loadDeveloperArchiveHistory();
+}
+
+function toggleArchiveRecipient() {
+    const method = document.getElementById('archiveMethod')?.value || 'email';
+    const email = document.getElementById('archiveEmailWrap');
+    const wa = document.getElementById('archiveWhatsAppWrap');
+    if (email) email.style.display = method === 'email' ? '' : 'none';
+    if (wa) wa.style.display = method === 'whatsapp' ? '' : 'none';
+}
+
+async function saveDeveloperArchiveSettings() {
+    const result = await api('/api/developer/archive/settings', 'PUT', {
+        archive_days: document.getElementById('archiveDays')?.value || 7,
+        archive_method: document.getElementById('archiveMethod')?.value || 'email',
+        archive_email: document.getElementById('archiveEmail')?.value.trim() || '',
+        archive_whatsapp: document.getElementById('archiveWhatsApp')?.value.trim() || ''
+    });
+    const msg = document.getElementById('archiveMessage');
+    if (msg) msg.textContent = result._ok ? 'Archive settings saved.' : (result.error || 'Could not save archive settings.');
+    if (result._ok) await loadDeveloperArchiveHistory();
+}
+
+async function checkDeveloperArchive() {
+    const msg = document.getElementById('archiveMessage');
+    if (msg) msg.textContent = 'Checking eligible orders…';
+    const result = await api('/api/developer/archive/check', 'POST');
+    if (!result._ok) {
+        if (msg) msg.textContent = result.error || 'Archive failed.';
+        return;
+    }
+    if (!result.created) {
+        if (msg) msg.textContent = result.message || 'No orders are eligible.';
+        return;
+    }
+    if (result.whatsapp_url) {
+        if (msg) msg.innerHTML = `Archive #${esc(result.archive.id)} prepared. <a href="${esc(result.whatsapp_url)}" target="_blank" rel="noopener">Open WhatsApp</a> and send the archive message.`;
+    } else if (msg) {
+        msg.textContent = `Archive #${result.archive.id} sent successfully. Waiting for Admin confirmation.`;
+    }
+    await loadDeveloperArchiveHistory();
+}
+
+async function loadDeveloperArchiveHistory() {
+    const box = document.getElementById('developerArchiveHistory');
+    if (!box) return;
+    const result = await api('/api/developer/archive/history');
+    if (!result._ok) { box.textContent = result.error || 'Could not load archive history.'; return; }
+    if (!result.archives?.length) { box.innerHTML = '<p class="muted">No archives yet.</p>'; return; }
+    box.innerHTML = `<table><thead><tr><th>Archive</th><th>Period</th><th>Orders</th><th>Total</th><th>Method</th><th>Status</th></tr></thead><tbody>` +
+        result.archives.map(a => `<tr><td>#${esc(a.id)}</td><td>${esc(a.period_start)} → ${esc(a.period_end)}</td><td>${esc(a.orders)}</td><td>${money(a.total)}</td><td>${esc(a.method)}</td><td>${esc(a.status)}</td></tr>`).join('') +
+        '</tbody></table>';
+}
+
+window.loadDeveloperArchive = loadDeveloperArchive;
+window.toggleArchiveRecipient = toggleArchiveRecipient;
+window.saveDeveloperArchiveSettings = saveDeveloperArchiveSettings;
+window.checkDeveloperArchive = checkDeveloperArchive;
+window.loadDeveloperArchiveHistory = loadDeveloperArchiveHistory;
+
+document.addEventListener('DOMContentLoaded', () => {
+    if (document.getElementById('developerArchivePanel')) loadDeveloperArchive();
+});
