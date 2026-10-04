@@ -1506,10 +1506,12 @@ async function loadDeveloperArchive() {
     const method = document.getElementById('archiveMethod');
     const email = document.getElementById('archiveEmail');
     const wa = document.getElementById('archiveWhatsApp');
+    const drive = document.getElementById('archiveDriveLink');
     if (days) days.value = s.archive_days || 7;
     if (method) method.value = s.archive_method || 'email';
     if (email) email.value = s.archive_email || '';
     if (wa) wa.value = s.archive_whatsapp || '';
+    if (drive) drive.value = s.archive_drive_link || '';
     toggleArchiveRecipient();
     await loadDeveloperArchiveHistory();
 }
@@ -1518,8 +1520,10 @@ function toggleArchiveRecipient() {
     const method = document.getElementById('archiveMethod')?.value || 'email';
     const email = document.getElementById('archiveEmailWrap');
     const wa = document.getElementById('archiveWhatsAppWrap');
+    const drive = document.getElementById('archiveDriveWrap');
     if (email) email.style.display = method === 'email' ? '' : 'none';
     if (wa) wa.style.display = method === 'whatsapp' ? '' : 'none';
+    if (drive) drive.style.display = method === 'drive' ? '' : 'none';
 }
 
 async function saveDeveloperArchiveSettings() {
@@ -1527,7 +1531,8 @@ async function saveDeveloperArchiveSettings() {
         archive_days: document.getElementById('archiveDays')?.value || 7,
         archive_method: document.getElementById('archiveMethod')?.value || 'email',
         archive_email: document.getElementById('archiveEmail')?.value.trim() || '',
-        archive_whatsapp: document.getElementById('archiveWhatsApp')?.value.trim() || ''
+        archive_whatsapp: document.getElementById('archiveWhatsApp')?.value.trim() || '',
+        archive_drive_link: document.getElementById('archiveDriveLink')?.value.trim() || ''
     });
     const msg = document.getElementById('archiveMessage');
     if (msg) msg.textContent = result._ok ? 'Archive settings saved.' : (result.error || 'Could not save archive settings.');
@@ -1546,7 +1551,9 @@ async function checkDeveloperArchive() {
         if (msg) msg.textContent = result.message || 'No orders are eligible.';
         return;
     }
-    if (result.whatsapp_url) {
+    if (result.archive.method === 'drive' && result.drive_url) {
+        if (msg) msg.innerHTML = `Archive #${esc(result.archive.id)} uploaded to <a href="${esc(result.drive_url)}" target="_blank" rel="noopener">Google Drive</a>. Waiting for Admin confirmation.`;
+    } else if (result.whatsapp_url) {
         if (msg) msg.innerHTML = `Archive #${esc(result.archive.id)} prepared. <a href="${esc(result.whatsapp_url)}" target="_blank" rel="noopener">Open WhatsApp</a> and send the archive message.`;
     } else if (msg) {
         msg.textContent = `Archive #${result.archive.id} sent successfully. Waiting for Admin confirmation.`;
