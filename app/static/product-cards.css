@@ -431,18 +431,27 @@
 
 /* Developer panel: hamburger only on small screens (the buttons show in the bar on desktop) */
 @media (min-width: 901px) {
-    header.dev-nav .nav-hamburger {
+    header.dev-nav .nav-hamburger,
+    header.staff-nav .nav-hamburger {
         display: none;
     }
 }
 
 /* Developer header layout: logo left; buttons + theme toggle right */
 @media (min-width: 901px) {
-    header.dev-nav .nav-actions {
+    header.dev-nav .nav-actions,
+    header.staff-nav .staff-nav-actions {
         margin-left: auto;
     }
 
-    header.dev-nav .nav-tools {
+    header.dev-nav .nav-tools,
+    header.staff-nav .nav-tools {
         margin-left: 12px;
     }
+}
+
+/* Delivery header was always white; follow the theme */
+:root[data-theme="dark"] .staff-nav {
+    background: rgb(20 33 46 / 94%);
+    box-shadow: 0 4px 20px rgb(0 0 0 / 35%);
 }
