@@ -239,8 +239,10 @@ function render(anim = false) {
                             style="--i:${index}"
                         >
 
-                            <div class="ic">
-                                ${esc(product.icon)}
+                            <div class="ic product-image-box">
+                                ${product.image_url
+                                  ? `<img src="${esc(product.image_url)}" alt="${esc(product.name)}" loading="lazy" style="width:100%;height:100%;object-fit:contain;border-radius:inherit">`
+                                  : esc(product.icon || "🥤")}
                             </div>
 
 
