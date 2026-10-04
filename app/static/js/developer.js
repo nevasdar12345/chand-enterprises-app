@@ -339,6 +339,18 @@ async function developerSettings() {
             <input id="ds_brochure" type="url" placeholder="https://..." value="${esc(settings.brochure_url || '')}">
         </label>
 
+        <label>Brochure page – top line
+            <input id="ds_bro_eyebrow" maxlength="80" placeholder="CHAND ENTERPRISES · DARBHANGA, BIHAR" value="${esc(settings.brochure_eyebrow || '')}">
+        </label>
+
+        <label>Brochure page – heading
+            <input id="ds_bro_title" maxlength="80" placeholder="Premium Product Brochure" value="${esc(settings.brochure_title || '')}">
+        </label>
+
+        <label>Brochure page – description
+            <textarea id="ds_bro_subtitle" rows="3" maxlength="300" placeholder="Explore our product collections...">${esc(settings.brochure_subtitle || '')}</textarea>
+        </label>
+
         <p
             class="err"
             id="ds_err"
@@ -408,7 +420,10 @@ async function saveDeveloperSettings() {
                 delivery_free_above: $('#ds_free')?.value,
                 instagram_url: $('#ds_instagram')?.value.trim(),
                 facebook_url: $('#ds_facebook')?.value.trim(),
-                brochure_url: $('#ds_brochure')?.value.trim()
+                brochure_url: $('#ds_brochure')?.value.trim(),
+                brochure_eyebrow: $('#ds_bro_eyebrow')?.value.trim(),
+                brochure_title: $('#ds_bro_title')?.value.trim(),
+                brochure_subtitle: $('#ds_bro_subtitle')?.value.trim()
             }
         );
 
