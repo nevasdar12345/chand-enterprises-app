@@ -22,6 +22,34 @@
     </a>
 
 
+    <div class="admin-header-controls">
+
+        <button
+            type="button"
+            class="admin-theme-toggle"
+            id="adminThemeToggle"
+            onclick="toggleAdminTheme()"
+            aria-label="Toggle light and dark theme"
+            title="Toggle theme"
+        >
+            🌙
+        </button>
+
+        <button
+            type="button"
+            class="admin-menu-toggle"
+            id="adminMenuToggle"
+            onclick="toggleAdminMenu()"
+            aria-label="Open admin menu"
+            aria-expanded="false"
+            title="Admin menu"
+        >
+            ☰
+        </button>
+
+    </div>
+
+
     <div class="admin-nav-right">
 
         <a
@@ -104,7 +132,7 @@
          TABS
          ========================= -->
 
-    <div class="tabs admin-tabs">
+    <div class="tabs admin-tabs" id="adminTabs">
 
         <button
             class="on"
