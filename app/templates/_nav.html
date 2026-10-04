@@ -1,0 +1,181 @@
+<!-- ================= NAVIGATION ================= -->
+
+<header class="nav store-nav">
+
+    <a class="logo store-logo" href="/">
+
+        <span class="store-logo-mark">
+            CE
+        </span>
+
+        <span>
+            Chand Enterprises
+            <small>Darbhanga, Bihar</small>
+        </span>
+
+    </a>
+
+
+    <!-- ================= THEME + MOBILE MENU BUTTON ================= -->
+
+    <div class="nav-tools">
+
+        <button
+            type="button"
+            class="theme-toggle"
+            id="themeToggle"
+            aria-label="Switch to dark theme"
+            title="Switch theme"
+        >
+            <span class="theme-icon" aria-hidden="true">🌙</span>
+        </button>
+
+
+    </div>
+
+
+    <!-- ================= NAVIGATION ACTIONS ================= -->
+
+    <div class="store-actions">
+<button
+            type="button"
+            class="soft nav-action"
+            onclick="orders()"
+        >
+            📦
+            <span>My Orders</span>
+        </button>
+
+
+        <button
+            type="button"
+            class="soft nav-action"
+            id="accountBtn"
+            onclick="account()"
+        >
+            Login
+        </button>
+
+
+        <button
+            type="button"
+            class="soft nav-action"
+            id="logoutBtn"
+            onclick="logout()"
+            hidden
+        >
+            Logout
+        </button>
+    </div>
+
+
+    <!-- Cart stays visible in mobile header -->
+    <button
+        type="button"
+        class="cart premium-cart"
+        onclick="cart()"
+        aria-label="Shopping cart"
+    >
+        🛒
+        <span class="cart-label">Cart</span>
+        <b id="count">0</b>
+    </button>
+
+    <!-- Hamburger is outside the collapsible action group so it remains visible on mobile -->
+    <button
+        type="button"
+        class="nav-hamburger"
+        id="mobileMenuButton"
+        aria-label="Open menu"
+        aria-expanded="false"
+    >
+        <span></span>
+        <span></span>
+        <span></span>
+    </button>
+
+</header>
+
+
+<!-- ================= MOBILE MENU ================= -->
+
+<div class="ce-menu-backdrop" id="ceMenuBackdrop" aria-hidden="true"></div>
+
+<aside class="ce-menu" id="ceMobileMenu" aria-hidden="true">
+
+    <div class="ce-menu-head">
+        <div>
+            <span class="ce-menu-kicker">CHAND ENTERPRISES</span>
+            <h2>Menu</h2>
+        </div>
+
+        <button type="button" class="ce-menu-close" id="ceMenuClose" aria-label="Close menu">
+            ×
+        </button>
+    </div>
+
+    <nav class="ce-menu-links" aria-label="Mobile menu">
+
+        <button
+            type="button"
+            class="ce-menu-link ce-menu-button"
+            id="menuInstallApp"
+            onclick="installApp(); closeMobileMenu();"
+        >
+            <span>📲</span>
+            <span>Install App</span>
+        </button>
+        <a href="/" class="ce-menu-link">
+            <span>🏠</span>
+            <span>Home</span>
+        </a>
+
+        <a href="/#shop" class="ce-menu-link">
+            <span>🛒</span>
+            <span>Products</span>
+        </a>
+
+        <a href="/brochure" class="ce-menu-link ce-menu-featured">
+            <span>📖</span>
+            <span>Brochure</span>
+            <small>Premium product catalogue</small>
+        </a>
+
+        <button type="button" class="ce-menu-link ce-menu-button" onclick="orders(); closeMobileMenu();">
+            <span>📦</span>
+            <span>My Orders</span>
+        </button>
+
+        <button type="button" class="ce-menu-link ce-menu-button" onclick="enquiry(); closeMobileMenu();">
+            <span>💬</span>
+            <span>WhatsApp Enquiry</span>
+        </button>
+
+        <!-- Shows Login when logged out, Logout when logged in -->
+        <button
+            type="button"
+            class="ce-menu-link ce-menu-button"
+            id="menuAccountBtn"
+            onclick="account(); closeMobileMenu();"
+        >
+            <span>🔐</span>
+            <span>Login</span>
+        </button>
+
+        <button
+            type="button"
+            class="ce-menu-link ce-menu-button ce-menu-logout"
+            id="menuLogoutBtn"
+            onclick="logout(); closeMobileMenu();"
+            hidden
+        >
+            <span>🚪</span>
+            <span>Logout</span>
+        </button>
+    </nav>
+
+    <div class="ce-menu-footer">
+        <span>📍</span> Darbhanga, Bihar
+    </div>
+
+</aside>
