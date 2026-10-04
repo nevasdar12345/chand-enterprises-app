@@ -4313,3 +4313,18 @@ body.ce-menu-open{
     }
 
 }
+
+/* Product images uploaded by Admin/Developer */
+.product-image-box {
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.product-image-box img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
