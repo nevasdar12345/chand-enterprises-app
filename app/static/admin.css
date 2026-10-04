@@ -1,0 +1,103 @@
+/* =========================================================
+   CHAND ENTERPRISES - ADMIN SAFE OVERRIDES
+   Supplemental stylesheet. Loaded after the main site CSS.
+   Does not replace the existing style.css.
+   ========================================================= */
+
+/* -------------------------
+   Recent Orders
+   ------------------------- */
+
+/* The outer card must not create a second horizontal scrollbar. */
+.orders-admin-table {
+    overflow-x: visible !important;
+}
+
+/* Only the orders table scrolls horizontally. */
+.orders-table-scroll {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: auto;
+}
+
+.orders-table-scroll table {
+    width: max-content;
+    min-width: 1250px;
+    border-collapse: collapse;
+}
+
+.orders-table-scroll th,
+.orders-table-scroll td {
+    white-space: nowrap;
+}
+
+/* Keep the first column fully visible when scrolled to the far left. */
+.orders-table-scroll table th:first-child,
+.orders-table-scroll table td:first-child {
+    padding-left: 12px;
+}
+
+/* -------------------------
+   Stock table
+   ------------------------- */
+
+#stockTable {
+    min-width: 900px;
+    width: 100%;
+}
+
+#stockTable th:nth-child(1),
+#stockTable td:nth-child(1) { width: 28%; }
+
+#stockTable th:nth-child(2),
+#stockTable td:nth-child(2) { width: 11%; }
+
+#stockTable th:nth-child(3),
+#stockTable td:nth-child(3) { width: 18%; }
+
+#stockTable th:nth-child(4),
+#stockTable td:nth-child(4) { width: 18%; }
+
+#stockTable th:nth-child(5),
+#stockTable td:nth-child(5) { width: 15%; }
+
+#stockTable th:nth-child(6),
+#stockTable td:nth-child(6) { width: 10%; }
+
+#stockTable td input,
+#stockTable td select {
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+/* -------------------------
+   All admin tables
+   ------------------------- */
+
+.admin-table td {
+    vertical-align: middle;
+}
+
+/* Horizontal scrolling on narrow screens without shrinking columns. */
+@media (max-width: 900px) {
+    .orders-table-scroll {
+        overflow-x: auto;
+    }
+
+    #stockTable {
+        min-width: 900px;
+    }
+}
+
+@media (max-width: 600px) {
+    .orders-table-scroll table {
+        min-width: 1100px;
+    }
+
+    #stockTable {
+        min-width: 900px;
+    }
+}
