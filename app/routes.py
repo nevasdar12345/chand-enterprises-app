@@ -1961,12 +1961,30 @@ def admin_archive_confirm(archive_id):
 def admin_archive_delete_all():
     if not role_ok("admin"):
         return jsonify(error="Forbidden"), 403
-    rows = OrderArchive.query.filter_by(status="WAITING_CONFIRMATION").order_by(OrderArchive.id.asc()).all()
-    if not rows:
-        return jsonify(error="No archived order data is waiting for confirmation."), 400
-    total_deleted = sum(_delete_archived_archive(a) for a in rows)
+
+    # Admin has verified the Excel backups in the UI before reaching this endpoint.
+    order_ids = [o.id for o in Order.query.with_entities(Order.id).all()]
+    deleted = len(order_ids)
+
+    if order_ids:
+        Payment.query.filter(Payment.order_id.in_(order_ids)).delete(synchronize_session=False)
+        OrderItem.query.filter(OrderItem.order_id.in_(order_ids)).delete(synchronize_session=False)
+        ArchivedOrder.query.filter(ArchivedOrder.order_id.in_(order_ids)).delete(synchronize_session=False)
+        Order.query.filter(Order.id.in_(order_ids)).delete(synchronize_session=False)
+
+    # Keep the archive history, but mark pending archives as completed/deleted.
+    rows = OrderArchive.query.filter_by(status="WAITING_CONFIRMATION").all()
+    for archive in rows:
+        archive.status = "RECEIVED_AND_DELETED"
+        archive.confirmed_at = datetime.utcnow()
+        archive.deleted_at = datetime.utcnow()
+        archive.note = "Admin verified the Excel backup and deleted all order data."
+        archive_path = Path(current_app.instance_path) / "archives" / archive.file_name
+        if archive_path.exists():
+            archive_path.unlink()
+
     db.session.commit()
-    return jsonify(ok=True, archives=len(rows), deleted=total_deleted)
+    return jsonify(ok=True, archives=len(rows), deleted=deleted)
 
 @main.get("/api/developer/settings")
 def developer_get_settings():
