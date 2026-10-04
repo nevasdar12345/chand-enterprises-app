@@ -1978,7 +1978,7 @@ window.sendOrderBill=sendOrderBill;
 function applyAdminTheme(theme) {
     const selected = theme === 'dark' ? 'dark' : 'light';
     document.documentElement.setAttribute('data-theme', selected);
-    localStorage.setItem('admin-theme', selected);
+    localStorage.setItem('ce_theme', selected);
 
     const button = document.getElementById('adminThemeToggle');
     if (button) {
@@ -2036,7 +2036,7 @@ if (typeof originalShowTab === 'function') {
 function initAdminThemeAndMenu() {
     let saved = 'light';
     try {
-        saved = localStorage.getItem('admin-theme') || 'light';
+        saved = localStorage.getItem('ce_theme') || localStorage.getItem('admin-theme') || 'light';
     } catch (e) {}
 
     applyAdminTheme(saved);
