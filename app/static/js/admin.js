@@ -208,6 +208,33 @@ async function loadAdminOrders() {
 
 
     renderAdminOrders();
+    loadPendingArchives();
+}
+
+async function loadPendingArchives() {
+    const box = document.getElementById('archiveConfirmBanner');
+    if (!box) return;
+    const result = await api('/api/admin/archive/pending');
+    if (!result._ok || !Array.isArray(result.archives) || !result.archives.length) {
+        box.hidden = true;
+        box.innerHTML = '';
+        return;
+    }
+    box.hidden = false;
+    box.innerHTML = result.archives.map(a => `
+        <div class="archive-confirm-card">
+            <div><strong>📦 Archive #${esc(a.id)}</strong><br><small>${esc(a.orders)} orders · ${money(a.total)} · ${esc(a.method)} · ${esc(a.created_at)}</small></div>
+            <button class="primary" onclick="confirmOrderArchive(${a.id})">✓ Confirm Received</button>
+        </div>
+    `).join('');
+}
+
+async function confirmOrderArchive(id) {
+    if (!confirm('Confirm that you received this archive? The archived orders will then be permanently removed from the active database.')) return;
+    const result = await api(`/api/admin/archive/${id}/confirm`, 'POST');
+    if (!result._ok) return alert(result.error || 'Could not confirm archive');
+    alert(`Archive #${id} confirmed. ${result.deleted || 0} orders removed from the active database.`);
+    loadAdminOrders();
 }
 
 
@@ -446,6 +473,10 @@ function renderAdminOrders() {
 
                             <small>
                                 #${esc(order.id)}
+                            </small>
+
+                            <small style="display:block;margin-top:5px">
+                                📅 ${esc(order.created || '')}
                             </small>
                         </td>
 
@@ -1987,3 +2018,7 @@ document.addEventListener('DOMContentLoaded', initAdminThemeAndMenu);
 
 window.toggleAdminTheme = toggleAdminTheme;
 window.toggleAdminMenu = toggleAdminMenu;
+
+
+window.loadPendingArchives = loadPendingArchives;
+window.confirmOrderArchive = confirmOrderArchive;
