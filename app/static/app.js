@@ -301,7 +301,7 @@ function productArt(product) {
    ========================= */
 
 /* Product photos go through a free image-resizing service (wsrv.nl) so phones
-   download ~360px WebP files instead of the full-size originals.
+   download ~640px WebP files instead of the full-size originals.
    Set to false to load the original image links directly. */
 const USE_IMAGE_CDN = true;
 
@@ -311,7 +311,7 @@ function imgSrc(url) {
   return (
     "https://wsrv.nl/?url=" +
     encodeURIComponent(url) +
-    "&w=360&h=360&fit=contain&output=webp&q=80"
+    "&w=640&output=webp&q=85"
   );
 }
 
@@ -322,7 +322,12 @@ function productVisual(product) {
   if (product.image_url) {
     const original = product.image_url;
 
-    return `<img src="${esc(imgSrc(original))}" alt="${esc(product.name)}" loading="lazy" decoding="async" onerror="this.onerror=null;this.src='${esc(original)}'" style="width:100%;height:100%;object-fit:contain;border-radius:inherit">`;
+    const src = esc(imgSrc(original));
+
+    /* The first image is a blurred copy that fills the frame; the second is
+       the poster itself, shown whole and never cropped. */
+    return `<img class="ph-bg" src="${src}" alt="" aria-hidden="true" loading="lazy" decoding="async">` +
+      `<img class="ph" src="${src}" alt="${esc(product.name)}" loading="lazy" decoding="async" onerror="this.onerror=null;this.src='${esc(original)}'">`;
   }
 
   const key = [product.id, product.name, product.size, product.category].join("|");
