@@ -31,3 +31,35 @@ On a new production database, if an initial staff password is not supplied, the 
 - Customer bills are itemised and can be opened in WhatsApp. The website uses a pre-filled WhatsApp link; automatic server-side WhatsApp sending requires a WhatsApp Business API provider.
 - Instagram, Facebook and brochure links are configured by the developer and validated as HTTP(S) URLs.
 - The map library loads only when the customer actually opens the location picker.
+
+## Free product image hosting (GitHub)
+
+Admin and Developer can upload product images from their dashboards. Uploaded images are stored in a **public GitHub repository** through the GitHub Contents API, and the resulting public `raw.githubusercontent.com` URL is saved in the Product database. This avoids losing images when Render restarts or redeploys.
+
+### Render Environment Variables
+
+Add these variables in Render:
+
+```text
+GITHUB_TOKEN=your_github_token
+GITHUB_REPO=YOUR_GITHUB_USERNAME/YOUR_PUBLIC_REPOSITORY
+GITHUB_BRANCH=main
+GITHUB_IMAGE_FOLDER=static/product-images
+```
+
+`GITHUB_TOKEN` stays server-side and is never sent to the browser.
+
+The GitHub repository should be **public**, because the website needs to display the images without authentication. Create a fine-grained GitHub token with access to the selected repository and permission to read/write repository contents.
+
+### Image rules
+
+- JPG / JPEG / PNG / WEBP / GIF
+- Maximum 5 MB per image
+- Admin and Developer can upload, replace, remove, or paste a public image URL
+- Old GitHub image files are intentionally kept when an image is replaced, so replacing an image never breaks an older cached URL
+
+### Dashboard flow
+
+`Admin/Developer → Products → 📷 Image → Upload to GitHub`
+
+You can also use `Save image URL` if an image is already hosted somewhere publicly.
