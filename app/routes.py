@@ -1893,32 +1893,13 @@ def admin_archive_delete_all():
     deleted = len(order_ids)
 
     if order_ids:
-        # Remove child records before deleting the parent Order rows.
+        # Remove every child record that references an order before deleting
+        # the parent Order rows.  LedgerEntry also has an order_id foreign key.
         Payment.query.filter(Payment.order_id.in_(order_ids)).delete(synchronize_session=False)
         OrderItem.query.filter(OrderItem.order_id.in_(order_ids)).delete(synchronize_session=False)
-
-        # Some existing deployments may have an older LedgerEntry table that
-        # does not yet contain order_id. Check the live schema before using it,
-        # so the delete-all operation cannot fail with "no such column".
-        try:
-            from sqlalchemy import inspect
-            ledger_columns = {
-                col["name"] for col in inspect(db.engine).get_columns(LedgerEntry.__tablename__)
-            }
-            if "order_id" in ledger_columns:
-                LedgerEntry.query.filter(
-                    LedgerEntry.order_id.in_(order_ids)
-                ).delete(synchronize_session=False)
-        except Exception:
-            # Ledger cleanup must not prevent the actual order deletion.
-            pass
-
-        ArchivedOrder.query.filter(
-            ArchivedOrder.order_id.in_(order_ids)
-        ).delete(synchronize_session=False)
-        Order.query.filter(
-            Order.id.in_(order_ids)
-        ).delete(synchronize_session=False)
+        LedgerEntry.query.filter(LedgerEntry.order_id.in_(order_ids)).delete(synchronize_session=False)
+        ArchivedOrder.query.filter(ArchivedOrder.order_id.in_(order_ids)).delete(synchronize_session=False)
+        Order.query.filter(Order.id.in_(order_ids)).delete(synchronize_session=False)
 
     # Keep archive history as an audit record; only the actual order data is deleted.
     now = datetime.utcnow()
@@ -1928,12 +1909,16 @@ def admin_archive_delete_all():
         archive.confirmed_at = now
         archive.deleted_at = now
         archive.note = "Admin verified the Excel backup and deleted all order data."
-        archive_path = Path(current_app.instance_path) / "archives" / archive.file_name
-        try:
-            if archive_path.exists():
-                archive_path.unlink()
-        except OSError:
-            pass
+        # An older archive row may have an empty/NULL file_name.
+        # Never let cleanup of an already-delivered Excel file break deletion.
+        file_name = str(archive.file_name or "").strip()
+        if file_name:
+            archive_path = Path(current_app.instance_path) / "archives" / file_name
+            try:
+                if archive_path.exists():
+                    archive_path.unlink()
+            except (OSError, TypeError):
+                pass
 
     db.session.commit()
     return jsonify(ok=True, deleted=deleted)
