@@ -449,6 +449,7 @@
                 <h2>Sales dashboard</h2>
                 <small>Daily and monthly performance with top products.</small>
             </div>
+            <a class="primary export-btn" href="/admin/export-sales.xlsx">↓ Export Excel</a>
         </div>
         <div class="metrics admin-metrics">
             <div class="metric-card"><div class="metric-icon blue">₹</div><div class="metric-content"><small>Today</small><b id="salesToday">—</b><span id="ordersToday">— orders</span></div></div>
@@ -840,8 +841,9 @@
 
 
 
-            <div class="inventory-icon">
-                📦
+            <div style="display:flex;align-items:center;gap:10px">
+                <a class="primary export-btn" href="/admin/export-stock.xlsx">↓ Export Excel</a>
+                <div class="inventory-icon">📦</div>
             </div>
 
 
@@ -1070,7 +1072,11 @@
     <section id="tab-ledger" style="display:none">
         <div class="premium-section-head">
             <div><span class="section-kicker">CREDIT</span><h2>Customer credit ledger</h2><small>Track outstanding credit and record payments.</small></div>
-            <button class="add" onclick="ledgerEntryForm('debit')">+ Add credit</button><button class="primary" onclick="ledgerEntryForm('payment')">+ Record payment</button>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                <a class="primary export-btn" href="/admin/export-credit.xlsx">↓ Export Excel</a>
+                <button class="add" onclick="ledgerEntryForm('debit')">+ Add credit</button>
+                <button class="primary" onclick="ledgerEntryForm('payment')">+ Record payment</button>
+            </div>
         </div>
         <div class="table admin-table">
             <table>
