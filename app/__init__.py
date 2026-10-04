@@ -319,6 +319,15 @@ def create_app():
 
         add_column("order_item", "product_size VARCHAR(40) DEFAULT ''", "order_item", "product_size")
 
+        # Add the archive Drive URL column to older PostgreSQL databases.
+        # create_all() does not alter an existing table.
+        add_column(
+            "order_archive",
+            "drive_file_url TEXT DEFAULT ''",
+            "order_archive",
+            "drive_file_url"
+        )
+
         # Refresh after migrations
         inspector = inspect(db.engine)
 
