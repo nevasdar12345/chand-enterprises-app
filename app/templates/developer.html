@@ -7,7 +7,7 @@ Developer · Chand Enterprises
 
 {% block body %}
 
-<header class="nav">
+<header class="nav dev-nav">
 
     <a
         class="logo"
@@ -42,6 +42,33 @@ Developer · Chand Enterprises
         Logout
     </button>
 </form>
+
+    </div>
+
+    <!-- Theme toggle + hamburger (hamburger opens the button list on small screens) -->
+    <div class="nav-tools">
+
+        <button
+            type="button"
+            class="theme-toggle"
+            id="themeToggle"
+            aria-label="Switch to dark theme"
+            title="Switch theme"
+        >
+            <span class="theme-icon" aria-hidden="true">🌙</span>
+        </button>
+
+        <button
+            type="button"
+            class="nav-hamburger"
+            id="mobileMenuButton"
+            aria-label="Open menu"
+            aria-expanded="false"
+        >
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
 
     </div>
 
