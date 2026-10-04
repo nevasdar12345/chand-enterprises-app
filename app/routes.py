@@ -1,7 +1,8 @@
-import csv, io, secrets, urllib.parse, math, re, os, base64, json, mimetypes, urllib.request, urllib.error
+import csv, io, secrets, urllib.parse, math, re, os, base64, json, mimetypes, urllib.request, urllib.error, smtplib, tempfile, uuid
 from pathlib import Path
 
 import segno
+from email.message import EmailMessage
 from sqlalchemy import case
 
 from openpyxl import Workbook
@@ -11,13 +12,13 @@ from sqlalchemy.orm import joinedload, selectinload
 from datetime import datetime, timedelta
 
 from flask import (Blueprint, render_template, request, redirect, url_for,
-                   session, jsonify, Response, current_app, g)
+                   session, jsonify, Response, current_app, g, send_file)
 
 from werkzeug.security import generate_password_hash, check_password_hash
 
 from . import db
 
-from .models import User, Product, Category, Order, OrderItem, Enquiry, Payment, OtpChallenge, SiteSetting, Coupon, LedgerEntry
+from .models import User, Product, Category, Order, OrderItem, Enquiry, Payment, OtpChallenge, SiteSetting, Coupon, LedgerEntry, OrderArchive, ArchivedOrder
 
 
 main = Blueprint("main", __name__)
@@ -46,6 +47,10 @@ DEFAULT_SETTINGS = {
     "brochure_url": "",
     "instagram_url": "",
     "facebook_url": "",
+    "archive_days": "7",
+    "archive_method": "email",
+    "archive_email": "",
+    "archive_whatsapp": "",
 }
 
 DEFAULT_OFFERS = [
@@ -144,7 +149,14 @@ def calculate_coupon(code, subtotal):
 def developer_settings():
     raw = setting_value("offers")
     offers = [x.strip() for x in raw.splitlines() if x.strip()] if raw else DEFAULT_OFFERS[:]
-    return {"business_name": setting_value("business_name"), "business_mobile": setting_value("business_mobile"), "whatsapp": setting_value("whatsapp"), "business_location": setting_value("business_location"), "upi": setting_value("upi"), "payment_name": setting_value("payment_name"), "business_lat": setting_value("business_lat"), "business_lng": setting_value("business_lng"), "delivery_base": setting_value("delivery_base"), "delivery_per_km": setting_value("delivery_per_km"), "delivery_free_above": setting_value("delivery_free_above"), "instagram_url": setting_value("instagram_url"), "facebook_url": setting_value("facebook_url"), "brochure_url": setting_value("brochure_url"), "offers": offers}
+    return {"business_name": setting_value("business_name"), "business_mobile": setting_value("business_mobile"), "whatsapp": setting_value("whatsapp"), "business_location": setting_value("business_location"), "upi": setting_value("upi"), "payment_name": setting_value("payment_name"), "business_lat": setting_value("business_lat"), "business_lng": setting_value("business_lng"), "delivery_base": setting_value("delivery_base"), "delivery_per_km": setting_value("delivery_per_km"), "delivery_free_above": setting_value("delivery_free_above"), "instagram_url": setting_value("instagram_url"), "facebook_url": setting_value("facebook_url"), "brochure_url": setting_value("brochure_url"), "archive_days": setting_value("archive_days") or "7", "archive_method": setting_value("archive_method") or "email", "archive_email": setting_value("archive_email"), "archive_whatsapp": setting_value("archive_whatsapp"), "offers": offers}
+
+
+def display_datetime(dt):
+    if not dt:
+        return ""
+    # Existing database timestamps are stored as UTC; display in India time.
+    return (dt + timedelta(hours=5, minutes=30)).strftime("%d-%m-%Y %I:%M %p")
 
 
 def developer_product_dict(p):
@@ -269,7 +281,7 @@ def order_dict(o):
                 map_url=o.map_url, total=o.total, subtotal=o.subtotal, discount=o.discount,
                 delivery_charge=o.delivery_charge, payment=o.payment_method,
                 payment_status=o.payment_status, status=o.status,
-                created=o.created_at.strftime("%d-%m-%Y %H:%M"),
+                created=display_datetime(o.created_at),
                 delivery_person_id=o.delivery_person_id, delivery_person=dp.name if dp else "",
                 items=[
                     (
@@ -1674,6 +1686,235 @@ def delivery_cash(oid):
     return jsonify(ok=True, cash_collected=o.cash_collected, payment_status=o.payment_status)
 
 
+# ---------- order archive ----------
+
+def _archive_days():
+    try:
+        return max(1, int(setting_value("archive_days") or 7))
+    except (TypeError, ValueError):
+        return 7
+
+
+def _archive_workbook(orders, archive):
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Orders"
+    headers = ["Order ID", "Order #", "Booking Date", "Booking Time", "Customer", "Mobile", "Address", "Total", "Payment", "Status", "Delivery", "Coupon", "Discount"]
+    ws.append(headers)
+    for cell in ws[1]:
+        cell.font = Font(bold=True)
+    for o in orders:
+        ws.append([
+            o.id, o.code, o.created_at.strftime("%d-%m-%Y"), o.created_at.strftime("%I:%M %p"),
+            o.customer_name, o.mobile, o.address, o.total, o.payment_status, o.status,
+            o.delivery_person.name if o.delivery_person else "", o.coupon_code or "", o.discount or 0
+        ])
+    items = wb.create_sheet("Order Items")
+    items.append(["Order ID", "Order #", "Product", "Size", "Category", "Quantity", "Unit Price", "Item Total"])
+    for cell in items[1]:
+        cell.font = Font(bold=True)
+    for o in orders:
+        for i in o.items:
+            product = db.session.get(Product, i.product_id)
+            items.append([o.id, o.code, i.product_name, i.product_size or "1L", product.category if product else "", i.quantity, i.unit_price, i.line_total])
+    summary = wb.create_sheet("Archive Summary")
+    summary.append(["Archive ID", "Period Start", "Period End", "Orders", "Total", "Method", "Recipient", "Status"])
+    summary.append([archive.id, display_datetime(archive.period_start), display_datetime(archive.period_end), archive.order_count, archive.total_amount, archive.delivery_method, archive.recipient, archive.status])
+    for sh in wb.worksheets:
+        sh.freeze_panes = "A2"
+        for col in sh.columns:
+            max_len = min(max(len(str(c.value or "")) for c in col) + 2, 40)
+            sh.column_dimensions[col[0].column_letter].width = max_len
+    out = io.BytesIO()
+    wb.save(out)
+    out.seek(0)
+    return out.getvalue()
+
+
+def _send_archive_email(recipient, filename, data):
+    host = os.getenv("SMTP_HOST", "")
+    user = os.getenv("SMTP_USER", "")
+    password = os.getenv("SMTP_PASSWORD", "")
+    sender = os.getenv("SMTP_FROM", user)
+    if not host or not sender or not recipient:
+        raise RuntimeError("Email is not configured. Set SMTP_HOST, SMTP_USER, SMTP_PASSWORD and SMTP_FROM in Render, and set the archive email in Developer Settings.")
+    port = int(os.getenv("SMTP_PORT", "587"))
+    msg = EmailMessage()
+    msg["Subject"] = "Chand Enterprises · Order Archive"
+    msg["From"] = sender
+    msg["To"] = recipient
+    msg.set_content("Attached is the Chand Enterprises order archive. Admin confirmation is required before archived orders are deleted from the active database.")
+    msg.add_attachment(data, maintype="application", subtype="vnd.openxmlformats-officedocument.spreadsheetml.sheet", filename=filename)
+    with smtplib.SMTP(host, port, timeout=30) as smtp:
+        if os.getenv("SMTP_USE_TLS", "1") == "1":
+            smtp.starttls()
+        if user:
+            smtp.login(user, password)
+        smtp.send_message(msg)
+
+
+def _archive_whatsapp_link(recipient, archive):
+    number = "".join(c for c in (recipient or "") if c.isdigit())
+    if len(number) == 10:
+        number = "91" + number
+    text = (f"Chand Enterprises order archive #{archive.id}\\n"
+            f"Orders: {archive.order_count}\\n"
+            f"Total: ₹{archive.total_amount:.2f}\\n"
+            f"Period: {archive.period_start.strftime('%d-%m-%Y')} to {archive.period_end.strftime('%d-%m-%Y')}\\n"
+            f"Download archive: {url_for('main.archive_download', token=archive.download_token, _external=True)}\n"
+            f"Please confirm receipt in the Admin Panel after receiving the archive.")
+    return "https://wa.me/" + number + "?text=" + urllib.parse.quote(text)
+
+
+def _create_archive(send=True):
+    days = _archive_days()
+    cutoff = datetime.utcnow() - timedelta(days=days)
+    method = (setting_value("archive_method") or "email").lower()
+    recipient = setting_value("archive_email") if method == "email" else setting_value("archive_whatsapp")
+    if not recipient:
+        raise RuntimeError("Set the archive recipient in Developer Settings first.")
+    archived_ids = {x.order_id for x in ArchivedOrder.query.all()}
+    q = Order.query.options(selectinload(Order.items), joinedload(Order.delivery_person)).filter(Order.created_at < cutoff)
+    candidates = [o for o in q.order_by(Order.created_at.asc()).all() if o.id not in archived_ids]
+    if not candidates:
+        return None
+    period_start = min(o.created_at for o in candidates)
+    period_end = max(o.created_at for o in candidates)
+    archive = OrderArchive(period_start=period_start, period_end=period_end, order_count=len(candidates), total_amount=sum(float(o.total or 0) for o in candidates), delivery_method=method, recipient=recipient, status="PREPARING", download_token=secrets.token_urlsafe(32))
+    db.session.add(archive)
+    db.session.flush()
+    for o in candidates:
+        db.session.add(ArchivedOrder(archive_id=archive.id, order_id=o.id))
+    data = _archive_workbook(candidates, archive)
+    filename = f"chand-enterprises-order-archive-{archive.id}.xlsx"
+    archive.file_name = filename
+    archive_dir = Path(current_app.instance_path) / "archives"
+    archive_dir.mkdir(parents=True, exist_ok=True)
+    archive_path = archive_dir / filename
+    archive_path.write_bytes(data)
+    try:
+        if method == "email":
+            _send_archive_email(recipient, filename, data)
+            archive.note = "Email sent successfully. Waiting for Admin confirmation."
+            archive.status = "WAITING_CONFIRMATION"
+            archive.sent_at = datetime.utcnow()
+            result = {"method": "email"}
+        elif method == "whatsapp":
+            archive.note = "WhatsApp handoff link generated. Open it and send the archive to the configured number."
+            archive.status = "WAITING_CONFIRMATION"
+            archive.sent_at = datetime.utcnow()
+            result = {"method": "whatsapp", "whatsapp_url": _archive_whatsapp_link(recipient, archive)}
+        else:
+            raise RuntimeError("Archive method must be email or whatsapp.")
+        db.session.commit()
+        return {"archive": archive, **result}
+    except Exception:
+        db.session.rollback()
+        raise
+
+
+@main.get("/archive/download/<token>")
+def archive_download(token):
+    archive = OrderArchive.query.filter_by(download_token=token).first()
+    if not archive or archive.status == "RECEIVED_AND_DELETED":
+        return "Archive not available", 404
+    path = Path(current_app.instance_path) / "archives" / archive.file_name
+    if not path.exists():
+        return "Archive file is no longer available", 404
+    return send_file(path, as_attachment=True, download_name=archive.file_name)
+
+
+@main.get("/api/developer/archive/settings")
+def developer_archive_settings():
+    if not role_ok("developer"):
+        return jsonify(error="Forbidden"), 403
+    return jsonify(ok=True, settings={"archive_days": _archive_days(), "archive_method": setting_value("archive_method") or "email", "archive_email": setting_value("archive_email"), "archive_whatsapp": setting_value("archive_whatsapp")})
+
+
+@main.put("/api/developer/archive/settings")
+def developer_save_archive_settings():
+    if not role_ok("developer"):
+        return jsonify(error="Forbidden"), 403
+    d = request.json or {}
+    try:
+        days = max(1, int(d.get("archive_days", 7)))
+    except (TypeError, ValueError):
+        return jsonify(error="Archive days must be a positive number"), 400
+    method = str(d.get("archive_method") or "email").lower()
+    if method not in {"email", "whatsapp"}:
+        return jsonify(error="Choose Email or WhatsApp"), 400
+    email = str(d.get("archive_email") or "").strip()
+    wa = str(d.get("archive_whatsapp") or "").strip()
+    if method == "email" and (not email or "@" not in email):
+        return jsonify(error="Enter a valid archive email"), 400
+    if method == "whatsapp" and len("".join(c for c in wa if c.isdigit())) < 10:
+        return jsonify(error="Enter a valid WhatsApp number"), 400
+    set_setting("archive_days", days); set_setting("archive_method", method); set_setting("archive_email", email); set_setting("archive_whatsapp", wa)
+    db.session.commit()
+    return jsonify(ok=True, settings={"archive_days": days, "archive_method": method, "archive_email": email, "archive_whatsapp": wa})
+
+
+@main.post("/api/developer/archive/check")
+def developer_archive_check():
+    if not role_ok("developer"):
+        return jsonify(error="Forbidden"), 403
+    try:
+        result = _create_archive()
+        if not result:
+            return jsonify(ok=True, created=False, message=f"No orders older than {_archive_days()} days are waiting for archive.")
+        a = result["archive"]
+        return jsonify(ok=True, created=True, archive={"id": a.id, "orders": a.order_count, "total": a.total_amount, "method": a.delivery_method, "status": a.status}, whatsapp_url=result.get("whatsapp_url", ""))
+    except Exception as e:
+        return jsonify(error=str(e)), 400
+
+
+@main.get("/api/developer/archive/history")
+def developer_archive_history():
+    if not role_ok("developer"):
+        return jsonify(error="Forbidden"), 403
+    rows = OrderArchive.query.order_by(OrderArchive.id.desc()).limit(100).all()
+    return jsonify(ok=True, archives=[{"id":a.id,"created_at":a.created_at.strftime("%d-%m-%Y %H:%M"),"period_start":a.period_start.strftime("%d-%m-%Y"),"period_end":a.period_end.strftime("%d-%m-%Y"),"orders":a.order_count,"total":a.total_amount,"method":a.delivery_method,"recipient":a.recipient,"status":a.status,"sent_at":a.sent_at.strftime("%d-%m-%Y %H:%M") if a.sent_at else "","confirmed_at":a.confirmed_at.strftime("%d-%m-%Y %H:%M") if a.confirmed_at else "","deleted_at":a.deleted_at.strftime("%d-%m-%Y %H:%M") if a.deleted_at else ""} for a in rows])
+
+
+@main.get("/api/admin/archive/pending")
+def admin_archive_pending():
+    if not role_ok("admin"):
+        return jsonify(error="Forbidden"), 403
+    rows = OrderArchive.query.filter_by(status="WAITING_CONFIRMATION").order_by(OrderArchive.id.desc()).all()
+    return jsonify(ok=True, archives=[{"id":a.id,"orders":a.order_count,"total":a.total_amount,"method":a.delivery_method,"recipient":a.recipient,"created_at":a.created_at.strftime("%d-%m-%Y %H:%M")} for a in rows])
+
+
+@main.post("/api/admin/archive/<int:archive_id>/confirm")
+def admin_archive_confirm(archive_id):
+    if not role_ok("admin"):
+        return jsonify(error="Forbidden"), 403
+    archive = db.session.get(OrderArchive, archive_id)
+    if not archive or archive.status != "WAITING_CONFIRMATION":
+        return jsonify(error="Archive is not awaiting confirmation"), 404
+    links = ArchivedOrder.query.filter_by(archive_id=archive.id).all()
+    order_ids = [x.order_id for x in links]
+    for link in links:
+        db.session.delete(link)
+    if order_ids:
+        payments = Payment.query.filter(Payment.order_id.in_(order_ids)).all()
+        items = OrderItem.query.filter(OrderItem.order_id.in_(order_ids)).all()
+        for p in payments: db.session.delete(p)
+        for i in items: db.session.delete(i)
+        orders = Order.query.filter(Order.id.in_(order_ids)).all()
+        for o in orders: db.session.delete(o)
+    archive.status = "RECEIVED_AND_DELETED"
+    archive.confirmed_at = datetime.utcnow()
+    archive_path = Path(current_app.instance_path) / "archives" / archive.file_name
+    try:
+        if archive_path.exists():
+            archive_path.unlink()
+    except OSError:
+        pass
+    archive.deleted_at = datetime.utcnow()
+    db.session.commit()
+    return jsonify(ok=True, deleted=len(order_ids), archive_id=archive.id)
+
+
 # ---------- developer console ----------
 
 @main.get("/api/developer/settings")
@@ -1688,13 +1929,20 @@ def developer_save_settings():
     if not role_ok("developer"):
         return jsonify(error="Forbidden"), 403
     d = request.json or {}
-    for key in ["business_name", "business_mobile", "whatsapp", "business_location", "upi", "payment_name", "business_lat", "business_lng", "delivery_base", "delivery_per_km", "delivery_free_above", "instagram_url", "facebook_url", "brochure_url"]:
+    for key in ["business_name", "business_mobile", "whatsapp", "business_location", "upi", "payment_name", "business_lat", "business_lng", "delivery_base", "delivery_per_km", "delivery_free_above", "instagram_url", "facebook_url", "brochure_url", "archive_days", "archive_method", "archive_email", "archive_whatsapp"]:
         if key in d:
             value = str(d.get(key) or "").strip()
             if key in {"business_name", "whatsapp", "upi"} and not value:
                 return jsonify(error=f"{key.replace('_', ' ').title()} is required"), 400
             if key in {"instagram_url", "facebook_url", "brochure_url"} and value and not _clean_http_url(value):
                 return jsonify(error=f"{key.replace('_', ' ').title()} must be a valid http(s) URL"), 400
+            if key == "archive_days":
+                try:
+                    value = str(max(1, int(value or 7)))
+                except ValueError:
+                    return jsonify(error="Archive days must be a positive number"), 400
+            if key == "archive_method" and value not in {"email", "whatsapp"}:
+                return jsonify(error="Archive method must be email or whatsapp"), 400
             set_setting(key, value)
     db.session.commit()
     return jsonify(ok=True, settings=developer_settings())
