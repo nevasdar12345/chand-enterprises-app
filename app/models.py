@@ -4,7 +4,7 @@ from . import db
 
 class OtpChallenge(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    mobile = db.Column(db.String(20), nullable=False)
+    mobile = db.Column(db.String(20), nullable=False, index=True)          # index added (OTP lookups)
     otp_hash = db.Column(db.String(255), nullable=False)
     expires_at = db.Column(db.DateTime, nullable=False)
     last_sent_at = db.Column(db.DateTime, nullable=False)
@@ -189,9 +189,11 @@ class Order(db.Model):
         nullable=False
     )
 
+    # index added: "My orders" and order ownership checks filter on this
     mobile = db.Column(
         db.String(20),
-        nullable=False
+        nullable=False,
+        index=True
     )
 
     address = db.Column(
@@ -234,10 +236,12 @@ class Order(db.Model):
         default=0
     )
 
+    # index added: the delivery dashboard filters on this
     delivery_person_id = db.Column(
         db.Integer,
         db.ForeignKey("user.id"),
-        nullable=True
+        nullable=True,
+        index=True
     )
 
     coupon_code = db.Column(
@@ -308,10 +312,12 @@ class OrderItem(db.Model):
         primary_key=True
     )
 
+    # index added: every order list loads items by order_id
     order_id = db.Column(
         db.Integer,
         db.ForeignKey("order.id"),
-        nullable=False
+        nullable=False,
+        index=True
     )
 
     product_id = db.Column(
@@ -359,10 +365,12 @@ class Payment(db.Model):
         primary_key=True
     )
 
+    # index added: every order list loads payments by order_id
     order_id = db.Column(
         db.Integer,
         db.ForeignKey("order.id"),
-        nullable=False
+        nullable=False,
+        index=True
     )
 
     transaction_id = db.Column(
