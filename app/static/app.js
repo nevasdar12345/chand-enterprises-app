@@ -208,6 +208,89 @@ function category(categoryName, button) {
   render(true);
 }
 
+/* =========================
+   PRODUCT ARTWORK
+   (clean bottle / can drawings used when a product has no photo)
+   ========================= */
+
+function artKind(product) {
+  const t = ((product.category || "") + " " + (product.name || "")).toLowerCase();
+  if (/water|aqua|nevas|bisleri|kinley/.test(t)) return "water";
+  if (/energy|monster|red ?bull|boost/.test(t)) return "energy";
+  if (/cola|coke|pepsi|soda|sprite|fanta|thums|drink|juice|limca/.test(t)) return "cola";
+  return "other";
+}
+
+function artScale(product) {
+  const text = (product.size || "") + " " + (product.name || "");
+  const m = text.match(/(\d+(?:\.\d+)?)\s*(ml|ltr|l)\b/i);
+  if (!m) return 0.9;
+  let ml = parseFloat(m[1]);
+  if (m[2].toLowerCase() !== "ml") ml *= 1000;
+  return 0.74 + 0.26 * Math.min(1, ml / 2000);
+}
+
+function cleanName(name) {
+  return String(name || "").replace(/[\s\-\u2013\u2014:]+$/, "");
+}
+
+function productArt(product) {
+  const kind = artKind(product);
+  const id = "pa" + String(product.id).replace(/\W/g, "");
+  const scale = artScale(product).toFixed(2);
+  const brand = esc(
+    cleanName(product.name).split(/\s+/)[0].toUpperCase().slice(0, 9),
+  );
+  const size = esc(product.size || "");
+  const brandSize = brand.length > 7 ? 6.6 : brand.length > 5 ? 8.4 : 9.5;
+
+  const label = (fill, ink, y) => `
+      <rect x="37" y="${y}" width="46" height="36" fill="${fill}"/>
+      <text x="60" y="${y + 16}" text-anchor="middle" font-family="Inter,system-ui,sans-serif" font-size="${brandSize}" font-weight="800" fill="${ink}" letter-spacing=".2">${brand}</text>
+      <text x="60" y="${y + 28}" text-anchor="middle" font-family="Inter,system-ui,sans-serif" font-size="8" font-weight="600" fill="${ink}" opacity=".8">${size}</text>`;
+
+  let body = "";
+
+  if (kind === "water") {
+    body = `
+      <defs><linearGradient id="${id}" x1="0" x2="1">
+        <stop offset="0" stop-color="#4aa8ee"/><stop offset=".45" stop-color="#cdeeff"/><stop offset="1" stop-color="#3f94dc"/>
+      </linearGradient></defs>
+      <rect x="47" y="8" width="26" height="15" rx="4" fill="#0a5fc4"/>
+      <rect x="47" y="13" width="26" height="2" fill="#fff" opacity=".35"/>
+      <path d="M51 23h18v9c0 5 14 11 14 23v83c0 6-5 10-10 10H47c-5 0-10-4-10-10V55c0-12 14-18 14-23z" fill="url(#${id})" stroke="#fff" stroke-opacity=".7"/>
+      ${label("#ffffff", "#0a5fc4", 76)}
+      <path d="M43 58v70" stroke="#fff" stroke-opacity=".6" stroke-width="3" stroke-linecap="round"/>`;
+  } else if (kind === "cola" || kind === "other") {
+    const liquid = kind === "cola" ? ["#7a3b22", "#2a0f06"] : ["#ffb347", "#e8590c"];
+    const band = kind === "cola" ? "#e11d2e" : "#0f766e";
+    body = `
+      <defs><linearGradient id="${id}" x1="0" x2="1">
+        <stop offset="0" stop-color="${liquid[0]}"/><stop offset=".5" stop-color="${liquid[1]}"/><stop offset="1" stop-color="${liquid[0]}"/>
+      </linearGradient></defs>
+      <rect x="49" y="8" width="22" height="14" rx="4" fill="${band}"/>
+      <path d="M52 22h16v13c0 7 11 10 15 23 3 10 3 21 3 32 0 14-2 26-2 42 0 8-4 12-10 12H49c-6 0-10-4-10-12 0-16-2-28-2-42 0-11 0-22 3-32 4-13 15-16 15-23z" fill="url(#${id})" stroke="#fff" stroke-opacity=".35"/>
+      ${label(band, "#ffffff", 80)}
+      <path d="M43 60v62" stroke="#fff" stroke-opacity=".4" stroke-width="3" stroke-linecap="round"/>`;
+  } else {
+    body = `
+      <defs><linearGradient id="${id}" x1="0" x2="1">
+        <stop offset="0" stop-color="#0b0b0f"/><stop offset=".5" stop-color="#2b2b36"/><stop offset="1" stop-color="#0b0b0f"/>
+      </linearGradient></defs>
+      <rect x="36" y="14" width="48" height="128" rx="9" fill="url(#${id})" stroke="#fff" stroke-opacity=".25"/>
+      <rect x="40" y="9" width="40" height="9" rx="3" fill="#b9bcc4"/>
+      <rect x="36" y="108" width="48" height="5" fill="#ffd21f"/>
+      <path d="M62 36 48 72h10l-4 26 18-38H61z" fill="#ffd21f"/>
+      <text x="60" y="128" text-anchor="middle" font-family="Inter,system-ui,sans-serif" font-size="9" font-weight="800" fill="#fff" letter-spacing=".4">${brand}</text>
+      <path d="M42 30v70" stroke="#fff" stroke-opacity=".25" stroke-width="3" stroke-linecap="round"/>`;
+  }
+
+  return `<svg class="pa-svg" viewBox="0 0 120 160" role="img" aria-label="${esc(product.name)}">
+      <ellipse cx="60" cy="152" rx="${(34 * scale).toFixed(1)}" ry="4" fill="#000" opacity=".16"/>
+      <g transform="translate(60 150) scale(${scale}) translate(-60 -150)">${body}</g>
+    </svg>`;
+}
+
 function render(anim = false) {
   const grid = $("#grid");
 
@@ -239,15 +322,15 @@ function render(anim = false) {
                             style="--i:${index}"
                         >
 
-                            <div class="ic product-image-box">
+                            <div class="ic product-image-box kind-${artKind(product)}">
                                 ${product.image_url
                                   ? `<img src="${esc(product.image_url)}" alt="${esc(product.name)}" loading="lazy" style="width:100%;height:100%;object-fit:contain;border-radius:inherit">`
-                                  : esc(product.icon || "🥤")}
+                                  : productArt(product)}
                             </div>
 
 
                             <b>
-                                ${esc(product.name)}
+                                ${esc(cleanName(product.name))}
                                 ${product.size ? `<span class="product-size">${esc(product.size)}</span>` : ""}
                             </b>
 
@@ -485,7 +568,7 @@ function cart() {
 
                             <span>
                                 ${esc(product.icon)}
-                                ${esc(product.name)}
+                                ${esc(cleanName(product.name))}
                                 ${product.size ? `(${esc(product.size)})` : ""}
                                 × ${CART[id]}
                             </span>
