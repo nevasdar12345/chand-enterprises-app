@@ -10,9 +10,9 @@
 
     <section class="brochure-hero">
         <div class="brochure-hero-content">
-            <span class="brochure-eyebrow">CHAND ENTERPRISES · DARBHANGA, BIHAR</span>
-            <h1>Premium Product Brochure</h1>
-            <p>Explore our three product collections — Nevas Package Drinking Water, Cold Drinks and Energy Drinks.</p>
+            <span class="brochure-eyebrow">{{ brochure_text.eyebrow }}</span>
+            <h1>{{ brochure_text.title }}</h1>
+            <p>{{ brochure_text.subtitle }}</p>
 
             <div class="brochure-actions">
                 {% if b and b.url %}
