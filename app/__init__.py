@@ -257,6 +257,29 @@ def create_app():
                         db.session.rollback()
 
         # ========================================================
+        # PRODUCT IMAGE URL MIGRATION
+        # ========================================================
+
+        if "product" in tables:
+
+            existing = {
+                c["name"]
+                for c in inspector.get_columns("product")
+            }
+
+            if "image_url" not in existing:
+
+                try:
+                    db.session.execute(
+                        text(
+                            "ALTER TABLE product ADD COLUMN image_url TEXT DEFAULT ''"
+                        )
+                    )
+                    db.session.commit()
+                except Exception:
+                    db.session.rollback()
+
+        # ========================================================
         # USER ACTIVE STATUS MIGRATION
         # ========================================================
 
