@@ -45,6 +45,9 @@ DEFAULT_SETTINGS = {
     "delivery_per_km": "10",
     "delivery_free_above": "500",
     "brochure_url": "",
+    "brochure_eyebrow": "CHAND ENTERPRISES · DARBHANGA, BIHAR",
+    "brochure_title": "Premium Product Brochure",
+    "brochure_subtitle": "Explore our three product collections — Nevas Package Drinking Water, Cold Drinks and Energy Drinks.",
     "instagram_url": "",
     "facebook_url": "",
     "archive_days": "7",
@@ -52,6 +55,9 @@ DEFAULT_SETTINGS = {
     "archive_email": "",
     "archive_whatsapp": "",
 }
+
+# Maximum length of the brochure heading texts the developer can edit
+BROCHURE_TEXT_LIMITS = {"brochure_eyebrow": 80, "brochure_title": 80, "brochure_subtitle": 300}
 
 DEFAULT_OFFERS = [
     "🥤 Pepsi 200ml @ ₹12",
@@ -149,7 +155,7 @@ def calculate_coupon(code, subtotal):
 def developer_settings():
     raw = setting_value("offers")
     offers = [x.strip() for x in raw.splitlines() if x.strip()] if raw else DEFAULT_OFFERS[:]
-    return {"business_name": setting_value("business_name"), "business_mobile": setting_value("business_mobile"), "whatsapp": setting_value("whatsapp"), "business_location": setting_value("business_location"), "upi": setting_value("upi"), "payment_name": setting_value("payment_name"), "business_lat": setting_value("business_lat"), "business_lng": setting_value("business_lng"), "delivery_base": setting_value("delivery_base"), "delivery_per_km": setting_value("delivery_per_km"), "delivery_free_above": setting_value("delivery_free_above"), "instagram_url": setting_value("instagram_url"), "facebook_url": setting_value("facebook_url"), "brochure_url": setting_value("brochure_url"), "archive_days": setting_value("archive_days") or "7", "archive_method": setting_value("archive_method") or "email", "archive_email": setting_value("archive_email"), "archive_whatsapp": setting_value("archive_whatsapp"), "offers": offers}
+    return {"business_name": setting_value("business_name"), "business_mobile": setting_value("business_mobile"), "whatsapp": setting_value("whatsapp"), "business_location": setting_value("business_location"), "upi": setting_value("upi"), "payment_name": setting_value("payment_name"), "business_lat": setting_value("business_lat"), "business_lng": setting_value("business_lng"), "delivery_base": setting_value("delivery_base"), "delivery_per_km": setting_value("delivery_per_km"), "delivery_free_above": setting_value("delivery_free_above"), "instagram_url": setting_value("instagram_url"), "facebook_url": setting_value("facebook_url"), "brochure_url": setting_value("brochure_url"), "brochure_eyebrow": setting_value("brochure_eyebrow"), "brochure_title": setting_value("brochure_title"), "brochure_subtitle": setting_value("brochure_subtitle"), "archive_days": setting_value("archive_days") or "7", "archive_method": setting_value("archive_method") or "email", "archive_email": setting_value("archive_email"), "archive_whatsapp": setting_value("archive_whatsapp"), "offers": offers}
 
 
 def display_datetime(dt):
@@ -415,7 +421,12 @@ def brochure():
     for category_name in sorted({(p.category or "Other").strip() or "Other" for p in products}, key=str.lower):
         if category_name.lower() not in seen:
             grouped.append((category_name, [p for p in products if (p.category or "Other").strip().lower() == category_name.lower()]))
-    return render_template("brochure.html", brochure_pdf_exists=os.path.exists(pdf_path), b=links, product_groups=grouped)
+    brochure_text = {
+        "eyebrow": setting_value("brochure_eyebrow").strip() or DEFAULT_SETTINGS["brochure_eyebrow"],
+        "title": setting_value("brochure_title").strip() or DEFAULT_SETTINGS["brochure_title"],
+        "subtitle": setting_value("brochure_subtitle").strip() or DEFAULT_SETTINGS["brochure_subtitle"],
+    }
+    return render_template("brochure.html", brochure_pdf_exists=os.path.exists(pdf_path), b=links, product_groups=grouped, brochure_text=brochure_text)
 
 
 # ============================================================
@@ -1969,13 +1980,15 @@ def developer_save_settings():
     if not role_ok("developer"):
         return jsonify(error="Forbidden"), 403
     d = request.json or {}
-    for key in ["business_name", "business_mobile", "whatsapp", "business_location", "upi", "payment_name", "business_lat", "business_lng", "delivery_base", "delivery_per_km", "delivery_free_above", "instagram_url", "facebook_url", "brochure_url", "archive_days", "archive_method", "archive_email", "archive_whatsapp"]:
+    for key in ["business_name", "business_mobile", "whatsapp", "business_location", "upi", "payment_name", "business_lat", "business_lng", "delivery_base", "delivery_per_km", "delivery_free_above", "instagram_url", "facebook_url", "brochure_url", "brochure_eyebrow", "brochure_title", "brochure_subtitle", "archive_days", "archive_method", "archive_email", "archive_whatsapp"]:
         if key in d:
             value = str(d.get(key) or "").strip()
             if key in {"business_name", "whatsapp", "upi"} and not value:
                 return jsonify(error=f"{key.replace('_', ' ').title()} is required"), 400
             if key in {"instagram_url", "facebook_url", "brochure_url"} and value and not _clean_http_url(value):
                 return jsonify(error=f"{key.replace('_', ' ').title()} must be a valid http(s) URL"), 400
+            if key in BROCHURE_TEXT_LIMITS and len(value) > BROCHURE_TEXT_LIMITS[key]:
+                return jsonify(error=f"{key.replace('_', ' ').title()} must be {BROCHURE_TEXT_LIMITS[key]} characters or fewer"), 400
             if key == "archive_days":
                 try:
                     value = str(max(1, int(value or 7)))
