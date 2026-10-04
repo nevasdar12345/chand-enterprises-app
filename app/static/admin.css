@@ -284,3 +284,97 @@
         height:40px;
     }
 }
+
+/* =========================================================
+   ALL ADMIN TABS - SAFE HORIZONTAL SCROLL FIX
+   Products / Sales / Credit / Coupons / Team
+   Only the affected content area scrolls; the page stays responsive.
+   ========================================================= */
+
+.admin-panel > section[id^="tab-"] {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+}
+
+/* Every admin table becomes its own horizontal scroll container. */
+.admin-panel > section[id^="tab-"] .admin-table {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0 !important;
+    overflow-x: auto;
+    overflow-y: hidden;
+    box-sizing: border-box;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: auto;
+}
+
+.admin-panel > section[id^="tab-"] .admin-table > table {
+    width: 100%;
+    min-width: 760px;
+    table-layout: auto;
+    border-collapse: collapse;
+}
+
+/* Products has more columns, so give it enough room to scroll. */
+#tab-products .admin-table > table {
+    min-width: 1050px;
+}
+
+/* Sales charts/cards should never force the page wider. */
+#tab-sales .admin-table {
+    overflow-x: auto;
+}
+
+#tab-sales canvas {
+    max-width: 100%;
+}
+
+/* Credit ledger */
+#tab-ledger .admin-table > table {
+    min-width: 720px;
+}
+
+/* Coupons */
+#tab-coupons .admin-table > table {
+    min-width: 760px;
+}
+
+/* Team */
+#tab-team .admin-table > table {
+    min-width: 900px;
+}
+
+/* Keep controls from shrinking into unusable widths. */
+#tab-products .admin-table th,
+#tab-products .admin-table td,
+#tab-ledger .admin-table th,
+#tab-ledger .admin-table td,
+#tab-coupons .admin-table th,
+#tab-coupons .admin-table td,
+#tab-team .admin-table th,
+#tab-team .admin-table td {
+    white-space: nowrap;
+}
+
+/* Mobile: horizontal scrolling belongs to the table, not the whole page. */
+@media (max-width: 900px) {
+    .admin-panel {
+        width: 100%;
+        max-width: 100%;
+        overflow-x: hidden;
+    }
+
+    .admin-panel > section[id^="tab-"] {
+        width: 100%;
+        max-width: 100%;
+        overflow-x: visible;
+    }
+
+    .admin-panel > section[id^="tab-"] .admin-table {
+        width: 100%;
+        max-width: 100%;
+        overflow-x: auto;
+    }
+}
