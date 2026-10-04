@@ -430,3 +430,349 @@ header.nav .logo > span {
         height: 38px;
     }
 }
+
+
+/* =========================================================
+   PREMIUM POLISH (added at the very end of responsive.css)
+   Safe to delete this whole block to go back to the old look.
+   ========================================================= */
+
+
+/* ---------- header buttons ---------- */
+
+header.nav {
+    transition: box-shadow .25s ease, background .25s ease;
+}
+
+.theme-toggle,
+.nav-hamburger {
+    border-radius: 13px;
+    box-shadow: 0 2px 6px rgb(15 34 51 / 6%);
+}
+
+.theme-toggle:hover,
+.nav-hamburger:hover {
+    background: color-mix(in srgb, var(--pri) 10%, var(--card));
+    box-shadow: 0 6px 16px rgb(10 124 255 / 18%);
+}
+
+.theme-toggle:focus-visible,
+.nav-hamburger:focus-visible,
+.ce-menu-close:focus-visible,
+.ce-menu-link:focus-visible {
+    outline: 3px solid color-mix(in srgb, var(--pri) 45%, transparent);
+    outline-offset: 2px;
+}
+
+.store-actions .nav-action {
+    padding: 9px 14px;
+    border-radius: 12px;
+}
+
+.store-actions .nav-action:hover {
+    background: color-mix(in srgb, var(--pri) 10%, transparent);
+    color: var(--pri);
+}
+
+/* cart count badge: small pop when it appears */
+.premium-cart b {
+    box-shadow: 0 3px 8px rgb(255 59 48 / 40%);
+}
+
+
+/* ---------- dropdown menu (admin / staff / delivery on small screens) ---------- */
+
+@media (max-width: 900px) {
+
+    header.nav :is(.store-actions, .nav-actions, .admin-nav-right, .staff-nav-actions) {
+        border-radius: 20px;
+        padding: 10px;
+        gap: 6px;
+        -webkit-backdrop-filter: blur(18px);
+                backdrop-filter: blur(18px);
+        box-shadow:
+            0 4px 12px rgb(0 0 0 / 8%),
+            0 28px 60px rgb(0 0 0 / 28%);
+    }
+
+    header.nav :is(.store-actions, .nav-actions, .admin-nav-right, .staff-nav-actions) > * {
+        justify-content: flex-start;
+        border-radius: 14px;
+        background: transparent;
+        border-color: transparent;
+        transition: background .2s ease, transform .2s ease;
+    }
+
+    header.nav :is(.store-actions, .nav-actions, .admin-nav-right, .staff-nav-actions) > *:hover {
+        background: color-mix(in srgb, var(--pri) 10%, transparent);
+        transform: translateX(2px);
+    }
+
+    header.nav .store-actions .premium-cart {
+        justify-content: center;
+        background: linear-gradient(135deg, var(--pri), #2f9bff);
+        box-shadow: 0 8px 18px rgb(10 124 255 / 32%);
+    }
+}
+
+
+/* ---------- side menu drawer (storefront hamburger) ---------- */
+
+.ce-menu {
+    border-radius: 26px 0 0 26px;
+    background:
+        radial-gradient(circle at 100% 0, rgb(10 124 255 / 10%), transparent 38%),
+        var(--card);
+}
+
+.ce-menu-head {
+    border-bottom: 1px solid var(--line);
+}
+
+.ce-menu-head h2 {
+    background: linear-gradient(135deg, var(--ink), var(--pri));
+    -webkit-background-clip: text;
+            background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.ce-menu-close {
+    transition: transform .2s ease, background .2s ease, border-color .2s ease;
+}
+
+.ce-menu-close:hover {
+    transform: rotate(90deg);
+    border-color: var(--pri);
+    background: color-mix(in srgb, var(--pri) 10%, var(--bg));
+}
+
+.ce-menu-link {
+    border-radius: 16px;
+}
+
+.ce-menu-link > span:first-child {
+    background: color-mix(in srgb, var(--pri) 9%, var(--bg));
+    transition: background .2s ease, transform .2s ease;
+}
+
+.ce-menu-link:hover > span:first-child {
+    background: color-mix(in srgb, var(--pri) 18%, var(--bg));
+    transform: scale(1.08);
+}
+
+.ce-menu-featured {
+    background: linear-gradient(135deg, rgb(10 124 255 / 12%), rgb(0 194 209 / 12%));
+    border-color: rgb(10 124 255 / 28%);
+}
+
+.ce-menu-logout,
+.ce-menu-logout:hover {
+    color: var(--bad);
+}
+
+.ce-menu-footer {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+}
+
+/* menu items slide in one after another */
+.ce-menu.open .ce-menu-link {
+    animation: ceMenuItem .4s cubic-bezier(.2, .8, .2, 1) both;
+}
+
+.ce-menu.open .ce-menu-link:nth-child(1) { animation-delay: .05s; }
+.ce-menu.open .ce-menu-link:nth-child(2) { animation-delay: .10s; }
+.ce-menu.open .ce-menu-link:nth-child(3) { animation-delay: .15s; }
+.ce-menu.open .ce-menu-link:nth-child(4) { animation-delay: .20s; }
+.ce-menu.open .ce-menu-link:nth-child(5) { animation-delay: .25s; }
+.ce-menu.open .ce-menu-link:nth-child(6) { animation-delay: .30s; }
+.ce-menu.open .ce-menu-link:nth-child(7) { animation-delay: .35s; }
+.ce-menu.open .ce-menu-link:nth-child(8) { animation-delay: .40s; }
+
+@keyframes ceMenuItem {
+    from { opacity: 0; transform: translateX(18px); }
+    to   { opacity: 1; transform: none; }
+}
+
+
+/* ---------- My Orders cards ---------- */
+
+.ordercard {
+    position: relative;
+    margin: 12px 0;
+    padding: 14px 16px 14px 18px;
+    border-radius: 16px;
+    background: var(--card);
+    box-shadow: var(--shadow-sm, 0 6px 18px rgb(15 34 51 / 7%));
+    overflow: hidden;
+    transition: transform .2s ease, box-shadow .2s ease;
+}
+
+.ordercard::before {
+    content: "";
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 4px;
+    background: linear-gradient(180deg, var(--pri), #00c2d1);
+}
+
+.ordercard:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md, 0 14px 30px rgb(15 34 51 / 12%));
+}
+
+.ordercard .row:first-child b {
+    font-size: 15px;
+    letter-spacing: .02em;
+}
+
+.ordercard .row:first-child span {
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: capitalize;
+    color: var(--pri);
+    background: color-mix(in srgb, var(--pri) 12%, transparent);
+}
+
+.ordercard .row:nth-child(2) b {
+    font-size: 16px;
+}
+
+.ordercard small {
+    margin-top: 4px;
+    line-height: 1.5;
+}
+
+.ordercard button {
+    padding: 8px 14px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+
+/* ---------- welcome / message pop-up ---------- */
+
+#ui-modal {
+    backdrop-filter: blur(7px);
+    -webkit-backdrop-filter: blur(7px);
+}
+
+.ui-modal-box {
+    position: relative;
+    padding: 28px 26px 24px;
+    border-radius: 24px;
+    overflow: hidden;
+    box-shadow: 0 4px 10px rgb(0 0 0 / 10%), 0 34px 80px rgb(0 0 0 / 38%);
+}
+
+.ui-modal-box::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 4px;
+    background: linear-gradient(90deg, var(--pri), #00c2d1);
+}
+
+.ui-modal-title {
+    font-size: 22px;
+    letter-spacing: -.4px;
+}
+
+.ui-modal-close {
+    padding: 11px 22px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, var(--pri), #2f9bff);
+    box-shadow: 0 8px 18px rgb(10 124 255 / 32%);
+    cursor: pointer;
+    transition: transform .15s ease, box-shadow .15s ease;
+}
+
+.ui-modal-close:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 12px 24px rgb(10 124 255 / 42%);
+}
+
+.ui-modal-close:active {
+    transform: scale(.96);
+}
+
+
+/* ---------- dark theme extras ---------- */
+
+:root[data-theme="dark"] .theme-toggle,
+:root[data-theme="dark"] .nav-hamburger {
+    background: #182838;
+    box-shadow: none;
+}
+
+:root[data-theme="dark"] .theme-toggle:hover,
+:root[data-theme="dark"] .nav-hamburger:hover {
+    background: #1d3347;
+}
+
+:root[data-theme="dark"] .store-actions .nav-action:hover {
+    color: #7fbcff;
+}
+
+:root[data-theme="dark"] .store-nav {
+    border-bottom-color: rgb(255 255 255 / 6%);
+}
+
+:root[data-theme="dark"] .ce-menu {
+    box-shadow: -20px 0 60px rgb(0 0 0 / 55%);
+    background:
+        radial-gradient(circle at 100% 0, rgb(59 155 255 / 14%), transparent 38%),
+        var(--card);
+}
+
+:root[data-theme="dark"] .ce-menu-head h2 {
+    background: linear-gradient(135deg, #fff, #7fbcff);
+    -webkit-background-clip: text;
+            background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+:root[data-theme="dark"] .ordercard,
+:root[data-theme="dark"] .ui-modal-box {
+    background: #16253a;
+}
+
+:root[data-theme="dark"] .ordercard .row:first-child span {
+    color: #7fbcff;
+}
+
+:root[data-theme="dark"] .box {
+    background: var(--card);
+}
+
+
+/* ---------- small screens ---------- */
+
+@media (max-width: 600px) {
+
+    .ce-menu {
+        width: min(360px, 90vw);
+        border-radius: 24px 0 0 24px;
+    }
+
+    .ui-modal-box {
+        padding: 24px 20px 20px;
+        border-radius: 22px;
+    }
+
+    .ordercard {
+        padding: 12px 14px 12px 16px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+    .ce-menu.open .ce-menu-link {
+        animation: none;
+    }
+}
