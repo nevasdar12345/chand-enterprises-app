@@ -541,6 +541,10 @@
                         </th>
 
                         <th>
+                            Image
+                        </th>
+
+                        <th>
                             Category
                         </th>
 
@@ -601,6 +605,17 @@
                         </td>
 
 
+
+                        <!-- Image -->
+
+                        <td>
+                            {% if p.image_url %}
+                                <img src="{{ p.image_url }}" alt="{{ p.name|e }}" loading="lazy" style="width:54px;height:54px;object-fit:cover;border-radius:10px;border:1px solid #dbe4ea;display:block;margin-bottom:6px">
+                            {% else %}
+                                <span style="display:inline-flex;width:54px;height:54px;align-items:center;justify-content:center;border-radius:10px;background:#eef5f8;font-size:24px">{{ p.icon }}</span>
+                            {% endif %}
+                            <button type="button" class="add" onclick="openProductImageManager({{ p.id }}, {{ p.image_url|tojson }})">📷 Image</button>
+                        </td>
 
                         <!-- Category -->
 
