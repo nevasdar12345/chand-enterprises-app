@@ -335,6 +335,7 @@ Developer · Chand Enterprises
                 <select id="archiveMethod" onchange="toggleArchiveRecipient()" style="width:100%;box-sizing:border-box">
                     <option value="email">Email</option>
                     <option value="whatsapp">WhatsApp</option>
+                    <option value="drive">Google Drive</option>
                 </select>
             </div>
             <div id="archiveEmailWrap">
@@ -344,6 +345,11 @@ Developer · Chand Enterprises
             <div id="archiveWhatsAppWrap" style="display:none">
                 <small>Archive WhatsApp number</small>
                 <input id="archiveWhatsApp" type="tel" placeholder="9304295574" style="width:100%;box-sizing:border-box">
+            </div>
+            <div id="archiveDriveWrap" style="display:none">
+                <small>Google Drive folder link</small>
+                <input id="archiveDriveLink" type="url" placeholder="https://drive.google.com/drive/folders/..." style="width:100%;box-sizing:border-box">
+                <small class="muted">The server uploads the Excel here. Share this folder with the Google service-account email configured in Render.</small>
             </div>
         </div>
 
