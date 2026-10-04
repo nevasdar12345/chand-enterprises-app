@@ -1893,13 +1893,32 @@ def admin_archive_delete_all():
     deleted = len(order_ids)
 
     if order_ids:
-        # Remove every child record that references an order before deleting
-        # the parent Order rows.  LedgerEntry also has an order_id foreign key.
+        # Remove child records before deleting the parent Order rows.
         Payment.query.filter(Payment.order_id.in_(order_ids)).delete(synchronize_session=False)
         OrderItem.query.filter(OrderItem.order_id.in_(order_ids)).delete(synchronize_session=False)
-        LedgerEntry.query.filter(LedgerEntry.order_id.in_(order_ids)).delete(synchronize_session=False)
-        ArchivedOrder.query.filter(ArchivedOrder.order_id.in_(order_ids)).delete(synchronize_session=False)
-        Order.query.filter(Order.id.in_(order_ids)).delete(synchronize_session=False)
+
+        # Some existing deployments may have an older LedgerEntry table that
+        # does not yet contain order_id. Check the live schema before using it,
+        # so the delete-all operation cannot fail with "no such column".
+        try:
+            from sqlalchemy import inspect
+            ledger_columns = {
+                col["name"] for col in inspect(db.engine).get_columns(LedgerEntry.__tablename__)
+            }
+            if "order_id" in ledger_columns:
+                LedgerEntry.query.filter(
+                    LedgerEntry.order_id.in_(order_ids)
+                ).delete(synchronize_session=False)
+        except Exception:
+            # Ledger cleanup must not prevent the actual order deletion.
+            pass
+
+        ArchivedOrder.query.filter(
+            ArchivedOrder.order_id.in_(order_ids)
+        ).delete(synchronize_session=False)
+        Order.query.filter(
+            Order.id.in_(order_ids)
+        ).delete(synchronize_session=False)
 
     # Keep archive history as an audit record; only the actual order data is deleted.
     now = datetime.utcnow()
