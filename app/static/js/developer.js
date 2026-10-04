@@ -742,6 +742,11 @@ async function loadDeveloperProducts() {
                     </td>
 
                     <td>
+                        ${product.image_url ? `<img src="${esc(product.image_url)}" alt="" style="width:48px;height:48px;object-fit:cover;border-radius:8px;display:block;margin-bottom:6px">` : `<span style="font-size:24px">${esc(product.icon || '🥤')}</span>`}
+                        <button type="button" onclick="openProductImageManager(${product.id}, ${JSON.stringify(product.image_url || '')})">📷 Image</button>
+                    </td>
+
+                    <td>
 
                         <input
                             id="dp_size_${product.id}"
@@ -994,7 +999,10 @@ async function saveNewDeveloperProduct() {
 
     closeModal();
 
-    loadDeveloperProducts();
+    await loadDeveloperProducts();
+    if (result.product?.id) {
+        openProductImageManager(result.product.id, result.product.image_url || '');
+    }
 }
 
 
@@ -1416,3 +1424,72 @@ window.toggleDeveloperCategory = toggleDeveloperCategory;
 window.deleteDeveloperCategory = deleteDeveloperCategory;
 
 window.developerTeam=developerTeam; window.developerAddTeam=developerAddTeam; window.developerEditTeam=developerEditTeam; window.developerSaveTeam=developerSaveTeam; window.developerToggleTeam=developerToggleTeam;
+
+
+/* =========================================================
+   PRODUCT IMAGE MANAGER — FREE GITHUB HOSTING
+   ========================================================= */
+
+async function openProductImageManager(id, currentUrl = '') {
+    const config = await api('/api/product-image-config');
+    const githubReady = config._ok && config.github_configured;
+    modal(`
+        <div style="max-width:620px">
+            <h2 style="margin-top:0">📷 Product Image</h2>
+            <p class="muted">Upload to your public GitHub repository for free, or paste a public image URL.</p>
+            <div style="margin:14px 0;text-align:center">${currentUrl ? `<img src="${esc(currentUrl)}" alt="Current product image" style="max-width:220px;max-height:220px;object-fit:contain;border-radius:14px;border:1px solid #dbe4ea">` : '<div style="padding:36px;background:#f4f8fa;border-radius:14px">No image added yet</div>'}</div>
+            <label><b>Upload image to GitHub</b><input id="productImageFile" type="file" accept="image/jpeg,image/png,image/webp,image/gif" style="width:100%;margin-top:8px"></label>
+            <small class="muted">JPG, PNG, WEBP or GIF · maximum 5 MB</small>
+            <button class="primary" type="button" onclick="uploadProductImage(${id})" style="width:100%;margin-top:14px" ${githubReady ? '' : 'disabled'}>☁️ Upload to GitHub</button>
+            ${githubReady ? `<small class="muted">GitHub: ${esc(config.repository)} / ${esc(config.folder)}</small>` : `<div class="err" style="margin-top:10px">GitHub upload is not configured yet. Add GITHUB_TOKEN and GITHUB_REPO in Render Environment Variables.</div>`}
+            <hr style="margin:20px 0;border:0;border-top:1px solid #e4e9ed">
+            <label><b>Or paste a public image URL</b><input id="productImageUrl" type="url" value="${esc(currentUrl)}" placeholder="https://.../product.webp" style="width:100%;margin-top:8px;box-sizing:border-box"></label>
+            <button type="button" onclick="saveProductImageUrl(${id})" style="width:100%;margin-top:10px">🔗 Save image URL</button>
+            ${currentUrl ? `<button type="button" class="danger" onclick="removeProductImage(${id})" style="width:100%;margin-top:10px">Remove image</button>` : ''}
+            <button type="button" onclick="closeModal()" style="width:100%;margin-top:10px">Close</button>
+            <p id="productImageMsg" class="err"></p>
+        </div>`);
+}
+
+async function uploadProductImage(id) {
+    const input = document.getElementById('productImageFile');
+    const msg = document.getElementById('productImageMsg');
+    const file = input?.files?.[0];
+    if (!file) { if (msg) msg.textContent = 'Choose an image first.'; return; }
+    if (file.size > 5 * 1024 * 1024) { if (msg) msg.textContent = 'Image is larger than 5 MB.'; return; }
+    const form = new FormData(); form.append('image', file);
+    if (msg) msg.textContent = 'Uploading to GitHub…';
+    try {
+        const response = await fetch(`/api/product/${id}/image`, { method: 'POST', body: form });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) { if (msg) msg.textContent = data.error || 'Upload failed'; return; }
+        if (msg) msg.textContent = 'Image uploaded successfully.';
+        setTimeout(() => location.reload(), 700);
+    } catch (e) { if (msg) msg.textContent = 'Network error while uploading image.'; }
+}
+
+async function saveProductImageUrl(id) {
+    const url = document.getElementById('productImageUrl')?.value.trim();
+    const msg = document.getElementById('productImageMsg');
+    if (!url) { if (msg) msg.textContent = 'Paste an image URL first.'; return; }
+    const form = new FormData(); form.append('image_url', url);
+    if (msg) msg.textContent = 'Saving…';
+    const response = await fetch(`/api/product/${id}/image`, { method: 'POST', body: form });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) { if (msg) msg.textContent = data.error || 'Could not save image URL'; return; }
+    location.reload();
+}
+
+async function removeProductImage(id) {
+    if (!confirm('Remove this product image?')) return;
+    const response = await fetch(`/api/product/${id}/image`, { method: 'DELETE' });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) return alert(data.error || 'Could not remove image');
+    location.reload();
+}
+
+window.openProductImageManager = openProductImageManager;
+window.uploadProductImage = uploadProductImage;
+window.saveProductImageUrl = saveProductImageUrl;
+window.removeProductImage = removeProductImage;
+
