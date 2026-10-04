@@ -549,6 +549,10 @@
                         </th>
 
                         <th>
+                            Size
+                        </th>
+
+                        <th>
                             Price
                         </th>
 
@@ -637,6 +641,15 @@
 
 
 
+                        <!-- Size -->
+
+                        <td>
+                            <strong>
+                                {{ p.size or '—' }}
+                            </strong>
+                        </td>
+
+
                         <!-- Price -->
 
                         <td>
@@ -706,6 +719,7 @@
                                 data-price="{{ p.price }}"
                                 data-stock="{{ p.stock }}"
                                 data-icon="{{ p.icon|e }}"
+                                data-size="{{ p.size|default('', true)|e }}"
                                 onclick="
                                     productForm(
                                         this.dataset.id,
@@ -713,9 +727,10 @@
                                         this.dataset.category,
                                         this.dataset.price,
                                         this.dataset.stock,
-                                        this.dataset.icon
+                                        this.dataset.icon,
+                                        this.dataset.size
                                     )
-                                "
+                                " 
                             >
                                 Edit
                             </button>
