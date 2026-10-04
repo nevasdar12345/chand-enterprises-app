@@ -303,6 +303,35 @@ class Order(db.Model):
 
 
 # ============================================================
+# ORDER ARCHIVE
+# ============================================================
+
+class OrderArchive(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    period_start = db.Column(db.DateTime, nullable=False)
+    period_end = db.Column(db.DateTime, nullable=False)
+    order_count = db.Column(db.Integer, default=0, nullable=False)
+    total_amount = db.Column(db.Float, default=0, nullable=False)
+    delivery_method = db.Column(db.String(20), default="email", nullable=False)
+    recipient = db.Column(db.String(255), default="", nullable=False)
+    status = db.Column(db.String(40), default="WAITING_CONFIRMATION", nullable=False, index=True)
+    sent_at = db.Column(db.DateTime, nullable=True)
+    confirmed_at = db.Column(db.DateTime, nullable=True)
+    deleted_at = db.Column(db.DateTime, nullable=True)
+    note = db.Column(db.Text, default="")
+    download_token = db.Column(db.String(80), unique=True, nullable=True, index=True)
+    file_name = db.Column(db.String(255), default="")
+
+
+class ArchivedOrder(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    archive_id = db.Column(db.Integer, db.ForeignKey("order_archive.id"), nullable=False, index=True)
+    order_id = db.Column(db.Integer, nullable=False, index=True)
+
+
+
+# ============================================================
 # ORDER ITEM
 # ============================================================
 
