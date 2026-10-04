@@ -1241,6 +1241,26 @@ button:active,
     font-weight:700;
 }
 
+.size-chip{
+    display:inline-block;
+    min-width:52px;
+    padding:5px 9px;
+    text-align:center;
+    border-radius:8px;
+    background:#f3f6f8;
+    color:#17202a;
+    font-size:12px;
+    font-weight:700;
+    white-space:nowrap;
+}
+
+#stockTable th:nth-child(1){ width:28%; }
+#stockTable th:nth-child(2){ width:11%; }
+#stockTable th:nth-child(3){ width:18%; }
+#stockTable th:nth-child(4){ width:18%; }
+#stockTable th:nth-child(5){ width:15%; }
+#stockTable th:nth-child(6){ width:10%; }
+
 .status{
     display:inline-flex;
     align-items:center;
