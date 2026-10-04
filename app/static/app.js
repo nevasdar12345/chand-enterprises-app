@@ -2295,6 +2295,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     await Promise.all([refreshMe(), refreshConfig(), refreshProducts()]);
   }
 
+  /* Other public pages that share the header (e.g. brochure): wire up
+     login state, cart count and business settings. */
+  if (!$("#grid") && $("#ceMobileMenu")) {
+    persistCart();
+
+    await Promise.all([refreshMe(), refreshConfig(), refreshProducts()]);
+  }
+
   /*
    * IMPORTANT:
    * Admin, delivery and developer
