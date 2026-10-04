@@ -129,12 +129,16 @@
     <div id="lowStockBanner" class="low-stock-banner" hidden></div>
 
     <div id="archiveConfirmBanner" class="archive-confirm-banner" hidden></div>
-<div id="archiveDeleteAllWrap" class="archive-confirm-banner">
-    <div class="archive-confirm-card">
-        <div><strong>🗑️ Archived order data</strong><br><small>Verify that all required Excel backup(s) have been received before deletion. This permanently deletes ALL order data.</small></div>
-        <button class="danger" onclick="deleteAllArchivedOrders()">🗑️ Delete All Order Data</button>
+
+    <div id="archiveDeleteAllWrap" class="archive-confirm-banner">
+        <div class="archive-confirm-card">
+            <div>
+                <strong>🗑️ Delete All Order Data</strong><br>
+                <small>Verify that all required Excel backup(s) have been received before deletion. This permanently deletes ALL order data.</small>
+            </div>
+            <button class="danger" type="button" onclick="deleteAllOrderData()">🗑️ Delete All Order Data</button>
+        </div>
     </div>
-</div>
 
     <!-- =========================
          TABS
