@@ -229,6 +229,35 @@ async function loadPendingArchives() {
     `).join('');
 }
 
+async function deleteAllOrderData() {
+    const verified = confirm(
+        'WARNING: This will permanently delete ALL order data.\n\n' +
+        'Please confirm that you have received and verified all required Excel archive backups.\n\n' +
+        'Click OK only after the backup has been verified.'
+    );
+    if (!verified) return;
+
+    const confirmation = prompt(
+        'PERMANENT DELETION\n\n' +
+        'This will delete ALL orders, order items, payments and archive links.\n\n' +
+        'Type DELETE to continue:'
+    );
+    if (confirmation !== 'DELETE') {
+        alert('Deletion cancelled. You must type DELETE exactly.');
+        return;
+    }
+
+    const result = await api('/api/admin/archive/delete-all', 'POST');
+    if (!result._ok) {
+        alert(result.error || 'Could not delete order data.');
+        return;
+    }
+
+    alert(`Deleted ${result.deleted || 0} orders successfully.`);
+    await loadAdminOrders();
+    await loadPendingArchives();
+}
+
 async function confirmOrderArchive(id) {
     if (!confirm('Confirm that you received this archive? The archived orders will then be permanently removed from the active database.')) return;
     const result = await api(`/api/admin/archive/${id}/confirm`, 'POST');
@@ -2020,18 +2049,6 @@ window.toggleAdminTheme = toggleAdminTheme;
 window.toggleAdminMenu = toggleAdminMenu;
 
 
-
-async function deleteAllArchivedOrders() {
-    if (!confirm('Have you verified that all required Excel archive backups have been received? This will PERMANENTLY DELETE ALL order data and cannot be undone.')) return;
-    const typed = prompt('Type DELETE to permanently remove ALL order data:');
-    if (typed !== 'DELETE') return;
-    const result = await api('/api/admin/archive/delete-all', 'POST');
-    if (!result._ok) return alert(result.error || 'Could not delete order data');
-    alert(`Deleted ${result.deleted || 0} orders.`);
-    await loadAdminOrders();
-    await loadPendingArchives();
-}
-
-window.deleteAllArchivedOrders = deleteAllArchivedOrders;
 window.loadPendingArchives = loadPendingArchives;
+window.deleteAllOrderData = deleteAllOrderData;
 window.confirmOrderArchive = confirmOrderArchive;
