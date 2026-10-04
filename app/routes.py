@@ -2,13 +2,14 @@ import csv, io, secrets, urllib.parse, math, re, os, base64, json, mimetypes, ur
 from pathlib import Path
 
 import segno
+from sqlalchemy import case
 from sqlalchemy.orm import joinedload, selectinload
 
 from datetime import datetime, timedelta
 
 from flask import (Blueprint, render_template, request, redirect, url_for,
 
-                   session, jsonify, Response, current_app)
+                   session, jsonify, Response, current_app, g)
 
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -19,6 +20,10 @@ from .models import User, Product, Category, Order, OrderItem, Enquiry, Payment,
 
 
 main = Blueprint("main", __name__)
+
+# Fast hash for the short-lived 4-digit OTP (the default scrypt costs ~100 ms and 32 MB per call).
+# Old hashes keep working: check_password_hash reads the method from the stored hash.
+OTP_HASH_METHOD = "pbkdf2:sha256:30000"
 
 ORDER_STATUSES = {"Confirmed", "Preparing", "Out for Delivery", "Delivered", "Cancelled"}
 
@@ -51,10 +56,23 @@ DEFAULT_OFFERS = [
     "🍋 Lemon Soda 750ml - summer special",
 ]
 
+def _settings_cache():
+    """
+    All SiteSetting rows, loaded ONCE per request.
+    (Before: every setting_value() call ran its own database query -
+    /api/config alone ran about 20 of them.)
+    """
+    cache = getattr(g, "_site_settings", None)
+    if cache is None:
+        cache = {row.key: row.value for row in SiteSetting.query.all()}
+        g._site_settings = cache
+    return cache
+
+
 def setting_value(key):
-    row = SiteSetting.query.filter_by(key=key).first()
-    if row and row.value is not None:
-        return row.value
+    value = _settings_cache().get(key)
+    if value is not None:
+        return value
     return DEFAULT_SETTINGS.get(key, "")
 
 def set_setting(key, value):
@@ -63,6 +81,7 @@ def set_setting(key, value):
         row = SiteSetting(key=key, value="")
         db.session.add(row)
     row.value = str(value or "")
+    _settings_cache()[key] = row.value      # keep this request's cache in sync
 
 
 def float_setting(key, default=0):
@@ -328,7 +347,7 @@ def new_otp(mobile):
 
     otp = f"{secrets.randbelow(10000):04d}"
 
-    db.session.add(OtpChallenge(mobile=mobile, otp_hash=generate_password_hash(otp),
+    db.session.add(OtpChallenge(mobile=mobile, otp_hash=generate_password_hash(otp, method=OTP_HASH_METHOD),
 
                                 expires_at=now + timedelta(minutes=5), last_sent_at=now))
 
@@ -1174,11 +1193,15 @@ def admin_orders():
 
     rows = q.options(selectinload(Order.items), selectinload(Order.payments), joinedload(Order.delivery_person)).order_by(Order.created_at.desc()).limit(200).all()
 
-    live = Order.query.filter(Order.status != "Cancelled")
+    # one aggregate query (before: every non-cancelled order was loaded just to add up the paid ones)
+    live_orders, live_revenue = db.session.query(
+        db.func.count(Order.id),
+        db.func.coalesce(db.func.sum(case((Order.payment_status == "Paid", Order.total), else_=0)), 0),
+    ).filter(Order.status != "Cancelled").one()
 
-    stats = dict(orders=live.count(),
+    stats = dict(orders=live_orders,
 
-                 revenue=sum(o.total for o in live if o.payment_status == "Paid"),
+                 revenue=float(live_revenue or 0),
 
                  pending=Order.query.filter(Order.payment_status.in_(["Pending", "Verifying"]),
 
@@ -1416,7 +1439,7 @@ def export_csv():
                 "Delivery", "Total", "Payment", "Payment Status", "Status", "Delivery Person",
                 "Latitude", "Longitude", "Google Maps"])
 
-    for o in Order.query.order_by(Order.created_at.desc()):
+    for o in Order.query.options(selectinload(Order.items), selectinload(Order.payments), joinedload(Order.delivery_person)).order_by(Order.created_at.desc()):
 
         d = order_dict(o)
 
@@ -1671,14 +1694,21 @@ def admin_sales():
     now = datetime.utcnow()
     today_start = datetime(now.year, now.month, now.day)
     month_start = datetime(now.year, now.month, 1)
-    paid_orders = Order.query.filter(Order.status != "Cancelled", Order.payment_status == "Paid").all()
-    today = [o for o in paid_orders if o.created_at >= today_start]
-    month = [o for o in paid_orders if o.created_at >= month_start]
+    # earliest moment the charts below need (start of the month 5 months ago)
+    y0, m0 = now.year, now.month - 5
+    while m0 <= 0:
+        y0 -= 1; m0 += 12
+    since = datetime(y0, m0, 1)
+    # only two columns of the recent paid orders (no full order objects)
+    paid_rows = db.session.query(Order.created_at, Order.total).filter(
+        Order.status != "Cancelled", Order.payment_status == "Paid", Order.created_at >= since).all()
+    today = [r for r in paid_rows if r.created_at >= today_start]
+    month = [r for r in paid_rows if r.created_at >= month_start]
     daily = []
     for days_ago in range(6, -1, -1):
         start = datetime(now.year, now.month, now.day) - timedelta(days=days_ago)
         end = start + timedelta(days=1)
-        daily.append({"label": start.strftime("%d %b"), "sales": round(sum(o.total for o in paid_orders if start <= o.created_at < end), 2)})
+        daily.append({"label": start.strftime("%d %b"), "sales": round(sum(r.total for r in paid_rows if start <= r.created_at < end), 2)})
     monthly = []
     for months_ago in range(5, -1, -1):
         y, m = now.year, now.month - months_ago
@@ -1689,13 +1719,17 @@ def admin_sales():
             end = datetime(y + 1, 1, 1)
         else:
             end = datetime(y, m + 1, 1)
-        monthly.append({"label": start.strftime("%b %Y"), "sales": round(sum(o.total for o in paid_orders if start <= o.created_at < end), 2)})
+        monthly.append({"label": start.strftime("%b %Y"), "sales": round(sum(r.total for r in paid_rows if start <= r.created_at < end), 2)})
+    # top products: all-time, but only (name, quantity) pairs - one query instead of one per order
     counts = {}
-    for o in paid_orders:
-        for i in o.items:
-            counts[i.product_name] = counts.get(i.product_name, 0) + i.quantity
+    item_rows = (db.session.query(OrderItem.product_name, OrderItem.quantity)
+                 .join(Order, Order.id == OrderItem.order_id)
+                 .filter(Order.status != "Cancelled", Order.payment_status == "Paid")
+                 .order_by(Order.id, OrderItem.id).all())
+    for item_name, item_qty in item_rows:
+        counts[item_name] = counts.get(item_name, 0) + item_qty
     top = sorted(({"name": k, "qty": v} for k, v in counts.items()), key=lambda x: x["qty"], reverse=True)[:8]
-    return jsonify(today_sales=round(sum(o.total for o in today), 2), month_sales=round(sum(o.total for o in month), 2),
+    return jsonify(today_sales=round(sum(r.total for r in today), 2), month_sales=round(sum(r.total for r in month), 2),
                    today_orders=len(today), month_orders=len(month), daily=daily, monthly=monthly, top_products=top)
 
 @main.get("/api/admin/ledger")
