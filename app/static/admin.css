@@ -394,3 +394,32 @@
 }
 
 .archive-confirm-card .danger { background:#b42318; color:#fff; border:0; padding:10px 14px; border-radius:10px; cursor:pointer; font-weight:700; }
+
+/* =========================================================
+   ADMIN TABLES - readable chips and photo thumbnails
+   ========================================================= */
+
+/* size and "alert at" chips were dark text on a dark background */
+.size-chip,
+.threshold {
+    color: var(--ink);
+}
+
+:root[data-theme="dark"] .size-chip,
+:root[data-theme="dark"] .threshold {
+    background: #1f3a52;
+    color: #e8f0f7;
+    border: 1px solid #2d4a63;
+}
+
+/* product photo instead of a random emoji */
+.product-icon {
+    overflow: hidden;
+}
+
+.product-icon img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
