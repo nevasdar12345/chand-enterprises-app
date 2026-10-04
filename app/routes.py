@@ -1893,8 +1893,11 @@ def admin_archive_delete_all():
     deleted = len(order_ids)
 
     if order_ids:
+        # Remove every child record that references an order before deleting
+        # the parent Order rows.  LedgerEntry also has an order_id foreign key.
         Payment.query.filter(Payment.order_id.in_(order_ids)).delete(synchronize_session=False)
         OrderItem.query.filter(OrderItem.order_id.in_(order_ids)).delete(synchronize_session=False)
+        LedgerEntry.query.filter(LedgerEntry.order_id.in_(order_ids)).delete(synchronize_session=False)
         ArchivedOrder.query.filter(ArchivedOrder.order_id.in_(order_ids)).delete(synchronize_session=False)
         Order.query.filter(Order.id.in_(order_ids)).delete(synchronize_session=False)
 
