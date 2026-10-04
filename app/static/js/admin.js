@@ -2022,12 +2022,12 @@ window.toggleAdminMenu = toggleAdminMenu;
 
 
 async function deleteAllArchivedOrders() {
-    if (!confirm('Have you verified all archived Excel backups? This will PERMANENTLY DELETE ALL currently pending archived order data and cannot be undone.')) return;
-    const typed = prompt('Type DELETE to permanently remove all pending archived order data:');
+    if (!confirm('Have you verified that all required Excel archive backups have been received? This will PERMANENTLY DELETE ALL order data and cannot be undone.')) return;
+    const typed = prompt('Type DELETE to permanently remove ALL order data:');
     if (typed !== 'DELETE') return;
     const result = await api('/api/admin/archive/delete-all', 'POST');
-    if (!result._ok) return alert(result.error || 'Could not delete archived order data');
-    alert(`Deleted ${result.deleted || 0} orders from ${result.archives || 0} archive(s).`);
+    if (!result._ok) return alert(result.error || 'Could not delete order data');
+    alert(`Deleted ${result.deleted || 0} orders.`);
     await loadAdminOrders();
     await loadPendingArchives();
 }
