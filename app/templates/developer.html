@@ -312,6 +312,55 @@ Developer · Chand Enterprises
 
 
     <!-- =========================
+         ORDER ARCHIVE
+         ========================= -->
+
+    <section class="panel" id="developerArchivePanel">
+        <div class="panel-head">
+            <div>
+                <h2>📦 Order Archive</h2>
+                <p class="muted">Archive orders older than the configured period. Delivery is controlled here; Admin only confirms receipt before deletion.</p>
+            </div>
+            <button class="primary" onclick="loadDeveloperArchive()">Refresh</button>
+        </div>
+
+        <div class="settings-grid">
+            <div>
+                <small>Archive orders older than</small>
+                <input id="archiveDays" type="number" min="1" value="7" style="width:100%;box-sizing:border-box">
+                <small class="muted">Default: 7 days</small>
+            </div>
+            <div>
+                <small>Delivery method</small>
+                <select id="archiveMethod" onchange="toggleArchiveRecipient()" style="width:100%;box-sizing:border-box">
+                    <option value="email">Email</option>
+                    <option value="whatsapp">WhatsApp</option>
+                </select>
+            </div>
+            <div id="archiveEmailWrap">
+                <small>Archive email</small>
+                <input id="archiveEmail" type="email" placeholder="admin@example.com" style="width:100%;box-sizing:border-box">
+            </div>
+            <div id="archiveWhatsAppWrap" style="display:none">
+                <small>Archive WhatsApp number</small>
+                <input id="archiveWhatsApp" type="tel" placeholder="9304295574" style="width:100%;box-sizing:border-box">
+            </div>
+        </div>
+
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px">
+            <button class="primary" onclick="saveDeveloperArchiveSettings()">Save Archive Settings</button>
+            <button onclick="checkDeveloperArchive()">🔄 Check &amp; Archive Now</button>
+        </div>
+        <p id="archiveMessage" class="muted" style="margin-top:12px"></p>
+
+        <div style="margin-top:20px">
+            <h3>Archive History</h3>
+            <div id="developerArchiveHistory" class="table-wrap">Loading…</div>
+        </div>
+    </section>
+
+
+    <!-- =========================
          PRODUCTS
          ========================= -->
 
