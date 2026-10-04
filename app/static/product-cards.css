@@ -428,3 +428,21 @@
         max-height: calc(100dvh - 20px);
     }
 }
+
+/* Developer panel: hamburger only on small screens (the buttons show in the bar on desktop) */
+@media (min-width: 901px) {
+    header.dev-nav .nav-hamburger {
+        display: none;
+    }
+}
+
+/* Developer header layout: logo left; buttons + theme toggle right */
+@media (min-width: 901px) {
+    header.dev-nav .nav-actions {
+        margin-left: auto;
+    }
+
+    header.dev-nav .nav-tools {
+        margin-left: 12px;
+    }
+}
