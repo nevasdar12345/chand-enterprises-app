@@ -455,3 +455,116 @@
     background: rgb(20 33 46 / 94%);
     box-shadow: 0 4px 20px rgb(0 0 0 / 35%);
 }
+
+/* =========================================================
+   STAFF LOGIN + WHATSAPP PAGES - dark theme
+   These pages had a fixed white card but used the theme's light
+   text colour, so text vanished once dark mode applied everywhere.
+   ========================================================= */
+
+:root[data-theme="dark"] .staff-login-page,
+:root[data-theme="dark"] .wa-page {
+    background:
+        radial-gradient(circle at 10% 15%, rgb(10 124 255 / 14%), transparent 30%),
+        radial-gradient(circle at 90% 85%, rgb(0 194 209 / 10%), transparent 32%),
+        #0b141d;
+}
+
+:root[data-theme="dark"] .staff-login-shell,
+:root[data-theme="dark"] .wa-shell {
+    border-color: #243546;
+    background: #14212e;
+    box-shadow: 0 25px 70px rgb(0 0 0 / 50%);
+}
+
+:root[data-theme="dark"] .staff-login-card,
+:root[data-theme="dark"] .wa-card {
+    background: #14212e;
+}
+
+:root[data-theme="dark"] .staff-login-card h2,
+:root[data-theme="dark"] .wa-card h2 {
+    color: #e8f0f7;
+}
+
+:root[data-theme="dark"] .staff-login-card-head p,
+:root[data-theme="dark"] .wa-card-header p {
+    color: #93a8ba;
+}
+
+:root[data-theme="dark"] .staff-login-badge,
+:root[data-theme="dark"] .wa-badge {
+    color: #7bbcff;
+    background: rgb(59 155 255 / 16%);
+}
+
+:root[data-theme="dark"] .staff-field > span,
+:root[data-theme="dark"] .wa-label {
+    color: #b8cad8;
+}
+
+:root[data-theme="dark"] .staff-input-icon,
+:root[data-theme="dark"] .wa-textarea-icon {
+    color: #8aa3b6;
+}
+
+:root[data-theme="dark"] .staff-input-wrap input,
+:root[data-theme="dark"] .staff-input-wrap select,
+:root[data-theme="dark"] .wa-textarea-wrap textarea {
+    border-color: #2b4155;
+    background: #0f1a26;
+    color: #e8f0f7;
+}
+
+:root[data-theme="dark"] .staff-input-wrap select option {
+    background: #0f1a26;
+    color: #e8f0f7;
+}
+
+:root[data-theme="dark"] .staff-input-wrap input::placeholder,
+:root[data-theme="dark"] .wa-textarea-wrap textarea::placeholder {
+    color: #6f879a;
+}
+
+:root[data-theme="dark"] .staff-input-wrap input:hover,
+:root[data-theme="dark"] .staff-input-wrap select:hover,
+:root[data-theme="dark"] .wa-textarea-wrap textarea:hover {
+    border-color: #3d5a73;
+    background: #12202e;
+}
+
+:root[data-theme="dark"] .staff-input-wrap input:focus,
+:root[data-theme="dark"] .staff-input-wrap select:focus,
+:root[data-theme="dark"] .wa-textarea-wrap textarea:focus {
+    border-color: #3b9bff;
+    background: #12202e;
+    box-shadow: 0 0 0 4px rgb(59 155 255 / 18%);
+}
+
+:root[data-theme="dark"] .staff-login-security,
+:root[data-theme="dark"] .wa-security,
+:root[data-theme="dark"] .wa-hint {
+    border-color: #243546;
+    background: #0f1a26;
+}
+
+:root[data-theme="dark"] .staff-login-security > span,
+:root[data-theme="dark"] .wa-security > span {
+    background: #1b3144;
+}
+
+:root[data-theme="dark"] .staff-login-security b,
+:root[data-theme="dark"] .wa-security b {
+    color: #d6e3ee;
+}
+
+:root[data-theme="dark"] .staff-login-security small,
+:root[data-theme="dark"] .wa-security small,
+:root[data-theme="dark"] .wa-hint small {
+    color: #93a8ba;
+}
+
+:root[data-theme="dark"] .staff-back,
+:root[data-theme="dark"] .wa-back {
+    color: #93a8ba;
+}
