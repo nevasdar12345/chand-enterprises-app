@@ -3,13 +3,6 @@ from pathlib import Path
 
 import segno
 from email.message import EmailMessage
-
-try:
-    from google.oauth2 import service_account
-    from googleapiclient.discovery import build
-    from googleapiclient.http import MediaIoBaseUpload
-except Exception:
-    service_account = build = MediaIoBaseUpload = None
 from sqlalchemy import case
 
 from openpyxl import Workbook
@@ -58,7 +51,6 @@ DEFAULT_SETTINGS = {
     "archive_method": "email",
     "archive_email": "",
     "archive_whatsapp": "",
-    "archive_drive_link": "",
 }
 
 DEFAULT_OFFERS = [
@@ -157,7 +149,7 @@ def calculate_coupon(code, subtotal):
 def developer_settings():
     raw = setting_value("offers")
     offers = [x.strip() for x in raw.splitlines() if x.strip()] if raw else DEFAULT_OFFERS[:]
-    return {"business_name": setting_value("business_name"), "business_mobile": setting_value("business_mobile"), "whatsapp": setting_value("whatsapp"), "business_location": setting_value("business_location"), "upi": setting_value("upi"), "payment_name": setting_value("payment_name"), "business_lat": setting_value("business_lat"), "business_lng": setting_value("business_lng"), "delivery_base": setting_value("delivery_base"), "delivery_per_km": setting_value("delivery_per_km"), "delivery_free_above": setting_value("delivery_free_above"), "instagram_url": setting_value("instagram_url"), "facebook_url": setting_value("facebook_url"), "brochure_url": setting_value("brochure_url"), "archive_days": setting_value("archive_days") or "7", "archive_method": setting_value("archive_method") or "email", "archive_email": setting_value("archive_email"), "archive_whatsapp": setting_value("archive_whatsapp"), "archive_drive_link": setting_value("archive_drive_link"), "offers": offers}
+    return {"business_name": setting_value("business_name"), "business_mobile": setting_value("business_mobile"), "whatsapp": setting_value("whatsapp"), "business_location": setting_value("business_location"), "upi": setting_value("upi"), "payment_name": setting_value("payment_name"), "business_lat": setting_value("business_lat"), "business_lng": setting_value("business_lng"), "delivery_base": setting_value("delivery_base"), "delivery_per_km": setting_value("delivery_per_km"), "delivery_free_above": setting_value("delivery_free_above"), "instagram_url": setting_value("instagram_url"), "facebook_url": setting_value("facebook_url"), "brochure_url": setting_value("brochure_url"), "archive_days": setting_value("archive_days") or "7", "archive_method": setting_value("archive_method") or "email", "archive_email": setting_value("archive_email"), "archive_whatsapp": setting_value("archive_whatsapp"), "offers": offers}
 
 
 def display_datetime(dt):
@@ -1761,32 +1753,6 @@ def _send_archive_email(recipient, filename, data):
         smtp.send_message(msg)
 
 
-def _drive_folder_id_from_link(link):
-    m = re.search(r"/folders/([A-Za-z0-9_-]+)", link or "")
-    return m.group(1) if m else ""
-
-
-def _upload_archive_to_drive(folder_link, filename, data):
-    if service_account is None or build is None or MediaIoBaseUpload is None:
-        raise RuntimeError("Google Drive support is not installed. Install google-api-python-client and google-auth.")
-    folder_id = _drive_folder_id_from_link(folder_link)
-    if not folder_id:
-        raise RuntimeError("Enter a valid Google Drive folder link in Developer Settings.")
-    raw = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON", "").strip()
-    if not raw:
-        raise RuntimeError("Set GOOGLE_SERVICE_ACCOUNT_JSON in Render and share the Drive folder with that service-account email.")
-    try:
-        info = json.loads(raw)
-        creds = service_account.Credentials.from_service_account_info(info, scopes=["https://www.googleapis.com/auth/drive.file"])
-    except Exception as exc:
-        raise RuntimeError(f"Invalid GOOGLE_SERVICE_ACCOUNT_JSON: {exc}")
-    drive = build("drive", "v3", credentials=creds, cache_discovery=False)
-    metadata = {"name": filename, "parents": [folder_id], "mimeType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}
-    media = MediaIoBaseUpload(io.BytesIO(data), mimetype=metadata["mimeType"], resumable=False)
-    created = drive.files().create(body=metadata, media_body=media, fields="id,name,webViewLink").execute()
-    return created.get("webViewLink") or f"https://drive.google.com/file/d/{created.get('id')}/view"
-
-
 def _archive_whatsapp_link(recipient, archive):
     number = "".join(c for c in (recipient or "") if c.isdigit())
     if len(number) == 10:
@@ -1804,9 +1770,9 @@ def _create_archive(send=True):
     days = _archive_days()
     cutoff = datetime.utcnow() - timedelta(days=days)
     method = (setting_value("archive_method") or "email").lower()
-    recipient = (setting_value("archive_email") if method == "email" else setting_value("archive_whatsapp")) if method in {"email", "whatsapp"} else setting_value("archive_drive_link")
+    recipient = setting_value("archive_email") if method == "email" else setting_value("archive_whatsapp")
     if not recipient:
-        raise RuntimeError("Set the archive destination in Developer Settings first.")
+        raise RuntimeError("Set the archive recipient in Developer Settings first.")
     archived_ids = {x.order_id for x in ArchivedOrder.query.all()}
     q = Order.query.options(selectinload(Order.items), joinedload(Order.delivery_person)).filter(Order.created_at < cutoff)
     candidates = [o for o in q.order_by(Order.created_at.asc()).all() if o.id not in archived_ids]
@@ -1833,19 +1799,13 @@ def _create_archive(send=True):
             archive.status = "WAITING_CONFIRMATION"
             archive.sent_at = datetime.utcnow()
             result = {"method": "email"}
-        elif method == "drive":
-            archive.drive_file_url = _upload_archive_to_drive(recipient, filename, data)
-            archive.note = "Excel uploaded to Google Drive. Waiting for Admin confirmation."
-            archive.status = "WAITING_CONFIRMATION"
-            archive.sent_at = datetime.utcnow()
-            result = {"method": "drive", "drive_url": archive.drive_file_url}
         elif method == "whatsapp":
             archive.note = "WhatsApp handoff link generated. Open it and send the archive to the configured number."
             archive.status = "WAITING_CONFIRMATION"
             archive.sent_at = datetime.utcnow()
             result = {"method": "whatsapp", "whatsapp_url": _archive_whatsapp_link(recipient, archive)}
         else:
-            raise RuntimeError("Archive method must be email, whatsapp or drive.")
+            raise RuntimeError("Archive method must be email or whatsapp.")
         db.session.commit()
         return {"archive": archive, **result}
     except Exception:
@@ -1868,7 +1828,7 @@ def archive_download(token):
 def developer_archive_settings():
     if not role_ok("developer"):
         return jsonify(error="Forbidden"), 403
-    return jsonify(ok=True, settings={"archive_days": _archive_days(), "archive_method": setting_value("archive_method") or "email", "archive_email": setting_value("archive_email"), "archive_whatsapp": setting_value("archive_whatsapp"), "archive_drive_link": setting_value("archive_drive_link")})
+    return jsonify(ok=True, settings={"archive_days": _archive_days(), "archive_method": setting_value("archive_method") or "email", "archive_email": setting_value("archive_email"), "archive_whatsapp": setting_value("archive_whatsapp")})
 
 
 @main.put("/api/developer/archive/settings")
@@ -1881,20 +1841,17 @@ def developer_save_archive_settings():
     except (TypeError, ValueError):
         return jsonify(error="Archive days must be a positive number"), 400
     method = str(d.get("archive_method") or "email").lower()
-    if method not in {"email", "whatsapp", "drive"}:
-        return jsonify(error="Choose Email, WhatsApp or Google Drive"), 400
+    if method not in {"email", "whatsapp"}:
+        return jsonify(error="Choose Email or WhatsApp"), 400
     email = str(d.get("archive_email") or "").strip()
     wa = str(d.get("archive_whatsapp") or "").strip()
-    drive_link = str(d.get("archive_drive_link") or "").strip()
     if method == "email" and (not email or "@" not in email):
         return jsonify(error="Enter a valid archive email"), 400
     if method == "whatsapp" and len("".join(c for c in wa if c.isdigit())) < 10:
         return jsonify(error="Enter a valid WhatsApp number"), 400
-    if method == "drive" and not _drive_folder_id_from_link(drive_link):
-        return jsonify(error="Enter a valid Google Drive folder link"), 400
-    set_setting("archive_days", days); set_setting("archive_method", method); set_setting("archive_email", email); set_setting("archive_whatsapp", wa); set_setting("archive_drive_link", drive_link)
+    set_setting("archive_days", days); set_setting("archive_method", method); set_setting("archive_email", email); set_setting("archive_whatsapp", wa)
     db.session.commit()
-    return jsonify(ok=True, settings={"archive_days": days, "archive_method": method, "archive_email": email, "archive_whatsapp": wa, "archive_drive_link": drive_link})
+    return jsonify(ok=True, settings={"archive_days": days, "archive_method": method, "archive_email": email, "archive_whatsapp": wa})
 
 
 @main.post("/api/developer/archive/check")
@@ -1906,7 +1863,7 @@ def developer_archive_check():
         if not result:
             return jsonify(ok=True, created=False, message=f"No orders older than {_archive_days()} days are waiting for archive.")
         a = result["archive"]
-        return jsonify(ok=True, created=True, archive={"id": a.id, "orders": a.order_count, "total": a.total_amount, "method": a.delivery_method, "status": a.status}, whatsapp_url=result.get("whatsapp_url", ""), drive_url=result.get("drive_url", ""))
+        return jsonify(ok=True, created=True, archive={"id": a.id, "orders": a.order_count, "total": a.total_amount, "method": a.delivery_method, "status": a.status}, whatsapp_url=result.get("whatsapp_url", ""))
     except Exception as e:
         return jsonify(error=str(e)), 400
 
@@ -1924,25 +1881,40 @@ def admin_archive_pending():
     if not role_ok("admin"):
         return jsonify(error="Forbidden"), 403
     rows = OrderArchive.query.filter_by(status="WAITING_CONFIRMATION").order_by(OrderArchive.id.desc()).all()
-    return jsonify(ok=True, archives=[{"id":a.id,"orders":a.order_count,"total":a.total_amount,"method":a.delivery_method,"recipient":a.recipient,"drive_url":a.drive_file_url,"created_at":a.created_at.strftime("%d-%m-%Y %H:%M")} for a in rows])
+    return jsonify(ok=True, archives=[{"id":a.id,"orders":a.order_count,"total":a.total_amount,"method":a.delivery_method,"recipient":a.recipient,"created_at":a.created_at.strftime("%d-%m-%Y %H:%M")} for a in rows])
 
 
-def _delete_archived_archive(archive):
-    links = ArchivedOrder.query.filter_by(archive_id=archive.id).all()
-    order_ids = [x.order_id for x in links]
+@main.post("/api/admin/archive/delete-all")
+def admin_archive_delete_all():
+    if not role_ok("admin"):
+        return jsonify(error="Forbidden"), 403
+
+    order_ids = [row[0] for row in db.session.query(Order.id).all()]
+    deleted = len(order_ids)
+
     if order_ids:
         Payment.query.filter(Payment.order_id.in_(order_ids)).delete(synchronize_session=False)
         OrderItem.query.filter(OrderItem.order_id.in_(order_ids)).delete(synchronize_session=False)
+        ArchivedOrder.query.filter(ArchivedOrder.order_id.in_(order_ids)).delete(synchronize_session=False)
         Order.query.filter(Order.id.in_(order_ids)).delete(synchronize_session=False)
-    ArchivedOrder.query.filter_by(archive_id=archive.id).delete(synchronize_session=False)
-    archive.status = "RECEIVED_AND_DELETED"
-    archive.confirmed_at = datetime.utcnow()
-    archive.deleted_at = datetime.utcnow()
-    archive.note = "Admin confirmed the Excel backup and deleted the archived order data."
-    archive_path = Path(current_app.instance_path) / "archives" / archive.file_name
-    if archive_path.exists():
-        archive_path.unlink()
-    return len(order_ids)
+
+    # Keep archive history as an audit record; only the actual order data is deleted.
+    now = datetime.utcnow()
+    pending = OrderArchive.query.filter_by(status="WAITING_CONFIRMATION").all()
+    for archive in pending:
+        archive.status = "RECEIVED_AND_DELETED"
+        archive.confirmed_at = now
+        archive.deleted_at = now
+        archive.note = "Admin verified the Excel backup and deleted all order data."
+        archive_path = Path(current_app.instance_path) / "archives" / archive.file_name
+        try:
+            if archive_path.exists():
+                archive_path.unlink()
+        except OSError:
+            pass
+
+    db.session.commit()
+    return jsonify(ok=True, deleted=deleted)
 
 
 @main.post("/api/admin/archive/<int:archive_id>/confirm")
@@ -1952,39 +1924,31 @@ def admin_archive_confirm(archive_id):
     archive = db.session.get(OrderArchive, archive_id)
     if not archive or archive.status != "WAITING_CONFIRMATION":
         return jsonify(error="Archive is not awaiting confirmation"), 404
-    deleted = _delete_archived_archive(archive)
-    db.session.commit()
-    return jsonify(ok=True, deleted=deleted, archive_id=archive.id)
-
-
-@main.post("/api/admin/archive/delete-all")
-def admin_archive_delete_all():
-    if not role_ok("admin"):
-        return jsonify(error="Forbidden"), 403
-
-    # Admin has verified the Excel backups in the UI before reaching this endpoint.
-    order_ids = [o.id for o in Order.query.with_entities(Order.id).all()]
-    deleted = len(order_ids)
-
+    links = ArchivedOrder.query.filter_by(archive_id=archive.id).all()
+    order_ids = [x.order_id for x in links]
+    for link in links:
+        db.session.delete(link)
     if order_ids:
-        Payment.query.filter(Payment.order_id.in_(order_ids)).delete(synchronize_session=False)
-        OrderItem.query.filter(OrderItem.order_id.in_(order_ids)).delete(synchronize_session=False)
-        ArchivedOrder.query.filter(ArchivedOrder.order_id.in_(order_ids)).delete(synchronize_session=False)
-        Order.query.filter(Order.id.in_(order_ids)).delete(synchronize_session=False)
-
-    # Keep the archive history, but mark pending archives as completed/deleted.
-    rows = OrderArchive.query.filter_by(status="WAITING_CONFIRMATION").all()
-    for archive in rows:
-        archive.status = "RECEIVED_AND_DELETED"
-        archive.confirmed_at = datetime.utcnow()
-        archive.deleted_at = datetime.utcnow()
-        archive.note = "Admin verified the Excel backup and deleted all order data."
-        archive_path = Path(current_app.instance_path) / "archives" / archive.file_name
+        payments = Payment.query.filter(Payment.order_id.in_(order_ids)).all()
+        items = OrderItem.query.filter(OrderItem.order_id.in_(order_ids)).all()
+        for p in payments: db.session.delete(p)
+        for i in items: db.session.delete(i)
+        orders = Order.query.filter(Order.id.in_(order_ids)).all()
+        for o in orders: db.session.delete(o)
+    archive.status = "RECEIVED_AND_DELETED"
+    archive.confirmed_at = datetime.utcnow()
+    archive_path = Path(current_app.instance_path) / "archives" / archive.file_name
+    try:
         if archive_path.exists():
             archive_path.unlink()
-
+    except OSError:
+        pass
+    archive.deleted_at = datetime.utcnow()
     db.session.commit()
-    return jsonify(ok=True, archives=len(rows), deleted=deleted)
+    return jsonify(ok=True, deleted=len(order_ids), archive_id=archive.id)
+
+
+# ---------- developer console ----------
 
 @main.get("/api/developer/settings")
 def developer_get_settings():
@@ -1998,7 +1962,7 @@ def developer_save_settings():
     if not role_ok("developer"):
         return jsonify(error="Forbidden"), 403
     d = request.json or {}
-    for key in ["business_name", "business_mobile", "whatsapp", "business_location", "upi", "payment_name", "business_lat", "business_lng", "delivery_base", "delivery_per_km", "delivery_free_above", "instagram_url", "facebook_url", "brochure_url", "archive_days", "archive_method", "archive_email", "archive_whatsapp", "archive_drive_link"]:
+    for key in ["business_name", "business_mobile", "whatsapp", "business_location", "upi", "payment_name", "business_lat", "business_lng", "delivery_base", "delivery_per_km", "delivery_free_above", "instagram_url", "facebook_url", "brochure_url", "archive_days", "archive_method", "archive_email", "archive_whatsapp"]:
         if key in d:
             value = str(d.get(key) or "").strip()
             if key in {"business_name", "whatsapp", "upi"} and not value:
@@ -2010,8 +1974,8 @@ def developer_save_settings():
                     value = str(max(1, int(value or 7)))
                 except ValueError:
                     return jsonify(error="Archive days must be a positive number"), 400
-            if key == "archive_method" and value not in {"email", "whatsapp", "drive"}:
-                return jsonify(error="Archive method must be email, whatsapp or drive"), 400
+            if key == "archive_method" and value not in {"email", "whatsapp"}:
+                return jsonify(error="Archive method must be email or whatsapp"), 400
             set_setting(key, value)
     db.session.commit()
     return jsonify(ok=True, settings=developer_settings())
