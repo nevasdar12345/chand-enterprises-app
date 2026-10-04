@@ -322,6 +322,7 @@ class OrderArchive(db.Model):
     note = db.Column(db.Text, default="")
     download_token = db.Column(db.String(80), unique=True, nullable=True, index=True)
     file_name = db.Column(db.String(255), default="")
+    drive_file_url = db.Column(db.String(500), default="")
 
 
 class ArchivedOrder(db.Model):
