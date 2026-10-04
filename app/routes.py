@@ -1,4 +1,5 @@
-import csv, io, secrets, urllib.parse, math, re, os
+import csv, io, secrets, urllib.parse, math, re, os, base64, json, mimetypes, urllib.request, urllib.error
+from pathlib import Path
 
 import segno
 from sqlalchemy.orm import joinedload, selectinload
@@ -128,6 +129,7 @@ def developer_product_dict(p):
         stock=p.stock,
         low_stock_threshold=p.low_stock_threshold or 10,
         icon=p.icon,
+        image_url=p.image_url or "",
         active=p.active,
     )
 
@@ -218,7 +220,7 @@ def product_dict(p):
 
     return dict(id=p.id, name=p.name, category=p.category, size=p.size or "1L", price=p.price,
 
-                stock=p.stock, icon=p.icon, low=p.stock <= (p.low_stock_threshold or 10))
+                stock=p.stock, icon=p.icon, image_url=p.image_url or "", low=p.stock <= (p.low_stock_threshold or 10))
 
 
 
@@ -413,7 +415,162 @@ def brochure_links(url):
 def brochure():
     pdf_path = os.path.join(current_app.static_folder, "brochure.pdf")
     links = brochure_links(setting_value("brochure_url"))
-    return render_template("brochure.html", brochure_pdf_exists=os.path.exists(pdf_path), b=links)
+    products = Product.query.filter_by(active=True).order_by(Product.category, Product.id).all()
+    # Keep the most useful catalog order for the brochure while still showing
+    # any future categories created by Developer/Admin.
+    preferred = ["Premium Water", "Nevas Package Drinking Water", "Cold Drinks", "Energy Drinks"]
+    grouped = []
+    seen = set()
+    for category_name in preferred:
+        items = [p for p in products if (p.category or "").strip().lower() == category_name.lower()]
+        if items:
+            grouped.append((category_name, items))
+            seen.add(category_name.lower())
+    for category_name in sorted({(p.category or "Other").strip() or "Other" for p in products}, key=str.lower):
+        if category_name.lower() not in seen:
+            grouped.append((category_name, [p for p in products if (p.category or "Other").strip().lower() == category_name.lower()]))
+    return render_template("brochure.html", brochure_pdf_exists=os.path.exists(pdf_path), b=links, product_groups=grouped)
+
+
+# ============================================================
+# PRODUCT IMAGE HOSTING (FREE GITHUB STORAGE)
+# ============================================================
+
+ALLOWED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
+MAX_PRODUCT_IMAGE_BYTES = 5 * 1024 * 1024
+
+
+def github_image_config():
+    """Read GitHub image-hosting settings from environment variables."""
+    return {
+        "token": (os.getenv("GITHUB_TOKEN") or "").strip(),
+        "repo": (os.getenv("GITHUB_REPO") or "").strip().strip("/"),
+        "branch": (os.getenv("GITHUB_BRANCH") or "main").strip() or "main",
+        "folder": (os.getenv("GITHUB_IMAGE_FOLDER") or "static/product-images").strip("/") or "static/product-images",
+    }
+
+
+def github_upload_bytes(filename, content, content_type, message):
+    """Upload a file to a PUBLIC GitHub repository using the Contents API."""
+    cfg = github_image_config()
+    if not cfg["token"] or not cfg["repo"]:
+        raise RuntimeError("GitHub image storage is not configured. Add GITHUB_TOKEN and GITHUB_REPO in Render Environment Variables.")
+    if "/" not in cfg["repo"]:
+        raise RuntimeError("GITHUB_REPO must be in owner/repository format.")
+
+    # Keep the file name safe and predictable.
+    safe_name = re.sub(r"[^A-Za-z0-9._-]+", "-", filename).strip(".-") or "product-image"
+    path = f"{cfg['folder']}/{safe_name}"
+    api_url = f"https://api.github.com/repos/{cfg['repo']}/contents/{urllib.parse.quote(path, safe='/-._')}"
+    payload = {
+        "message": message,
+        "content": base64.b64encode(content).decode("ascii"),
+        "branch": cfg["branch"],
+    }
+    request_obj = urllib.request.Request(
+        api_url,
+        data=json.dumps(payload).encode("utf-8"),
+        method="PUT",
+        headers={
+            "Accept": "application/vnd.github+json",
+            "Authorization": f"Bearer {cfg['token']}",
+            "X-GitHub-Api-Version": "2022-11-28",
+            "User-Agent": "Chand-Enterprises/1.0",
+            "Content-Type": "application/json",
+        },
+    )
+    try:
+        with urllib.request.urlopen(request_obj, timeout=25) as response:
+            data = json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        try:
+            body = json.loads(exc.read().decode("utf-8"))
+            detail = body.get("message") or f"GitHub returned HTTP {exc.code}"
+        except Exception:
+            detail = f"GitHub returned HTTP {exc.code}"
+        raise RuntimeError(detail)
+    except urllib.error.URLError as exc:
+        raise RuntimeError(f"Could not reach GitHub: {exc.reason}")
+
+    # Raw GitHub URL works for public repositories.
+    raw_url = f"https://raw.githubusercontent.com/{cfg['repo']}/{urllib.parse.quote(cfg['branch'], safe='')}/{urllib.parse.quote(path, safe='/')}"
+    return raw_url, path, data
+
+
+@main.post("/api/product/<int:pid>/image")
+def product_image(pid):
+    if not role_ok("admin", "developer"):
+        return jsonify(error="Forbidden"), 403
+    p = db.session.get(Product, pid)
+    if not p:
+        return jsonify(error="Product not found"), 404
+
+    # URL mode: no GitHub upload required.
+    image_url = str(request.form.get("image_url") or "").strip()
+    if image_url:
+        clean = _clean_http_url(image_url)
+        if not clean:
+            return jsonify(error="Image URL must start with https:// or http://"), 400
+        p.image_url = clean
+        db.session.commit()
+        return jsonify(ok=True, image_url=p.image_url, source="url")
+
+    uploaded = request.files.get("image")
+    if not uploaded or not uploaded.filename:
+        return jsonify(error="Choose an image or paste an image URL"), 400
+
+    ext = Path(uploaded.filename).suffix.lower()
+    content_type = (uploaded.mimetype or mimetypes.guess_type(uploaded.filename)[0] or "").lower()
+    if ext not in ALLOWED_IMAGE_EXTENSIONS or not content_type.startswith("image/"):
+        return jsonify(error="Allowed image types: JPG, JPEG, PNG, WEBP and GIF"), 400
+
+    content = uploaded.read(MAX_PRODUCT_IMAGE_BYTES + 1)
+    if len(content) > MAX_PRODUCT_IMAGE_BYTES:
+        return jsonify(error="Image is too large. Maximum size is 5 MB."), 400
+
+    # Unique name means changing an image never requires deleting an old Git blob.
+    base = re.sub(r"[^A-Za-z0-9]+", "-", p.name.lower()).strip("-") or "product"
+    filename = f"{base}-{p.id}-{int(datetime.utcnow().timestamp())}{ext}"
+    try:
+        raw_url, path, _ = github_upload_bytes(
+            filename,
+            content,
+            content_type,
+            f"Add product image: {p.name} (#{p.id})",
+        )
+    except RuntimeError as exc:
+        return jsonify(error=str(exc)), 400
+
+    p.image_url = raw_url
+    db.session.commit()
+    return jsonify(ok=True, image_url=raw_url, github_path=path, source="github")
+
+
+@main.delete("/api/product/<int:pid>/image")
+def product_image_remove(pid):
+    if not role_ok("admin", "developer"):
+        return jsonify(error="Forbidden"), 403
+    # Only clear the database pointer. GitHub files are intentionally kept as history.
+    p = db.session.get(Product, pid)
+    if not p:
+        return jsonify(error="Product not found"), 404
+    p.image_url = ""
+    db.session.commit()
+    return jsonify(ok=True)
+
+
+@main.get("/api/product-image-config")
+def product_image_config():
+    if not role_ok("admin", "developer"):
+        return jsonify(error="Forbidden"), 403
+    cfg = github_image_config()
+    return jsonify(
+        ok=True,
+        github_configured=bool(cfg["token"] and cfg["repo"]),
+        repository=cfg["repo"],
+        branch=cfg["branch"],
+        folder=cfg["folder"],
+    )
 
 
 @main.get("/api/admin/brochure")
@@ -1143,7 +1300,7 @@ def create_product():
 
                     price=float(d.get("price", 0)), stock=int(d.get("stock", 0)),
 
-                    icon=d.get("icon") or "🥤", size=str(d.get("size") or "1L").strip() or "1L", active=bool(d.get("active", True)))
+                    icon=d.get("icon") or "🥤", image_url=_clean_http_url(d.get("image_url") or ""), size=str(d.get("size") or "1L").strip() or "1L", active=bool(d.get("active", True)))
 
     except (TypeError, ValueError):
 
@@ -1192,6 +1349,12 @@ def update_product(pid):
         if "stock" in d: p.stock = int(d["stock"])
 
         if "icon" in d: p.icon = d["icon"]
+
+        if "image_url" in d:
+            raw_image_url = str(d.get("image_url") or "").strip()
+            if raw_image_url and not _clean_http_url(raw_image_url):
+                return jsonify(error="Image URL must start with https:// or http://"), 400
+            p.image_url = raw_image_url
 
         if "active" in d: p.active = bool(d["active"])
 
@@ -1721,7 +1884,7 @@ def developer_create_product():
         return jsonify(error="Forbidden"), 403
     d = request.json or {}
     try:
-        p = Product(name=str(d.get("name") or "").strip(), category=str(d.get("category") or "Cold Drinks").strip(), price=float(d.get("price", 0)), stock=int(d.get("stock", 0)), low_stock_threshold=int(d.get("low_stock_threshold", 10)), icon=str(d.get("icon") or "🥤"), size=str(d.get("size") or "1L").strip() or "1L", active=bool(d.get("active", True)))
+        p = Product(name=str(d.get("name") or "").strip(), category=str(d.get("category") or "Cold Drinks").strip(), price=float(d.get("price", 0)), stock=int(d.get("stock", 0)), low_stock_threshold=int(d.get("low_stock_threshold", 10)), icon=str(d.get("icon") or "🥤"), image_url=_clean_http_url(d.get("image_url") or ""), size=str(d.get("size") or "1L").strip() or "1L", active=bool(d.get("active", True)))
     except (TypeError, ValueError):
         return jsonify(error="Invalid product data"), 400
     if not p.name or not p.category or p.price < 0 or p.stock < 0:
@@ -1750,6 +1913,11 @@ def developer_update_product(pid):
         if "low_stock_threshold" in d: p.low_stock_threshold = int(d["low_stock_threshold"])
         if "icon" in d: p.icon = str(d["icon"] or "🥤")
         if "size" in d: p.size = str(d["size"] or "1L").strip() or "1L"
+        if "image_url" in d:
+            raw_image_url = str(d.get("image_url") or "").strip()
+            if raw_image_url and not _clean_http_url(raw_image_url):
+                return jsonify(error="Image URL must start with https:// or http://"), 400
+            p.image_url = raw_image_url
         if "active" in d: p.active = bool(d["active"])
     except (TypeError, ValueError):
         db.session.rollback()
