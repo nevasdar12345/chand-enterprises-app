@@ -2037,8 +2037,45 @@ async function refreshProducts() {
   window.PRODUCTS = products;
 
   render();
+  heroArt();
 
   return true;
+}
+
+/* Hero pictures: use the shop's own product photos instead of emoji. */
+function heroArt() {
+  const main = $("#heroMain");
+  const side = $("#heroSide");
+
+  if (!main || !side) {
+    return;
+  }
+
+  const list = window.PRODUCTS || [];
+  const withPhoto = list.filter((product) => product.image_url);
+  const pool = withPhoto.length ? withPhoto : list;
+
+  if (!pool.length) {
+    return;
+  }
+
+  /* second picture: a different product name (e.g. water next to cola) */
+  const first = pool[0];
+  const second =
+    pool.find((product) => cleanName(product.name) !== cleanName(first.name)) ||
+    pool[1] ||
+    first;
+
+  const fill = (box, product) => {
+    box.innerHTML = product.image_url
+      ? `<img src="${esc(imgSrc(product.image_url))}" alt="${esc(product.name)}" decoding="async" onerror="this.onerror=null;this.src='${esc(product.image_url)}'">`
+      : productVisual(product);
+
+    box.classList.toggle("has-photo", Boolean(product.image_url));
+  };
+
+  fill(main, first);
+  fill(side, second);
 }
 
 /* =========================
