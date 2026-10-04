@@ -614,7 +614,15 @@
                             {% else %}
                                 <span style="display:inline-flex;width:54px;height:54px;align-items:center;justify-content:center;border-radius:10px;background:#eef5f8;font-size:24px">{{ p.icon }}</span>
                             {% endif %}
-                            <button type="button" class="add" onclick="openProductImageManager({{ p.id }}, {{ p.image_url|tojson }})">📷 Image</button>
+                            <button
+    type="button"
+    class="add"
+    data-product-id="{{ p.id }}"
+    data-image-url="{{ p.image_url|default('', true)|e }}"
+    onclick="openProductImageManager(this.dataset.productId, this.dataset.imageUrl)"
+>
+    📷 Image
+</button>
                         </td>
 
                         <!-- Category -->
