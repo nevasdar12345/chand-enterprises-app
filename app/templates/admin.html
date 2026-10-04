@@ -2,6 +2,8 @@
 
 {% block body %}
 
+<link rel="stylesheet" href="{{ url_for('static', filename='admin.css') }}">
+
 <header class="nav admin-nav">
 
     <a class="logo" href="/">
@@ -373,7 +375,7 @@
 
         <!-- Orders table -->
 
-        <div class="table admin-table">
+        <div class="table admin-table orders-admin-table">
 
 
             <div class="table-header">
@@ -656,14 +658,6 @@
                         </td>
 
 
-
-                        <!-- Size -->
-
-                        <td>
-                            <strong>
-                                {{ p.size or '—' }}
-                            </strong>
-                        </td>
 
 
                         <!-- Price -->
@@ -976,6 +970,18 @@
 
 
                             </div>
+
+                        </td>
+
+
+
+                        <!-- Size -->
+
+                        <td>
+
+                            <span class="size-chip">
+                                {{ p.size or '—' }}
+                            </span>
 
                         </td>
 
