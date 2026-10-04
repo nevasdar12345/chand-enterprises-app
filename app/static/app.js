@@ -340,23 +340,34 @@ function productVisual(product) {
 
 function cardHtml(product, index, anim) {
   const quantity = CART[product.id] || 0;
+  const soldOut = product.stock < 1;
 
-  const stockPart =
-    product.stock < 1
-      ? `<span class="badge">Out of stock</span>`
-      : (product.low
-          ? `<span class="badge">Only ${product.stock} left</span><br>`
-          : "") +
-        (quantity
-          ? `<div class="qty"><button onclick="chg(${product.id}, -1)">−</button><b>${quantity}</b><button onclick="chg(${product.id}, 1)">+</button></div>`
-          : `<button class="primary" onclick="chg(${product.id}, 1)">Add</button>`);
+  const badge = soldOut
+    ? `<span class="badge">Out of stock</span>`
+    : product.low
+      ? `<span class="badge">Only ${product.stock} left</span>`
+      : "";
 
-  return `<div class="card${anim ? " pop" : ""}" data-pid="${product.id}" style="--i:${index}">
+  const action = soldOut
+    ? ""
+    : quantity
+      ? `<div class="qty"><button aria-label="Remove one" onclick="chg(${product.id}, -1)">−</button><b>${quantity}</b><button aria-label="Add one more" onclick="chg(${product.id}, 1)">+</button></div>`
+      : `<button class="primary" aria-label="Add ${esc(cleanName(product.name))} to cart" onclick="chg(${product.id}, 1)">Add</button>`;
+
+  return `<div class="card${anim ? " pop" : ""}${soldOut ? " oos" : ""}" data-pid="${product.id}" style="--i:${index}">
+    ${badge}
     <div class="ic product-image-box kind-${artKind(product)}">${productVisual(product)}</div>
-    <b>${esc(cleanName(product.name))} ${product.size ? `<span class="product-size">${esc(product.size)}</span>` : ""}</b>
-    <small>${esc(product.category)}</small>
-    <div class="price">${money(product.price)}</div>
-    ${stockPart}
+    <div class="p-info">
+      <b class="p-name">${esc(cleanName(product.name))}</b>
+      <div class="p-sub">
+        ${product.size ? `<span class="product-size">${esc(product.size)}</span>` : ""}
+        <small>${esc(product.category)}</small>
+      </div>
+    </div>
+    <div class="p-buy">
+      <div class="price">${money(product.price)}</div>
+      ${action}
+    </div>
   </div>`;
 }
 
