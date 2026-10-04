@@ -36,9 +36,8 @@
         (function () {
             var theme = 'light';
             try {
-                var saved = localStorage.getItem('ce_theme');
-                var isStore = (location.pathname === '/' || location.pathname === '');
-                if (isStore && (saved === 'dark' || saved === 'light')) { theme = saved; }
+                var saved = localStorage.getItem('ce_theme') || localStorage.getItem('admin-theme');
+                if (saved === 'dark' || saved === 'light') { theme = saved; }
             } catch (e) {}
             document.documentElement.setAttribute('data-theme', theme);
             var meta = document.querySelector('meta[name="theme-color"]');
