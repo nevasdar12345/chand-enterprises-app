@@ -1179,6 +1179,42 @@ button:active,
     font-size:14px;
 }
 
+/* Recent Orders: allow full horizontal scrolling without shrinking columns. */
+.orders-table-scroll{
+    width:100%;
+    max-width:100%;
+    overflow-x:auto;
+    overflow-y:hidden;
+    -webkit-overflow-scrolling:touch;
+    scrollbar-width:auto;
+}
+
+.orders-table-scroll table{
+    width:max-content;
+    min-width:1050px;
+    table-layout:auto;
+}
+
+.orders-table-scroll th,
+.orders-table-scroll td{
+    white-space:nowrap;
+}
+
+.orders-table-scroll::-webkit-scrollbar{
+    height:10px;
+}
+
+.orders-table-scroll::-webkit-scrollbar-thumb{
+    background:#b8c7d4;
+    border-radius:10px;
+}
+
+.orders-table-scroll::-webkit-scrollbar-track{
+    background:#edf2f6;
+    border-radius:10px;
+}
+
+
 .admin-table th{
     background:#f8fafc;
     color:#62788b;
