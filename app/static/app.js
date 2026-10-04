@@ -164,7 +164,8 @@ function closeModal() {
    CART
    ========================= */
 
-function save(anim = false) {
+/* Saves the cart and updates the cart counter (no product-grid redraw). */
+function persistCart() {
   localStorage.setItem("cart", JSON.stringify(CART));
 
   const count = $("#count");
@@ -182,6 +183,10 @@ function save(anim = false) {
 
     count.textContent = total;
   }
+}
+
+function save(anim = false) {
+  persistCart();
 
   render(anim);
 }
@@ -291,6 +296,70 @@ function productArt(product) {
     </svg>`;
 }
 
+/* =========================
+   PRODUCT CARDS
+   ========================= */
+
+/* Product photos go through a free image-resizing service (wsrv.nl) so phones
+   download ~360px WebP files instead of the full-size originals.
+   Set to false to load the original image links directly. */
+const USE_IMAGE_CDN = true;
+
+function imgSrc(url) {
+  if (!USE_IMAGE_CDN || !/^https?:\/\//i.test(url)) return url;
+
+  return (
+    "https://wsrv.nl/?url=" +
+    encodeURIComponent(url) +
+    "&w=360&h=360&fit=contain&output=webp&q=80"
+  );
+}
+
+/* The bottle/can drawings are built once per product, then reused. */
+const ART_CACHE = new Map();
+
+function productVisual(product) {
+  if (product.image_url) {
+    const original = product.image_url;
+
+    return `<img src="${esc(imgSrc(original))}" alt="${esc(product.name)}" loading="lazy" decoding="async" onerror="this.onerror=null;this.src='${esc(original)}'" style="width:100%;height:100%;object-fit:contain;border-radius:inherit">`;
+  }
+
+  const key = [product.id, product.name, product.size, product.category].join("|");
+
+  let svg = ART_CACHE.get(key);
+
+  if (!svg) {
+    svg = productArt(product);
+
+    ART_CACHE.set(key, svg);
+  }
+
+  return svg;
+}
+
+function cardHtml(product, index, anim) {
+  const quantity = CART[product.id] || 0;
+
+  const stockPart =
+    product.stock < 1
+      ? `<span class="badge">Out of stock</span>`
+      : (product.low
+          ? `<span class="badge">Only ${product.stock} left</span><br>`
+          : "") +
+        (quantity
+          ? `<div class="qty"><button onclick="chg(${product.id}, -1)">−</button><b>${quantity}</b><button onclick="chg(${product.id}, 1)">+</button></div>`
+          : `<button class="primary" onclick="chg(${product.id}, 1)">Add</button>`);
+
+  return `<div class="card${anim ? " pop" : ""}" data-pid="${product.id}" style="--i:${index}">
+    <div class="ic product-image-box kind-${artKind(product)}">${productVisual(product)}</div>
+    <b>${esc(cleanName(product.name))} ${product.size ? `<span class="product-size">${esc(product.size)}</span>` : ""}</b>
+    <small>${esc(product.category)}</small>
+    <div class="price">${money(product.price)}</div>
+    ${stockPart}
+  </div>`;
+}
+
 function render(anim = false) {
   const grid = $("#grid");
 
@@ -311,114 +380,29 @@ function render(anim = false) {
   );
 
   grid.innerHTML =
-    list
-      .map((product, index) => {
-        const quantity = CART[product.id] || 0;
-
-        return `
-
-                        <div
-                            class="card${anim ? " pop" : ""}"
-                            style="--i:${index}"
-                        >
-
-                            <div class="ic product-image-box kind-${artKind(product)}">
-                                ${product.image_url
-                                  ? `<img src="${esc(product.image_url)}" alt="${esc(product.name)}" loading="lazy" style="width:100%;height:100%;object-fit:contain;border-radius:inherit">`
-                                  : productArt(product)}
-                            </div>
-
-
-                            <b>
-                                ${esc(cleanName(product.name))}
-                                ${product.size ? `<span class="product-size">${esc(product.size)}</span>` : ""}
-                            </b>
-
-
-                            <small>
-                                ${esc(product.category)}
-                            </small>
-
-
-                            <div class="price">
-                                ${money(product.price)}
-                            </div>
-
-
-                            ${
-                              product.stock < 1
-                                ? `
-                                    <span class="badge">
-                                        Out of stock
-                                    </span>
-                                `
-                                : (product.low
-                                    ? `
-                                        <span class="badge">
-                                            Only ${product.stock} left
-                                        </span>
-                                        <br>
-                                    `
-                                    : "") +
-                                  (quantity
-                                    ? `
-                                        <div class="qty">
-
-                                            <button
-                                                onclick="
-                                                    chg(
-                                                        ${product.id},
-                                                        -1
-                                                    )
-                                                "
-                                            >
-                                                −
-                                            </button>
-
-
-                                            <b>
-                                                ${quantity}
-                                            </b>
-
-
-                                            <button
-                                                onclick="
-                                                    chg(
-                                                        ${product.id},
-                                                        1
-                                                    )
-                                                "
-                                            >
-                                                +
-                                            </button>
-
-                                        </div>
-                                    `
-                                    : `
-                                        <button
-                                            class="primary"
-                                            onclick="
-                                                chg(
-                                                    ${product.id},
-                                                    1
-                                                )
-                                            "
-                                        >
-                                            Add
-                                        </button>
-                                    `)
-                            }
-
-                        </div>
-
-                    `;
-      })
-      .join("") ||
+    list.map((product, index) => cardHtml(product, index, anim)).join("") ||
     `
             <p class="muted">
                 No products found.
             </p>
         `;
+}
+
+/* Redraw only one product card (used when the cart quantity changes). */
+function updateCard(id) {
+  const grid = $("#grid");
+
+  const element = grid && grid.querySelector(`.card[data-pid="${id}"]`);
+
+  const product = find(id);
+
+  if (!element || !product) {
+    return render();
+  }
+
+  const index = parseInt(element.style.getPropertyValue("--i"), 10) || 0;
+
+  element.outerHTML = cardHtml(product, index, false);
 }
 
 /* =========================
@@ -444,7 +428,9 @@ function chg(id, change) {
     CART[id] = quantity;
   }
 
-  save();
+  persistCart();
+
+  updateCard(id);
 }
 
 /* =========================
@@ -648,7 +634,9 @@ async function checkout() {
   }
 
   // pick up coupons the admin created after this page was opened
-  try { await refreshConfig(); } catch (e) { /* ignore */ }
+  // (runs in the background so checkout opens immediately;
+  //  the server still checks the coupon and delivery charge)
+  refreshConfig().catch(() => {});
 
   if (!ME.authenticated || ME.role !== "customer") {
     LOGIN_FROM_CHECKOUT = true;
@@ -811,9 +799,15 @@ async function placeOrder() {
 
   localStorage.setItem("cart", "{}");
 
-  const products = await api("/api/products");
+  save();
 
-  if (Array.isArray(products)) {
+  // refresh the stock numbers in the background - the customer
+  // sees their order confirmation straight away
+  api("/api/products").then((products) => {
+    if (!Array.isArray(products)) {
+      return;
+    }
+
     products.forEach((product) => {
       const current = find(product.id);
 
@@ -821,9 +815,9 @@ async function placeOrder() {
         Object.assign(current, product);
       }
     });
-  }
 
-  save();
+    render();
+  });
 
   ORD[result.order_id] = {
     upi_url: result.upi_url,
@@ -972,8 +966,6 @@ async function paid(code) {
    ========================= */
 
 async function done(result) {
-  const whatsapp = await api(`/api/orders/${result.order_id}/whatsapp`);
-
   modal(`
 
         <svg
@@ -1046,20 +1038,7 @@ async function done(result) {
         </p>
 
 
-        ${
-          whatsapp.whatsapp_url
-            ? `
-                <a
-                    class="primary"
-                    target="_blank"
-                    rel="noopener"
-                    href="${whatsapp.whatsapp_url}"
-                >
-                    Send order on WhatsApp
-                </a>
-            `
-            : ""
-        }
+        <span id="waSlot"></span>
 
 
         <button
@@ -1081,6 +1060,16 @@ async function done(result) {
         </button>
 
     `);
+
+  // The confirmation is already on screen; the WhatsApp button appears
+  // as soon as its link is ready.
+  api(`/api/orders/${result.order_id}/whatsapp`).then((whatsapp) => {
+    const slot = $("#waSlot");
+
+    if (slot && whatsapp.whatsapp_url) {
+      slot.innerHTML = `<a class="primary" target="_blank" rel="noopener" href="${esc(whatsapp.whatsapp_url)}">Send order on WhatsApp</a>`;
+    }
+  });
 }
 
 /* =========================
@@ -1487,15 +1476,14 @@ async function verifyOTP() {
   await refreshMe();
 
 
-if (LOGIN_FROM_CHECKOUT) {
-
+  if (LOGIN_FROM_CHECKOUT) {
     LOGIN_FROM_CHECKOUT = false;
 
     return checkout();
-}
+  }
 
 
-closeModal();
+  closeModal();
 }
 
 async function refreshMe() {
@@ -2250,11 +2238,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     ticker();
 
-    await refreshMe();
-
-    await refreshConfig();
-
-    await refreshProducts();
+    // the three requests run at the same time (before: one after another)
+    await Promise.all([refreshMe(), refreshConfig(), refreshProducts()]);
   }
 
   /*
