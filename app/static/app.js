@@ -92,6 +92,7 @@ let CFG = {
   /* Developer switch. The server writes the real value into the page, so there is no flash. */
   show_prices_home: document.getElementById("productData")?.dataset.showPrices !== "false",
   ordering_enabled: document.documentElement.dataset.ordering !== "off",
+  customer_login_enabled: document.documentElement.dataset.login !== "off",
 };
 
 /* =========================
@@ -437,6 +438,26 @@ function orderingPausedModal() {
     <button class="primary" onclick="enquiry()">Order on WhatsApp</button>
     <button onclick="closeModal()">Close</button>
   `);
+}
+
+function loginPausedModal() {
+  return modal(`
+    <h2>Login is paused</h2>
+    <p>Customer login is not available right now. Please send us your order on WhatsApp.</p>
+    <button class="primary" onclick="enquiry()">Order on WhatsApp</button>
+    <button onclick="closeModal()">Close</button>
+  `);
+}
+
+/* Hide the Login buttons while customer login is paused (logged-in customers keep their session). */
+function applyLoginUI() {
+  const paused = CFG.customer_login_enabled === false;
+  const loggedIn = !!(ME && ME.authenticated);
+  const hideLogin = paused && !loggedIn;
+  const accountButton = $("#accountBtn");
+  const menuAccountButton = $("#menuAccountBtn");
+  if (accountButton) accountButton.hidden = hideLogin;
+  if (menuAccountButton) menuAccountButton.hidden = hideLogin || loggedIn;
 }
 
 function applyOrderingUI() {
@@ -1351,6 +1372,7 @@ async function bill(code) {
    ========================= */
 
 async function account(message = "") {
+  if (CFG.customer_login_enabled === false) return loginPausedModal();
   modal(`
 
         <h2>
@@ -1415,6 +1437,11 @@ async function sendOTP() {
   });
 
   if (!result._ok) {
+    if (result.login_paused) {
+      CFG.customer_login_enabled = false;
+      applyLoginUI();
+      return loginPausedModal();
+    }
     return ($("#lerr").textContent = result.error || "Could not send OTP");
   }
 
@@ -1571,6 +1598,8 @@ async function refreshMe() {
       menuLogoutButton.hidden = true;
     }
   }
+
+  applyLoginUI();
 }
 
 /* =========================
@@ -2125,6 +2154,8 @@ async function refreshConfig() {
   ticker();
 
   applyOrderingUI();
+
+  applyLoginUI();
 
   if (priceWas !== CFG.show_prices_home || orderWas !== CFG.ordering_enabled) render();
 
