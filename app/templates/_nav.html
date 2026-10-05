@@ -73,6 +73,7 @@
     <button
         type="button"
         class="cart premium-cart"
+        {% if not ordering_on %}hidden{% endif %}
         onclick="cart()"
         aria-label="Shopping cart"
     >
