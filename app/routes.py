@@ -44,7 +44,9 @@ DEFAULT_SETTINGS = {
     "delivery_base": "30",
     "delivery_per_km": "10",
     "delivery_free_above": "500",
-    "show_prices": "1",
+    "show_prices_home": "1",
+    "show_prices_brochure": "1",
+    "ordering_enabled": "1",
     "brochure_url": "",
     "brochure_eyebrow": "CHAND ENTERPRISES · DARBHANGA, BIHAR",
     "brochure_title": "Premium Product Brochure",
@@ -106,9 +108,37 @@ def float_setting(key, default=0):
         return float(default)
 
 
-def prices_visible():
-    """Developer switch: show product prices on the storefront cards and brochure."""
-    return str(setting_value("show_prices")).strip() != "0"
+def _flag(key, legacy=None):
+    """On/off site switch. Anything except "0" means ON. `legacy` = older single
+    key to fall back to, so a site that already saved the old setting keeps its choice."""
+    cache = _settings_cache()
+    raw = cache.get(key)
+    if raw is None and legacy:
+        raw = cache.get(legacy)
+    return str(raw if raw is not None else "1").strip() != "0"
+
+
+def prices_home():
+    """Developer switch: show prices on the home page product cards."""
+    return _flag("show_prices_home", "show_prices")
+
+
+def prices_brochure():
+    """Developer switch: show prices on the brochure page."""
+    return _flag("show_prices_brochure", "show_prices")
+
+
+def ordering_enabled():
+    """Developer switch: cart + checkout on/off."""
+    return _flag("ordering_enabled")
+
+
+@main.app_context_processor
+def inject_site_flags():
+    try:
+        return {"ordering_on": ordering_enabled()}
+    except Exception:
+        return {"ordering_on": True}
 
 
 def offers_list():
@@ -175,7 +205,7 @@ def calculate_coupon(code, subtotal):
 def developer_settings():
     raw = setting_value("offers")
     offers = [x.strip() for x in raw.splitlines() if x.strip()] if raw else DEFAULT_OFFERS[:]
-    return {"business_name": setting_value("business_name"), "business_mobile": setting_value("business_mobile"), "whatsapp": setting_value("whatsapp"), "business_location": setting_value("business_location"), "upi": setting_value("upi"), "payment_name": setting_value("payment_name"), "business_lat": setting_value("business_lat"), "business_lng": setting_value("business_lng"), "delivery_base": setting_value("delivery_base"), "delivery_per_km": setting_value("delivery_per_km"), "delivery_free_above": setting_value("delivery_free_above"), "instagram_url": setting_value("instagram_url"), "facebook_url": setting_value("facebook_url"), "show_prices": prices_visible(), "brochure_url": setting_value("brochure_url"), "brochure_eyebrow": setting_value("brochure_eyebrow"), "brochure_title": setting_value("brochure_title"), "brochure_subtitle": setting_value("brochure_subtitle"), "archive_days": setting_value("archive_days") or "7", "archive_method": setting_value("archive_method") or "email", "archive_email": setting_value("archive_email"), "archive_whatsapp": setting_value("archive_whatsapp"), "offers": offers}
+    return {"business_name": setting_value("business_name"), "business_mobile": setting_value("business_mobile"), "whatsapp": setting_value("whatsapp"), "business_location": setting_value("business_location"), "upi": setting_value("upi"), "payment_name": setting_value("payment_name"), "business_lat": setting_value("business_lat"), "business_lng": setting_value("business_lng"), "delivery_base": setting_value("delivery_base"), "delivery_per_km": setting_value("delivery_per_km"), "delivery_free_above": setting_value("delivery_free_above"), "instagram_url": setting_value("instagram_url"), "facebook_url": setting_value("facebook_url"), "show_prices_home": prices_home(), "show_prices_brochure": prices_brochure(), "ordering_enabled": ordering_enabled(), "brochure_url": setting_value("brochure_url"), "brochure_eyebrow": setting_value("brochure_eyebrow"), "brochure_title": setting_value("brochure_title"), "brochure_subtitle": setting_value("brochure_subtitle"), "archive_days": setting_value("archive_days") or "7", "archive_method": setting_value("archive_method") or "email", "archive_email": setting_value("archive_email"), "archive_whatsapp": setting_value("archive_whatsapp"), "offers": offers}
 
 
 def display_datetime(dt):
@@ -367,7 +397,7 @@ def new_otp(mobile):
 @main.route("/")
 def home():
     prods = [product_dict(p) for p in Product.query.filter_by(active=True)]
-    return render_template("index.html", products=prods, show_prices=prices_visible())
+    return render_template("index.html", products=prods, show_prices=prices_home())
 
 
 def _clean_http_url(value):
@@ -448,7 +478,7 @@ def brochure():
     }
     return render_template("brochure.html", brochure_pdf_exists=os.path.exists(pdf_path), b=links,
                            product_groups=grouped, brochure_text=brochure_text,
-                           show_prices=prices_visible(), offers=offers_list(),
+                           show_prices=prices_brochure(), offers=offers_list(),
                            products=[product_dict(p) for p in products], thumb=image_thumb)
 
 
@@ -785,7 +815,7 @@ def delivery_quote():
 @main.get("/api/config")
 def config():
     cfg = developer_settings()
-    return jsonify(_ok=True, whatsapp=wa_number(), upi=cfg["upi"] or current_app.config["UPI_ID"], business_name=cfg["business_name"], business_mobile=cfg["business_mobile"], business_location=cfg["business_location"], payment_name=cfg["payment_name"], offers=cfg["offers"], show_prices=cfg["show_prices"], instagram_url=cfg["instagram_url"], facebook_url=cfg["facebook_url"], brochure_url=cfg["brochure_url"], categories=[category_dict(c) for c in active_categories()], coupons=[coupon_dict(c) for c in Coupon.query.filter_by(active=True).order_by(Coupon.code).all()])
+    return jsonify(_ok=True, whatsapp=wa_number(), upi=cfg["upi"] or current_app.config["UPI_ID"], business_name=cfg["business_name"], business_mobile=cfg["business_mobile"], business_location=cfg["business_location"], payment_name=cfg["payment_name"], offers=cfg["offers"], show_prices_home=cfg["show_prices_home"], show_prices_brochure=cfg["show_prices_brochure"], ordering_enabled=cfg["ordering_enabled"], instagram_url=cfg["instagram_url"], facebook_url=cfg["facebook_url"], brochure_url=cfg["brochure_url"], categories=[category_dict(c) for c in active_categories()], coupons=[coupon_dict(c) for c in Coupon.query.filter_by(active=True).order_by(Coupon.code).all()])
 
 
 @main.get("/api/categories")
@@ -800,6 +830,9 @@ def api_products():
 
 @main.post("/api/orders")
 def create_order():
+    if not ordering_enabled():
+        return jsonify(error="Online ordering is paused right now. Please order on WhatsApp."), 403
+
     u = current_user()
 
     if not u or u.role != "customer":
@@ -2018,9 +2051,9 @@ def developer_save_settings():
     if not role_ok("developer"):
         return jsonify(error="Forbidden"), 403
     d = request.json or {}
-    for key in ["business_name", "business_mobile", "whatsapp", "business_location", "upi", "payment_name", "business_lat", "business_lng", "delivery_base", "delivery_per_km", "delivery_free_above", "instagram_url", "facebook_url", "show_prices", "brochure_url", "brochure_eyebrow", "brochure_title", "brochure_subtitle", "archive_days", "archive_method", "archive_email", "archive_whatsapp"]:
+    for key in ["business_name", "business_mobile", "whatsapp", "business_location", "upi", "payment_name", "business_lat", "business_lng", "delivery_base", "delivery_per_km", "delivery_free_above", "instagram_url", "facebook_url", "show_prices_home", "show_prices_brochure", "ordering_enabled", "brochure_url", "brochure_eyebrow", "brochure_title", "brochure_subtitle", "archive_days", "archive_method", "archive_email", "archive_whatsapp"]:
         if key in d:
-            if key == "show_prices":
+            if key in {"show_prices_home", "show_prices_brochure", "ordering_enabled"}:
                 set_setting(key, "0" if str(d.get(key)).strip().lower() in {"0", "false", "no", "off", ""} else "1")
                 continue
             value = str(d.get(key) or "").strip()
