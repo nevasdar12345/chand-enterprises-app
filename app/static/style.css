@@ -5079,3 +5079,23 @@ h1,h2,h3{
     .dlv-actions .dlv-done{flex:1 1 100%}
     .dlv-wa,.dlv-wa-admin{flex:1 1 calc(50% - 4px)}
 }
+
+
+/* ---------- "ordering paused" notice (home page) ---------- */
+.order-paused{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    flex-wrap:wrap;
+    gap:10px;
+    margin:10px auto 0;
+    padding:10px 14px;
+    max-width:1100px;
+    border:1px solid color-mix(in srgb,#f59e0b 45%,var(--line));
+    border-radius:14px;
+    background:color-mix(in srgb,#f59e0b 14%,var(--card));
+    color:var(--ink);
+    font-size:13px;
+    font-weight:700;
+}
+.order-paused[hidden]{display:none}
