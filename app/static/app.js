@@ -90,8 +90,8 @@ let CFG = {
   facebook_url: "",
   brochure_url: "",
   /* Developer switch. The server writes the real value into the page, so there is no flash. */
-  show_prices_home: window.__SHOW_PRICES !== false,
-  ordering_enabled: window.__ORDERING !== false,
+  show_prices_home: document.getElementById("productData")?.dataset.showPrices !== "false",
+  ordering_enabled: document.documentElement.dataset.ordering !== "off",
 };
 
 /* =========================
