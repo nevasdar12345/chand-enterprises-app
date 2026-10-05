@@ -1,0 +1,81 @@
+{% extends 'base.html' %}
+{% from '_social.html' import social_list %}
+
+{% block title %}About us · {{ site.name }}{% endblock %}
+
+{% block body %}
+
+{% include '_nav.html' %}
+
+<main class="about-page">
+
+    <section class="about-hero">
+        <span class="about-kicker">ABOUT US</span>
+        <h1>{{ site.about_title }}</h1>
+        <p>{{ site.about_text }}</p>
+
+        <div class="about-actions">
+            {% if site.whatsapp_url %}
+            <a class="primary about-btn" href="{{ site.whatsapp_url }}" target="_blank" rel="noopener">WhatsApp enquiry →</a>
+            {% endif %}
+            {% if site.mobile %}
+            <a class="about-btn about-btn-soft" href="tel:{{ site.tel }}">📞 Call {{ site.mobile }}</a>
+            {% endif %}
+        </div>
+    </section>
+
+    <section class="about-cards">
+        <div class="about-card">
+            <span class="about-card-icon">🚚</span>
+            <b>Local delivery</b>
+            <small>Fast delivery across {{ site.location }}.</small>
+        </div>
+        <div class="about-card">
+            <span class="about-card-icon">📱</span>
+            <b>Easy payment</b>
+            <small>Pay by QR or Cash on Delivery.</small>
+        </div>
+        <div class="about-card">
+            <span class="about-card-icon">📦</span>
+            <b>Bulk orders</b>
+            <small>Shops, events and offices are welcome.</small>
+        </div>
+    </section>
+
+    <section class="about-connect">
+        <div>
+            <span class="about-kicker">STAY CONNECTED</span>
+            <h2>Find us online</h2>
+            <p>Follow {{ site.name }} for offers, new products and updates.</p>
+        </div>
+        {% if site.social %}
+            {{ social_list(site.social, 'social-list social-list-large') }}
+        {% else %}
+            <p class="sf-muted">Social pages coming soon.</p>
+        {% endif %}
+    </section>
+
+    <section class="about-contact">
+        <h2>Get in touch</h2>
+        <div class="about-contact-grid">
+            {% if site.mobile %}
+            <a class="about-contact-item" href="tel:{{ site.tel }}">
+                <span>📞</span><div><small>Phone</small><b>{{ site.mobile }}</b></div>
+            </a>
+            {% endif %}
+            {% if site.whatsapp_url %}
+            <a class="about-contact-item" href="{{ site.whatsapp_url }}" target="_blank" rel="noopener">
+                <span>💬</span><div><small>WhatsApp</small><b>Message us</b></div>
+            </a>
+            {% endif %}
+            <div class="about-contact-item">
+                <span>📍</span><div><small>Location</small><b>{{ site.location }}</b></div>
+            </div>
+        </div>
+    </section>
+
+</main>
+
+{% include '_footer.html' %}
+
+{% endblock %}
