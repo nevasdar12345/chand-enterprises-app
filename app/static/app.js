@@ -59,6 +59,18 @@ let CART = JSON.parse(localStorage.getItem("cart") || "{}");
 
 let CAT = "All";
 
+/* Shop filters, sort and wishlist */
+let SORT = "featured";
+let SIZE = "";
+let INSTOCK = false;
+let WISH_ONLY = false;
+let WISH = new Set();
+try {
+  WISH = new Set((JSON.parse(localStorage.getItem("wishlist") || "[]") || []).map(Number));
+} catch (e) {
+  WISH = new Set();
+}
+
 let ME = null;
 
 let ORD = {};
@@ -365,8 +377,11 @@ function cardHtml(product, index, anim) {
       ? `<div class="qty"><button aria-label="Remove one" onclick="chg(${product.id}, -1)">−</button><b>${quantity}</b><button aria-label="Add one more" onclick="chg(${product.id}, 1)">+</button></div>`
       : `<button class="primary" aria-label="Add ${esc(cleanName(product.name))} to cart" onclick="chg(${product.id}, 1)">Add</button>`;
 
+  const liked = WISH.has(Number(product.id));
+
   return `<div class="card${anim ? " pop" : ""}${soldOut ? " oos" : ""}" data-pid="${product.id}" style="--i:${index}">
     ${badge}
+    <button type="button" class="wish-btn${liked ? " on" : ""}" aria-pressed="${liked}" aria-label="${liked ? "Remove from" : "Add to"} wishlist" onclick="toggleWish(${product.id})">${liked ? "♥" : "♡"}</button>
     <div class="ic product-image-box kind-${artKind(product)}">${productVisual(product)}</div>
     <div class="p-info">
       <b class="p-name">${esc(cleanName(product.name))}</b>
@@ -398,14 +413,21 @@ function render(anim = false) {
   const list = products.filter(
     (product) =>
       (CAT === "All" || product.category === CAT) &&
-      product.name.toLowerCase().includes(query),
+      product.name.toLowerCase().includes(query) &&
+      (!SIZE || product.size === SIZE) &&
+      (!INSTOCK || product.stock > 0) &&
+      (!WISH_ONLY || WISH.has(Number(product.id))),
   );
+
+  if (SORT === "price-asc") list.sort((a, b) => a.price - b.price);
+  else if (SORT === "price-desc") list.sort((a, b) => b.price - a.price);
+  else if (SORT === "name") list.sort((a, b) => cleanName(a.name).localeCompare(cleanName(b.name)));
 
   grid.innerHTML =
     list.map((product, index) => cardHtml(product, index, anim)).join("") ||
     `
             <p class="muted">
-                No products found.
+                ${WISH_ONLY ? "Your wishlist is empty. Tap the heart on a product to save it." : "No products found."}
             </p>
         `;
 }
@@ -519,7 +541,7 @@ function totals(coupon = "") {
   if (fresh && typeof quote.discount === "number") discount = Number(quote.discount || 0);
   const delivery = fresh
     ? Number(quote.delivery_charge || 0)
-    : (subtotal - discount >= 500 ? 0 : 30);
+    : (subtotal - discount >= freeDeliveryAbove() ? 0 : 30);
 
   return {
     sub: subtotal,
@@ -658,9 +680,10 @@ function cart() {
         </div>
 
 
+        ${freeDeliveryProgress(total)}
+
         <small>
-            Free delivery above ₹500 ·
-            coupons: WELCOME10, WATER50
+            ${couponHint()}
         </small>
 
 
@@ -690,6 +713,7 @@ function cart() {
 
 async function checkout() {
   if (CFG.ordering_enabled === false) return orderingPausedModal();
+  if (!navigator.onLine) return showMessage("You're offline. Please check your internet connection to place an order.");
   if (!ME) {
     ME = await api("/api/me");
   }
@@ -1797,6 +1821,13 @@ async function orders() {
                             </button>
 
 
+                            <button
+                                onclick="reorder('${esc(order.code)}')"
+                            >
+                                🔄 Reorder
+                            </button>
+
+
                             ${
                               order.payment_method === "QR" &&
                               order.payment_status !== "Paid" &&
@@ -2347,6 +2378,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
     save(true);
 
+    initShopTools();
+    initNetworkStatus();
+
     ticker();
 
     // The page already contains the product list, so draw it straight away
@@ -2357,6 +2391,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       heroArt();
     }
     await Promise.all([refreshMe(), refreshConfig(), haveProducts ? Promise.resolve() : refreshProducts()]);
+    populateSizes();
   }
 
   /* Other public pages that share the header (e.g. brochure): wire up
@@ -2376,6 +2411,416 @@ document.addEventListener("DOMContentLoaded", async () => {
    * JavaScript files.
    */
 });
+
+/* =========================================================
+   EXTRA STOREFRONT FEATURES
+   free-delivery progress · wishlist · sort & filters · reorder
+   online status · function / bulk quote (sent to WhatsApp)
+   ========================================================= */
+
+/* ---------- free delivery + coupon hint (cart) ---------- */
+
+function freeDeliveryAbove() {
+  const n = Number(CFG.free_delivery_above);
+  return Number.isFinite(n) ? n : 500;
+}
+
+function freeDeliveryProgress(t) {
+  const above = freeDeliveryAbove();
+  if (above <= 0) return "";
+
+  const amount = t.sub - t.disc;
+
+  if (amount >= above) {
+    return `<div class="fd-progress done">🎉 You get FREE delivery on this order!</div>`;
+  }
+
+  const left = Math.ceil(above - amount);
+  const pct = Math.max(0, Math.min(100, Math.round((amount / above) * 100)));
+
+  return `<div class="fd-progress">
+    <span>🚚 Add ${money(left)} more for FREE delivery!</span>
+    <div class="fd-bar"><i style="width:${pct}%"></i></div>
+  </div>`;
+}
+
+function couponHint() {
+  const above = freeDeliveryAbove();
+  const codes = (CFG.coupons || []).filter((c) => c.active).map((c) => c.code);
+  const parts = [];
+
+  if (above > 0) parts.push(`Free delivery above ${money(above)}`);
+  if (codes.length) parts.push(`coupons: ${codes.map(esc).join(", ")}`);
+
+  return parts.join(" · ");
+}
+
+/* ---------- wishlist ---------- */
+
+function updateWishUI() {
+  const el = $("#wishCount");
+  if (el) el.textContent = WISH.size ? `(${WISH.size})` : "";
+}
+
+function toggleWish(id) {
+  id = Number(id);
+
+  if (WISH.has(id)) WISH.delete(id);
+  else WISH.add(id);
+
+  try {
+    localStorage.setItem("wishlist", JSON.stringify([...WISH]));
+  } catch (e) {
+    /* private mode: wishlist just lasts for this visit */
+  }
+
+  updateWishUI();
+
+  if (WISH_ONLY) return render();
+
+  updateCard(id);
+}
+
+/* ---------- sort & filters ---------- */
+
+function sizeValue(label) {
+  const m = String(label).trim().toLowerCase().match(/([\d.]+)\s*(ml|ltr|litre|liter|l|kg|g)?/);
+  if (!m) return Infinity;
+  let n = parseFloat(m[1]);
+  if (["l", "ltr", "litre", "liter", "kg"].includes(m[2])) n *= 1000;
+  return n;
+}
+
+function populateSizes() {
+  const select = $("#sizeFilter");
+  if (!select) return;
+
+  const sizes = [...new Set((window.PRODUCTS || []).map((p) => p.size).filter(Boolean))]
+    .sort((a, b) => sizeValue(a) - sizeValue(b));
+
+  if (!sizes.includes(SIZE)) SIZE = "";
+
+  select.innerHTML =
+    `<option value="">All sizes</option>` +
+    sizes.map((z) => `<option value="${esc(z)}">${esc(z)}</option>`).join("");
+
+  select.value = SIZE;
+}
+
+function initShopTools() {
+  const sort = $("#sortBy");
+  const size = $("#sizeFilter");
+  const stock = $("#inStockOnly");
+  const wish = $("#wishFilter");
+
+  if (sort) sort.addEventListener("change", () => { SORT = sort.value; render(true); });
+  if (size) size.addEventListener("change", () => { SIZE = size.value; render(true); });
+  if (stock) stock.addEventListener("change", () => { INSTOCK = stock.checked; render(true); });
+
+  if (wish) {
+    wish.addEventListener("click", () => {
+      WISH_ONLY = !WISH_ONLY;
+      wish.classList.toggle("on", WISH_ONLY);
+      wish.setAttribute("aria-pressed", String(WISH_ONLY));
+      render(true);
+    });
+  }
+
+  populateSizes();
+  updateWishUI();
+}
+
+/* ---------- reorder ---------- */
+
+function reorder(code) {
+  if (CFG.ordering_enabled === false) return orderingPausedModal();
+
+  const lines = (ORD[code] && ORD[code].lines) || [];
+
+  if (!lines.length) return showMessage("Could not find the items of this order.");
+
+  const all = window.PRODUCTS || [];
+  let added = 0;
+  const notes = [];
+
+  lines.forEach((line) => {
+    const label = `${line.name}${line.size ? " (" + line.size + ")" : ""}`;
+
+    let product = line.product_id != null ? find(line.product_id) : null;
+
+    if (!product) {
+      product = all.find((p) => p.name === line.name && p.size === line.size);
+    }
+
+    if (!product || product.stock < 1) {
+      notes.push(`${label}: not available right now`);
+      return;
+    }
+
+    const current = CART[product.id] || 0;
+    const qty = Math.min(current + line.qty, product.stock);
+
+    if (qty - current < line.qty) {
+      notes.push(`${label}: only ${product.stock} in stock`);
+    }
+
+    if (qty > current) {
+      CART[product.id] = qty;
+      added++;
+    }
+  });
+
+  persistCart();
+  render();
+
+  modal(`
+    <h2>Reorder</h2>
+    <p>${added ? `${added} item${added === 1 ? "" : "s"} added to your cart.` : "None of these items could be added."}</p>
+    ${notes.length ? `<p class="muted">${notes.map(esc).join("<br>")}</p>` : ""}
+    ${added ? `<button class="primary" onclick="cart()">View cart</button>` : ""}
+    <button onclick="closeModal()">Close</button>
+  `);
+}
+
+/* ---------- online / offline banner ---------- */
+
+function initNetworkStatus() {
+  let bar = document.getElementById("netBanner");
+
+  if (!bar) {
+    bar = document.createElement("div");
+    bar.id = "netBanner";
+    bar.setAttribute("role", "status");
+    bar.hidden = true;
+    document.body.appendChild(bar);
+  }
+
+  let timer;
+
+  const show = (online) => {
+    clearTimeout(timer);
+    bar.className = "net-banner " + (online ? "online" : "offline");
+    bar.textContent = online
+      ? "🟢 Back online"
+      : "🔴 You're offline. You can browse, but ordering needs internet.";
+    bar.hidden = false;
+    if (online) timer = setTimeout(() => { bar.hidden = true; }, 2500);
+  };
+
+  window.addEventListener("offline", () => show(false));
+  window.addEventListener("online", () => show(true));
+
+  if (!navigator.onLine) show(false);
+}
+
+/* ---------- function planner + bulk order (WhatsApp quote) ---------- */
+
+/* Drinks needed PER GUEST for a 5-hour function. Change these numbers to match your experience. */
+const EVENT_PROFILES = {
+  "Wedding": { water: 1.2, cold: 0.7, energy: 0.2 },
+  "Birthday / Party": { water: 1.0, cold: 1.0, energy: 0.1 },
+  "Corporate event": { water: 1.5, cold: 0.6, energy: 0.3 },
+  "Puja / Religious": { water: 1.5, cold: 0.3, energy: 0 },
+  "Other": { water: 1.2, cold: 0.7, energy: 0.2 },
+};
+
+function eventEstimate(type, guests, hours) {
+  const profile = EVENT_PROFILES[type] || EVENT_PROFILES.Other;
+  const factor = Math.max(0.4, hours / 5);
+  const count = (rate) => Math.ceil(Math.round(guests * rate * factor * 100) / 100);
+
+  return {
+    water: count(profile.water),
+    cold: count(profile.cold),
+    energy: count(profile.energy),
+  };
+}
+
+function todayISO() {
+  const d = new Date();
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  return d.toISOString().slice(0, 10);
+}
+
+function prettyDate(iso) {
+  const [y, m, d] = String(iso).split("-").map(Number);
+  if (!y || !m || !d) return "";
+  return new Date(y, m - 1, d).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+}
+
+function quoteContactFields() {
+  return `
+    <label>Your name <input id="qn" autocomplete="name"></label>
+    <label>Mobile <input id="qm" maxlength="10" inputmode="numeric" autocomplete="tel"></label>
+    <p class="err" id="qerr"></p>
+  `;
+}
+
+async function sendQuote(message) {
+  const err = $("#qerr");
+  const name = ($("#qn")?.value || "").trim();
+  const mobile = ($("#qm")?.value || "").replace(/\D/g, "");
+
+  if (!name) return (err.textContent = "Please enter your name");
+  if (mobile.length !== 10) return (err.textContent = "Please enter a 10 digit mobile number");
+
+  err.textContent = "";
+
+  const result = await api("/api/enquiry", "POST", { name, mobile, message });
+
+  if (!result._ok) return (err.textContent = result.error || "Could not send the request");
+
+  if (result.whatsapp_url) window.open(result.whatsapp_url, "_blank", "noopener");
+
+  closeModal();
+}
+
+function eventPlanner() {
+  modal(`
+    <h2>🎉 Plan your function</h2>
+    <p class="muted">Tell us about the function and we will estimate the drinks you need.</p>
+
+    <label>Function type
+      <select id="evType" onchange="updateEventEstimate()">
+        ${Object.keys(EVENT_PROFILES).map((t) => `<option>${esc(t)}</option>`).join("")}
+      </select>
+    </label>
+
+    <label>Number of guests
+      <input id="evGuests" type="number" min="1" max="100000" inputmode="numeric" value="100" oninput="updateEventEstimate()">
+    </label>
+
+    <label>Duration (hours)
+      <input id="evHours" type="number" min="1" max="48" step="0.5" inputmode="decimal" value="5" oninput="updateEventEstimate()">
+    </label>
+
+    <label>Function date (optional)
+      <input id="evDate" type="date" min="${todayISO()}">
+    </label>
+
+    <div class="event-est" id="evResult"></div>
+
+    ${quoteContactFields()}
+
+    <button class="primary" onclick="sendEventQuote()">Request bulk quote on WhatsApp</button>
+    <button onclick="closeModal()">Close</button>
+  `);
+
+  updateEventEstimate();
+}
+
+function readEvent() {
+  const guests = Math.floor(Number($("#evGuests")?.value));
+  const hours = Number($("#evHours")?.value);
+
+  if (!(guests >= 1) || !(hours > 0)) return null;
+
+  const type = $("#evType").value;
+
+  return { type, guests, hours, date: $("#evDate")?.value || "", est: eventEstimate(type, guests, hours) };
+}
+
+function updateEventEstimate() {
+  const box = $("#evResult");
+  if (!box) return;
+
+  const ev = readEvent();
+
+  box.innerHTML = ev
+    ? `<b>Estimated requirement</b>
+       <div class="row"><span>💧 Water bottles</span><b>${formatNumber(ev.est.water)}</b></div>
+       <div class="row"><span>🥤 Cold drinks</span><b>${formatNumber(ev.est.cold)}</b></div>
+       ${ev.est.energy ? `<div class="row"><span>⚡ Energy drinks</span><b>${formatNumber(ev.est.energy)}</b></div>` : ""}
+       <small class="muted">This is only an estimate. We will confirm the final quantity with you.</small>`
+    : `<small class="muted">Enter the number of guests and hours.</small>`;
+}
+
+function sendEventQuote() {
+  const ev = readEvent();
+
+  if (!ev) return ($("#qerr").textContent = "Please enter guests and duration");
+
+  const lines = [
+    "🎉 Function bulk quote request",
+    "",
+    `Function: ${ev.type}`,
+    `Guests: ${ev.guests}`,
+    `Duration: ${ev.hours} hours`,
+  ];
+
+  if (ev.date) lines.push(`Date: ${prettyDate(ev.date)}`);
+
+  lines.push(
+    "",
+    "Estimated requirement:",
+    `💧 Water bottles: ${ev.est.water}`,
+    `🥤 Cold drinks: ${ev.est.cold}`,
+  );
+
+  if (ev.est.energy) lines.push(`⚡ Energy drinks: ${ev.est.energy}`);
+
+  lines.push("", "Please share your best bulk price.");
+
+  return sendQuote(lines.join("\n"));
+}
+
+function bulkOrder() {
+  const products = (window.PRODUCTS || []).slice().sort((a, b) =>
+    cleanName(a.name).localeCompare(cleanName(b.name)));
+
+  modal(`
+    <h2>📦 Bulk order</h2>
+    <p class="muted">Ordering a large quantity? Send us the details and we will reply with the best price.</p>
+
+    <label>Product
+      <select id="bkProduct">
+        ${products.map((p) => `<option value="${p.id}">${esc(cleanName(p.name))}${p.size ? " (" + esc(p.size) + ")" : ""}</option>`).join("")}
+      </select>
+    </label>
+
+    <label>Quantity
+      <input id="bkQty" type="number" min="1" max="100000" inputmode="numeric" value="100">
+    </label>
+
+    <label>Delivery date
+      <input id="bkDate" type="date" min="${todayISO()}">
+    </label>
+
+    <label>Function (optional)
+      <input id="bkFn" placeholder="e.g. Wedding, Office party">
+    </label>
+
+    ${quoteContactFields()}
+
+    <button class="primary" onclick="sendBulkQuote()">Request bulk quote on WhatsApp</button>
+    <button onclick="closeModal()">Close</button>
+  `);
+}
+
+function sendBulkQuote() {
+  const product = find($("#bkProduct")?.value);
+  const qty = Math.floor(Number($("#bkQty")?.value));
+
+  if (!product) return ($("#qerr").textContent = "Please choose a product");
+  if (!(qty >= 1)) return ($("#qerr").textContent = "Please enter a quantity");
+
+  const date = $("#bkDate")?.value || "";
+  const fn = ($("#bkFn")?.value || "").trim();
+
+  const lines = [
+    "📦 Bulk order request",
+    "",
+    `Product: ${cleanName(product.name)}${product.size ? " (" + product.size + ")" : ""}`,
+    `Quantity: ${qty}`,
+  ];
+
+  if (date) lines.push(`Delivery date: ${prettyDate(date)}`);
+  if (fn) lines.push(`Function: ${fn}`);
+
+  lines.push("", "Please share your best bulk price and availability.");
+
+  return sendQuote(lines.join("\n"));
+}
 
 /* =========================
    GLOBAL FUNCTIONS
@@ -2454,6 +2899,20 @@ window.safeLoadOrders = safeLoadOrders;
 window.formatNumber = formatNumber;
 
 window.showMessage = showMessage;
+
+window.toggleWish = toggleWish;
+
+window.reorder = reorder;
+
+window.eventPlanner = eventPlanner;
+
+window.updateEventEstimate = updateEventEstimate;
+
+window.sendEventQuote = sendEventQuote;
+
+window.bulkOrder = bulkOrder;
+
+window.sendBulkQuote = sendBulkQuote;
 
 /* Compatibility */
 
