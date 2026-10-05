@@ -774,7 +774,7 @@ async function loadDeveloperProducts() {
 
                     <td>
                         ${product.image_url ? `<img src="${esc(product.image_url)}" alt="" style="width:48px;height:48px;object-fit:cover;border-radius:8px;display:block;margin-bottom:6px">` : `<span style="font-size:24px">${esc(product.icon || '🥤')}</span>`}
-                        <button type="button" onclick="openProductImageManager(${product.id}, ${JSON.stringify(product.image_url || '')})">📷 Image</button>
+                        <button type="button" onclick="openProductImageManager(${product.id}, ${esc(JSON.stringify(product.image_url || ''))})">📷 Image</button>
                     </td>
 
                     <td>
