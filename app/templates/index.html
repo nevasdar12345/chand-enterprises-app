@@ -20,6 +20,12 @@
 </div>
 
 
+<div id="orderPaused" class="order-paused" {% if ordering_on %}hidden{% endif %}>
+    <span>🛑 Online ordering is paused right now. Please order on WhatsApp.</span>
+    <button type="button" class="primary" onclick="enquiry()">Order on WhatsApp</button>
+</div>
+
+
 <!-- ================= HERO ================= -->
 
 <main>
@@ -376,11 +382,10 @@
 <div
     id="productData"
     hidden
+    data-show-prices="{{ 'true' if show_prices else 'false' }}"
     data-products="{{ products|tojson|forceescape }}"
 ></div>
 
-
-<script>window.__SHOW_PRICES = {{ 'true' if show_prices else 'false' }};</script>
 
 <script>
 
