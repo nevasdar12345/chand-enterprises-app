@@ -47,6 +47,7 @@ DEFAULT_SETTINGS = {
     "show_prices_home": "1",
     "show_prices_brochure": "1",
     "ordering_enabled": "1",
+    "customer_login_enabled": "1",
     "brochure_url": "",
     "brochure_eyebrow": "CHAND ENTERPRISES · DARBHANGA, BIHAR",
     "brochure_title": "Premium Product Brochure",
@@ -137,6 +138,14 @@ def ordering_enabled():
     return _flag("ordering_enabled")
 
 
+def customer_login_enabled():
+    """Developer switch: customer (OTP) login on/off. Staff/admin/developer login is never affected."""
+    return _flag("customer_login_enabled")
+
+
+LOGIN_PAUSED_MESSAGE = "Customer login is paused right now. Please order on WhatsApp."
+
+
 SOCIAL_LIMIT = 12
 
 
@@ -187,9 +196,9 @@ def site_info():
 @main.app_context_processor
 def inject_site_flags():
     try:
-        return {"ordering_on": ordering_enabled(), "site": site_info()}
+        return {"ordering_on": ordering_enabled(), "login_on": customer_login_enabled(), "site": site_info()}
     except Exception:
-        return {"ordering_on": True, "site": {
+        return {"ordering_on": True, "login_on": True, "site": {
             "name": "Chand Enterprises", "mobile": "", "tel": "", "location": "Darbhanga, Bihar",
             "whatsapp_url": "", "tagline": "Drinks & premium water",
             "about_title": "About Chand Enterprises", "about_text": "", "social": []}}
@@ -259,7 +268,7 @@ def calculate_coupon(code, subtotal):
 def developer_settings():
     raw = setting_value("offers")
     offers = [x.strip() for x in raw.splitlines() if x.strip()] if raw else DEFAULT_OFFERS[:]
-    return {"business_name": setting_value("business_name"), "business_mobile": setting_value("business_mobile"), "whatsapp": setting_value("whatsapp"), "business_location": setting_value("business_location"), "upi": setting_value("upi"), "payment_name": setting_value("payment_name"), "business_lat": setting_value("business_lat"), "business_lng": setting_value("business_lng"), "delivery_base": setting_value("delivery_base"), "delivery_per_km": setting_value("delivery_per_km"), "delivery_free_above": setting_value("delivery_free_above"), "instagram_url": setting_value("instagram_url"), "facebook_url": setting_value("facebook_url"), "social_links": social_links(), "about_title": setting_value("about_title"), "about_text": setting_value("about_text"), "footer_tagline": setting_value("footer_tagline"), "show_prices_home": prices_home(), "show_prices_brochure": prices_brochure(), "ordering_enabled": ordering_enabled(), "brochure_url": setting_value("brochure_url"), "brochure_eyebrow": setting_value("brochure_eyebrow"), "brochure_title": setting_value("brochure_title"), "brochure_subtitle": setting_value("brochure_subtitle"), "archive_days": setting_value("archive_days") or "7", "archive_method": setting_value("archive_method") or "email", "archive_email": setting_value("archive_email"), "archive_whatsapp": setting_value("archive_whatsapp"), "offers": offers}
+    return {"business_name": setting_value("business_name"), "business_mobile": setting_value("business_mobile"), "whatsapp": setting_value("whatsapp"), "business_location": setting_value("business_location"), "upi": setting_value("upi"), "payment_name": setting_value("payment_name"), "business_lat": setting_value("business_lat"), "business_lng": setting_value("business_lng"), "delivery_base": setting_value("delivery_base"), "delivery_per_km": setting_value("delivery_per_km"), "delivery_free_above": setting_value("delivery_free_above"), "instagram_url": setting_value("instagram_url"), "facebook_url": setting_value("facebook_url"), "social_links": social_links(), "about_title": setting_value("about_title"), "about_text": setting_value("about_text"), "footer_tagline": setting_value("footer_tagline"), "show_prices_home": prices_home(), "show_prices_brochure": prices_brochure(), "ordering_enabled": ordering_enabled(), "customer_login_enabled": customer_login_enabled(), "brochure_url": setting_value("brochure_url"), "brochure_eyebrow": setting_value("brochure_eyebrow"), "brochure_title": setting_value("brochure_title"), "brochure_subtitle": setting_value("brochure_subtitle"), "archive_days": setting_value("archive_days") or "7", "archive_method": setting_value("archive_method") or "email", "archive_email": setting_value("archive_email"), "archive_whatsapp": setting_value("archive_whatsapp"), "offers": offers}
 
 
 def display_datetime(dt):
@@ -744,6 +753,8 @@ def login():
     d = request.json or {}
 
     if d.get("role", "customer") == "customer":
+        if not customer_login_enabled():
+            return jsonify(ok=False, login_paused=True, error=LOGIN_PAUSED_MESSAGE), 403
         mobile = str(d.get("mobile", "")).strip()
         if not (mobile.isdigit() and len(mobile) == 10):
             return jsonify(ok=False, error="Enter a valid 10-digit mobile number"), 400
@@ -762,6 +773,8 @@ def login():
 
 @main.post("/api/otp/resend")
 def resend_otp():
+    if not customer_login_enabled():
+        return jsonify(ok=False, login_paused=True, error=LOGIN_PAUSED_MESSAGE), 403
     m = session.get("otp_mobile")
     if not m:
         return jsonify(ok=False, error="OTP session expired"), 400
@@ -770,6 +783,8 @@ def resend_otp():
 
 @main.post("/api/verify-otp")
 def verify_otp():
+    if not customer_login_enabled():
+        return jsonify(ok=False, login_paused=True, error=LOGIN_PAUSED_MESSAGE), 403
     d = request.json or {}
     mobile = session.get("otp_mobile")
 
@@ -874,7 +889,7 @@ def delivery_quote():
 @main.get("/api/config")
 def config():
     cfg = developer_settings()
-    return jsonify(_ok=True, whatsapp=wa_number(), upi=cfg["upi"] or current_app.config["UPI_ID"], business_name=cfg["business_name"], business_mobile=cfg["business_mobile"], business_location=cfg["business_location"], payment_name=cfg["payment_name"], offers=cfg["offers"], show_prices_home=cfg["show_prices_home"], show_prices_brochure=cfg["show_prices_brochure"], ordering_enabled=cfg["ordering_enabled"], instagram_url=cfg["instagram_url"], facebook_url=cfg["facebook_url"], social_links=cfg["social_links"], about_title=cfg["about_title"], about_text=cfg["about_text"], footer_tagline=cfg["footer_tagline"], brochure_url=cfg["brochure_url"], categories=[category_dict(c) for c in active_categories()], coupons=[coupon_dict(c) for c in Coupon.query.filter_by(active=True).order_by(Coupon.code).all()])
+    return jsonify(_ok=True, whatsapp=wa_number(), upi=cfg["upi"] or current_app.config["UPI_ID"], business_name=cfg["business_name"], business_mobile=cfg["business_mobile"], business_location=cfg["business_location"], payment_name=cfg["payment_name"], offers=cfg["offers"], show_prices_home=cfg["show_prices_home"], show_prices_brochure=cfg["show_prices_brochure"], ordering_enabled=cfg["ordering_enabled"], customer_login_enabled=cfg["customer_login_enabled"], instagram_url=cfg["instagram_url"], facebook_url=cfg["facebook_url"], social_links=cfg["social_links"], about_title=cfg["about_title"], about_text=cfg["about_text"], footer_tagline=cfg["footer_tagline"], brochure_url=cfg["brochure_url"], categories=[category_dict(c) for c in active_categories()], coupons=[coupon_dict(c) for c in Coupon.query.filter_by(active=True).order_by(Coupon.code).all()])
 
 
 @main.get("/api/categories")
@@ -2139,9 +2154,9 @@ def developer_save_settings():
             if len(value) > limit:
                 return jsonify(error=f"{key.replace('_', ' ').title()} must be {limit} characters or fewer"), 400
             set_setting(key, value)
-    for key in ["business_name", "business_mobile", "whatsapp", "business_location", "upi", "payment_name", "business_lat", "business_lng", "delivery_base", "delivery_per_km", "delivery_free_above", "show_prices_home", "show_prices_brochure", "ordering_enabled", "brochure_url", "brochure_eyebrow", "brochure_title", "brochure_subtitle", "archive_days", "archive_method", "archive_email", "archive_whatsapp"]:
+    for key in ["business_name", "business_mobile", "whatsapp", "business_location", "upi", "payment_name", "business_lat", "business_lng", "delivery_base", "delivery_per_km", "delivery_free_above", "show_prices_home", "show_prices_brochure", "ordering_enabled", "customer_login_enabled", "brochure_url", "brochure_eyebrow", "brochure_title", "brochure_subtitle", "archive_days", "archive_method", "archive_email", "archive_whatsapp"]:
         if key in d:
-            if key in {"show_prices_home", "show_prices_brochure", "ordering_enabled"}:
+            if key in {"show_prices_home", "show_prices_brochure", "ordering_enabled", "customer_login_enabled"}:
                 set_setting(key, "0" if str(d.get(key)).strip().lower() in {"0", "false", "no", "off", ""} else "1")
                 continue
             value = str(d.get(key) or "").strip()
