@@ -615,6 +615,78 @@ def github_upload_bytes(filename, content, content_type, message):
     return raw_url, path, data
 
 
+def github_path_from_url(url):
+    """
+    Return the repo path of an image that WE uploaded (inside GITHUB_IMAGE_FOLDER of our
+    repo/branch), or "" for anything else (pasted external URLs are never touched).
+    """
+    cfg = github_image_config()
+    url = (url or "").strip()
+    if not (cfg["token"] and cfg["repo"] and url):
+        return ""
+    prefix = f"https://raw.githubusercontent.com/{cfg['repo']}/{urllib.parse.quote(cfg['branch'], safe='')}/"
+    if not url.lower().startswith(prefix.lower()):
+        return ""
+    path = urllib.parse.unquote(url[len(prefix):].split("?")[0].split("#")[0])
+    if ".." in path or not path.startswith(cfg["folder"] + "/"):
+        return ""
+    return path
+
+
+def github_delete_file(path, message):
+    """Delete one file from the GitHub repo (Contents API). A file that is already gone counts as deleted."""
+    cfg = github_image_config()
+    api_url = f"https://api.github.com/repos/{cfg['repo']}/contents/{urllib.parse.quote(path, safe='/-._')}"
+    headers = {
+        "Accept": "application/vnd.github+json",
+        "Authorization": f"Bearer {cfg['token']}",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "User-Agent": "Chand-Enterprises/1.0",
+    }
+    try:
+        get_req = urllib.request.Request(api_url + "?ref=" + urllib.parse.quote(cfg["branch"], safe=""), headers=headers)
+        with urllib.request.urlopen(get_req, timeout=20) as response:
+            sha = json.loads(response.read().decode("utf-8")).get("sha")
+        if not sha:
+            raise RuntimeError("GitHub did not return the file id")
+        del_req = urllib.request.Request(
+            api_url,
+            data=json.dumps({"message": message, "sha": sha, "branch": cfg["branch"]}).encode("utf-8"),
+            method="DELETE",
+            headers=dict(headers, **{"Content-Type": "application/json"}),
+        )
+        with urllib.request.urlopen(del_req, timeout=25):
+            pass
+    except urllib.error.HTTPError as exc:
+        if exc.code == 404:
+            return True
+        raise RuntimeError(f"GitHub returned HTTP {exc.code}")
+    except urllib.error.URLError as exc:
+        raise RuntimeError(f"Could not reach GitHub: {exc.reason}")
+    return True
+
+
+def delete_replaced_image(old_url, new_url=""):
+    """
+    Call AFTER the product row is saved. If old_url was one of our uploaded GitHub images and
+    nothing uses it any more, delete it from the repo. Best-effort: a GitHub problem never
+    breaks the product update. Returns True (deleted), False (tried, failed) or None (nothing to do).
+    """
+    old_url = (old_url or "").strip()
+    if not old_url or old_url == (new_url or "").strip():
+        return None
+    path = github_path_from_url(old_url)
+    if not path:
+        return None
+    if Product.query.filter(Product.image_url == old_url).first():
+        return None                      # another product still shows this image
+    try:
+        return github_delete_file(path, f"Remove replaced product image: {path.rsplit('/', 1)[-1]}")
+    except RuntimeError as exc:
+        current_app.logger.warning("Could not delete old product image %s: %s", path, exc)
+        return False
+
+
 @main.post("/api/product/<int:pid>/image")
 def product_image(pid):
     if not role_ok("admin", "developer"):
@@ -629,9 +701,11 @@ def product_image(pid):
         clean = _clean_http_url(image_url)
         if not clean:
             return jsonify(error="Image URL must start with https:// or http://"), 400
+        old_url = p.image_url
         p.image_url = clean
         db.session.commit()
-        return jsonify(ok=True, image_url=p.image_url, source="url")
+        deleted = delete_replaced_image(old_url, clean)
+        return jsonify(ok=True, image_url=p.image_url, source="url", old_image_deleted=deleted)
 
     uploaded = request.files.get("image")
     if not uploaded or not uploaded.filename:
@@ -659,22 +733,25 @@ def product_image(pid):
     except RuntimeError as exc:
         return jsonify(error=str(exc)), 400
 
+    old_url = p.image_url
     p.image_url = raw_url
     db.session.commit()
-    return jsonify(ok=True, image_url=raw_url, github_path=path, source="github")
+    deleted = delete_replaced_image(old_url, raw_url)
+    return jsonify(ok=True, image_url=raw_url, github_path=path, source="github", old_image_deleted=deleted)
 
 
 @main.delete("/api/product/<int:pid>/image")
 def product_image_remove(pid):
     if not role_ok("admin", "developer"):
         return jsonify(error="Forbidden"), 403
-    # Only clear the database pointer. GitHub files are intentionally kept as history.
     p = db.session.get(Product, pid)
     if not p:
         return jsonify(error="Product not found"), 404
+    old_url = p.image_url
     p.image_url = ""
     db.session.commit()
-    return jsonify(ok=True)
+    deleted = delete_replaced_image(old_url, "")      # also removes the file from GitHub
+    return jsonify(ok=True, old_image_deleted=deleted)
 
 
 @main.get("/api/product-image-config")
@@ -1232,6 +1309,7 @@ def update_product(pid):
 
     if not p:
         return jsonify(error="Product not found"), 404
+    previous_image_url = p.image_url
 
     try:
         if "name" in d:
@@ -2262,6 +2340,7 @@ def developer_update_product(pid):
     p = db.session.get(Product, pid)
     if not p:
         return jsonify(error="Product not found"), 404
+    previous_image_url = p.image_url
     d = request.json or {}
     try:
         if "name" in d:
