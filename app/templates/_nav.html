@@ -60,6 +60,7 @@
             class="soft nav-action"
             id="accountBtn"
             onclick="account()"
+            {% if not login_on and session.get('role') != 'customer' %}hidden{% endif %}
         >
             Login
         </button>
@@ -178,6 +179,7 @@
             class="ce-menu-link ce-menu-button"
             id="menuAccountBtn"
             onclick="account(); closeMobileMenu();"
+            {% if not login_on and session.get('role') != 'customer' %}hidden{% endif %}
         >
             <span>🔐</span>
             <span>Login</span>
