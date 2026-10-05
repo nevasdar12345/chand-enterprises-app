@@ -228,19 +228,7 @@ async function loadDelivery() {
     }
 
 
-    rows.innerHTML = `
-
-        <tr>
-
-            <td
-                colspan="7"
-                style="text-align:center"
-            >
-                Loading assigned orders...
-            </td>
-
-        </tr>
-    `;
+    rows.innerHTML = `<div class="dlv-empty">Loading assigned orders...</div>`;
 
 
     const result =
@@ -254,22 +242,7 @@ async function loadDelivery() {
         result._ok === false
     ) {
 
-        rows.innerHTML = `
-
-            <tr>
-
-                <td
-                    colspan="7"
-                    style="text-align:center"
-                >
-                    ${esc(
-                        result.error ||
-                        'Could not load delivery orders'
-                    )}
-                </td>
-
-            </tr>
-        `;
+        rows.innerHTML = `<div class="dlv-empty">${esc(result.error || 'Could not load delivery orders')}</div>`;
 
         return;
     }
@@ -317,147 +290,106 @@ function renderDeliveryOrders() {
 
     if (!DELIVERY_ORDERS.length) {
 
-        rows.innerHTML = `
-
-            <tr>
-
-                <td
-                    colspan="7"
-                    style="text-align:center"
-                >
-                    No orders assigned to you.
-                </td>
-
-            </tr>
-        `;
+        rows.innerHTML = `<div class="dlv-empty">No orders assigned to you.</div>`;
 
         return;
     }
 
 
-    rows.innerHTML =
-        DELIVERY_ORDERS
-            .map(order => `
-
-                <tr>
-
-                    <!-- ORDER -->
-
-                    <td>
-
-                        <strong>
-                            ${esc(order.code)}
-                        </strong>
-
-                        <small>
-                            #${esc(order.id)}
-                        </small>
-
-                    </td>
+    rows.innerHTML = DELIVERY_ORDERS.map(deliveryCard).join('');
+}
 
 
-                    <!-- CUSTOMER -->
-
-                    <td>
-
-                        <strong>
-                            ${esc(
-                                order.customer ||
-                                order.customer_name ||
-                                ''
-                            )}
-                        </strong>
-
-                        <small>
-                            ${esc(
-                                order.mobile ||
-                                ''
-                            )}
-                        </small>
-
-                    </td>
+function statusClass(status) {
+    return 'dlv-status s-' + String(status || 'Confirmed').toLowerCase().replace(/[^a-z]+/g, '-');
+}
 
 
-                    <!-- ADDRESS -->
+function deliveryCard(order) {
+    const status = order.status || 'Confirmed';
+    const name = order.customer || order.customer_name || '';
 
-                    <td>
+    return `
+    <article class="dlv-card ${status === 'Delivered' ? 'is-done' : ''}">
 
-                        ${esc(
-                            order.address ||
-                            ''
-                        )}
+        <div class="dlv-top">
+            <div>
+                <strong class="dlv-code">${esc(order.code)}</strong>
+                <small>#${esc(order.id)}</small>
+            </div>
+            <span class="${statusClass(status)}">${esc(status)}</span>
+        </div>
 
-                        ${order.map_url
-                            ? `<br><a class="loc-map-link" target="_blank" rel="noopener" href="${esc(order.map_url)}">📍 Navigate</a>`
-                            : ''}
+        <div class="dlv-grid">
 
-                    </td>
+            <div class="dlv-block">
+                <span class="dlv-label">Customer</span>
+                <b>${esc(name)}</b>
+                <small>${esc(order.mobile || '')}</small>
+            </div>
 
+            <div class="dlv-block">
+                <span class="dlv-label">Address</span>
+                <div>${esc(order.address || '')}</div>
+                ${order.map_url ? `<a class="loc-map-link" target="_blank" rel="noopener" href="${esc(order.map_url)}">📍 Navigate</a>` : ''}
+            </div>
 
-                    <!-- ITEMS -->
+            <div class="dlv-block">
+                <span class="dlv-label">Items</span>
+                ${deliveryItems(order)}
+            </div>
 
-                    <td>
+            <div class="dlv-block">
+                <span class="dlv-label">Payment</span>
+                ${deliveryPayment(order)}
+            </div>
 
-                        ${deliveryItems(order)}
+        </div>
 
-                    </td>
+        ${deliveryAction(order)}
 
-
-                    <!-- PAYMENT -->
-
-                    <td>
-
-                        ${deliveryPayment(order)}
-
-                    </td>
-
-
-                    <!-- STATUS -->
-
-                    <td>
-
-                        <span class="status">
-
-                            ${esc(
-                                order.status ||
-                                'Confirmed'
-                            )}
-
-                        </span>
-
-                    </td>
-
-
-                    <!-- ACTION -->
-
-                    <td>
-
-                        ${deliveryAction(order)}
-
-                    </td>
-
-                </tr>
-
-            `)
-            .join('');
+    </article>`;
 }
 
 
 /* =========================
    DELIVERY ACTION
+   Call + both WhatsApp buttons stay visible in EVERY status
+   (also after Delivered). Only the status button changes:
+   Confirmed -> Out for Delivery -> Delivered
    ========================= */
 
 function deliveryAction(order) {
-    if (order.status === 'Cancelled') return '<span>Cancelled</span>';
-    let html = `<a class="primary" href="tel:${esc(order.mobile || '')}">📞 Call</a>
-                <button onclick="deliveryWhatsApp(${order.id}, '${esc(order.status || 'Confirmed')}')">💬 WhatsApp</button>`;
-    if (order.payment === 'COD') {
-        html += `<div style="margin-top:6px"><input id="cash_${order.id}" type="number" min="0" max="${Number(order.total||0)}" value="${Number(order.cash_collected||0)}" placeholder="Cash collected" style="max-width:130px">
-                 <button onclick="saveCash(${order.id})">Save cash</button></div>`;
+    const status = order.status || 'Confirmed';
+
+    if (status === 'Cancelled') {
+        return '<div class="dlv-actions"><span class="dlv-note">Order cancelled</span></div>';
     }
-    if (order.status === 'Delivered') return html + '<div style="margin-top:6px">✓ Delivered</div>';
-    if (order.status === 'Out for Delivery') return html + `<button class="primary" onclick="deliveryStatus(${order.id}, 'Delivered')">✓ Delivered</button>`;
-    return html + `<button class="primary" onclick="deliveryStatus(${order.id}, 'Out for Delivery')">🚚 Start delivery</button>`;
+
+    const st = esc(status);
+    const contact = `
+        <a class="dlv-btn dlv-call" href="tel:${esc(order.mobile || '')}">📞 Call</a>
+        <button type="button" class="dlv-btn dlv-wa" onclick="deliveryWhatsApp(${order.id}, '${st}', 'customer')">💬 WhatsApp customer</button>
+        <button type="button" class="dlv-btn dlv-wa-admin" onclick="deliveryWhatsApp(${order.id}, '${st}', 'admin')">💬 WhatsApp admin</button>`;
+
+    let step;
+    if (status === 'Delivered') {
+        step = '<span class="dlv-done">✓ Delivered</span>';
+    } else if (status === 'Out for Delivery') {
+        step = `<button type="button" class="dlv-btn dlv-main" onclick="deliveryStatus(${order.id}, 'Delivered')">✓ Delivered</button>`;
+    } else {
+        step = `<button type="button" class="dlv-btn dlv-main" onclick="deliveryStatus(${order.id}, 'Out for Delivery')">🚚 Out for Delivery</button>`;
+    }
+
+    let cash = '';
+    if (order.payment === 'COD') {
+        cash = `<div class="dlv-cash">
+            <input id="cash_${order.id}" type="number" min="0" max="${Number(order.total || 0)}" value="${Number(order.cash_collected || 0)}" placeholder="Cash collected">
+            <button type="button" class="dlv-btn" onclick="saveCash(${order.id})">Save cash</button>
+        </div>`;
+    }
+
+    return `<div class="dlv-actions">${step}${contact}</div>${cash}`;
 }
 
 
@@ -499,8 +431,8 @@ async function deliveryStatus(
 
 
 
-async function deliveryWhatsApp(id, status) {
-    const result=await api(`/api/delivery/order/${id}/whatsapp`,'POST',{status});
+async function deliveryWhatsApp(id, status, to = 'customer') {
+    const result=await api(`/api/delivery/order/${id}/whatsapp`,'POST',{status, to});
     if(!result._ok) return alert(result.error||'Could not open WhatsApp');
     window.open(result.whatsapp_url,'_blank','noopener');
 }
