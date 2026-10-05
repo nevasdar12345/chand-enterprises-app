@@ -96,6 +96,10 @@
 
 </main>
 
-<script>window.PRODUCTS = {{ products|tojson }};</script>
+<div id="productData" hidden data-products="{{ products|tojson|forceescape }}"></div>
+<script>
+    try { window.PRODUCTS = JSON.parse(document.getElementById('productData').dataset.products || '[]'); }
+    catch (e) { window.PRODUCTS = []; }
+</script>
 
 {% endblock %}
