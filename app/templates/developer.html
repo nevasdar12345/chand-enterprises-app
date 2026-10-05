@@ -124,28 +124,34 @@ Developer · Chand Enterprises
 
 
         <div class="card">
-
-            <div class="ic">
-                ⚙️
-            </div>
-
-            <b>
-                Business Settings
-            </b>
-
-            <small>
-                Business name, mobile,
-                WhatsApp, UPI and location.
-            </small>
+            <div class="ic">🏠</div>
+            <b>Home Page Settings</b>
+            <small>Customer login, prices and online ordering on the storefront.</small>
+            <button class="primary" onclick="developerSettings('home')">Manage</button>
+        </div>
 
 
-            <button
-                class="primary"
-                onclick="developerSettings()"
-            >
-                Manage
-            </button>
+        <div class="card">
+            <div class="ic">ℹ️</div>
+            <b>About Page Settings</b>
+            <small>About text and social media links.</small>
+            <button class="primary" onclick="developerSettings('about')">Manage</button>
+        </div>
 
+
+        <div class="card">
+            <div class="ic">📖</div>
+            <b>Brochure Settings</b>
+            <small>Brochure link, headings and prices.</small>
+            <button class="primary" onclick="developerSettings('brochure')">Manage</button>
+        </div>
+
+
+        <div class="card">
+            <div class="ic">🏢</div>
+            <b>Business Settings</b>
+            <small>Business name, mobile, WhatsApp, UPI, location and delivery.</small>
+            <button class="primary" onclick="developerSettings('business')">Manage</button>
         </div>
 
 
@@ -237,7 +243,7 @@ Developer · Chand Enterprises
 
             <button
                 onclick="
-                    developerSettings()
+                    developerSettings('business')
                 "
             >
                 Edit
