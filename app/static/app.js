@@ -90,7 +90,8 @@ let CFG = {
   facebook_url: "",
   brochure_url: "",
   /* Developer switch. The server writes the real value into the page, so there is no flash. */
-  show_prices: window.__SHOW_PRICES !== false,
+  show_prices_home: window.__SHOW_PRICES !== false,
+  ordering_enabled: window.__ORDERING !== false,
 };
 
 /* =========================
@@ -355,7 +356,9 @@ function cardHtml(product, index, anim) {
       ? `<span class="badge">Only ${product.stock} left</span>`
       : "";
 
-  const action = soldOut
+  const action = CFG.ordering_enabled === false
+    ? `<button class="primary" onclick="enquiry()">Enquire</button>`
+    : soldOut
     ? ""
     : quantity
       ? `<div class="qty"><button aria-label="Remove one" onclick="chg(${product.id}, -1)">−</button><b>${quantity}</b><button aria-label="Add one more" onclick="chg(${product.id}, 1)">+</button></div>`
@@ -372,7 +375,7 @@ function cardHtml(product, index, anim) {
       </div>
     </div>
     <div class="p-buy">
-      ${CFG.show_prices === false ? "" : `<div class="price">${money(product.price)}</div>`}
+      ${CFG.show_prices_home === false ? "" : `<div class="price">${money(product.price)}</div>`}
       ${action}
     </div>
   </div>`;
@@ -427,7 +430,24 @@ function updateCard(id) {
    CHANGE CART
    ========================= */
 
+function orderingPausedModal() {
+  return modal(`
+    <h2>Ordering is paused</h2>
+    <p>Online ordering is not available right now. Please send us your order on WhatsApp.</p>
+    <button class="primary" onclick="enquiry()">Order on WhatsApp</button>
+    <button onclick="closeModal()">Close</button>
+  `);
+}
+
+function applyOrderingUI() {
+  const on = CFG.ordering_enabled !== false;
+  document.querySelectorAll(".premium-cart").forEach((el) => { el.hidden = !on; });
+  const note = document.getElementById("orderPaused");
+  if (note) note.hidden = on;
+}
+
 function chg(id, change) {
+  if (CFG.ordering_enabled === false) return;
   const product = find(id);
 
   if (!product) {
@@ -529,6 +549,7 @@ async function refreshDeliveryQuote() {
    ========================= */
 
 function cart() {
+  if (CFG.ordering_enabled === false) return orderingPausedModal();
   const ids = Object.keys(CART);
 
   if (!ids.length) {
@@ -647,6 +668,7 @@ function cart() {
    ========================= */
 
 async function checkout() {
+  if (CFG.ordering_enabled === false) return orderingPausedModal();
   if (!ME) {
     ME = await api("/api/me");
   }
@@ -2091,7 +2113,8 @@ async function refreshConfig() {
     return;
   }
 
-  const priceWas = CFG.show_prices;
+  const priceWas = CFG.show_prices_home;
+  const orderWas = CFG.ordering_enabled;
 
   CFG = Object.assign(CFG, result);
 
@@ -2101,7 +2124,9 @@ async function refreshConfig() {
 
   ticker();
 
-  if (priceWas !== CFG.show_prices) render();
+  applyOrderingUI();
+
+  if (priceWas !== CFG.show_prices_home || orderWas !== CFG.ordering_enabled) render();
 
   updateBusinessUI();
 
