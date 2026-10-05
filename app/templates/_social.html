@@ -1,0 +1,14 @@
+{# Shared social-link pills. Links come from Developer > Business Settings > Social media. #}
+{% macro social_list(items, class_name='social-list') %}
+{% if items %}
+<div class="{{ class_name }}" aria-label="Social media links">
+    {% for s in items %}
+    {% set slug = s.name|lower|replace(' ', '')|replace('.', '')|replace('/', '') %}
+    <a class="social-pill soc-{{ slug }}" href="{{ s.url }}" target="_blank" rel="noopener noreferrer" aria-label="{{ s.name }}">
+        <span class="social-badge" aria-hidden="true">{{ s.name[:1]|upper }}</span>
+        <span>{{ s.name }}</span>
+    </a>
+    {% endfor %}
+</div>
+{% endif %}
+{% endmacro %}
