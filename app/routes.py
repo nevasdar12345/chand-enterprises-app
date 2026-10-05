@@ -412,6 +412,7 @@ def order_dict(o):
                 ],
                 lines=[
                     dict(
+                        product_id=i.product_id,
                         name=i.product_name,
                         size=i.product_size or "1L",
                         qty=i.quantity,
@@ -966,7 +967,7 @@ def delivery_quote():
 @main.get("/api/config")
 def config():
     cfg = developer_settings()
-    return jsonify(_ok=True, whatsapp=wa_number(), upi=cfg["upi"] or current_app.config["UPI_ID"], business_name=cfg["business_name"], business_mobile=cfg["business_mobile"], business_location=cfg["business_location"], payment_name=cfg["payment_name"], offers=cfg["offers"], show_prices_home=cfg["show_prices_home"], show_prices_brochure=cfg["show_prices_brochure"], ordering_enabled=cfg["ordering_enabled"], customer_login_enabled=cfg["customer_login_enabled"], instagram_url=cfg["instagram_url"], facebook_url=cfg["facebook_url"], social_links=cfg["social_links"], about_title=cfg["about_title"], about_text=cfg["about_text"], footer_tagline=cfg["footer_tagline"], brochure_url=cfg["brochure_url"], categories=[category_dict(c) for c in active_categories()], coupons=[coupon_dict(c) for c in Coupon.query.filter_by(active=True).order_by(Coupon.code).all()])
+    return jsonify(_ok=True, whatsapp=wa_number(), upi=cfg["upi"] or current_app.config["UPI_ID"], business_name=cfg["business_name"], business_mobile=cfg["business_mobile"], business_location=cfg["business_location"], payment_name=cfg["payment_name"], offers=cfg["offers"], show_prices_home=cfg["show_prices_home"], show_prices_brochure=cfg["show_prices_brochure"], ordering_enabled=cfg["ordering_enabled"], customer_login_enabled=cfg["customer_login_enabled"], free_delivery_above=float_setting("delivery_free_above", 500), instagram_url=cfg["instagram_url"], facebook_url=cfg["facebook_url"], social_links=cfg["social_links"], about_title=cfg["about_title"], about_text=cfg["about_text"], footer_tagline=cfg["footer_tagline"], brochure_url=cfg["brochure_url"], categories=[category_dict(c) for c in active_categories()], coupons=[coupon_dict(c) for c in Coupon.query.filter_by(active=True).order_by(Coupon.code).all()])
 
 
 @main.get("/api/categories")
