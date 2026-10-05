@@ -1676,6 +1676,7 @@ def update_coupon(cid):
 
 @main.post("/api/delivery/order/<int:oid>/whatsapp")
 def delivery_whatsapp(oid):
+    """WhatsApp link for an order. body: {to: "customer" | "admin", status: optional}"""
     if not role_ok("delivery", "admin"):
         return jsonify(error="Forbidden"), 403
     o = db.session.get(Order, oid)
@@ -1683,7 +1684,21 @@ def delivery_whatsapp(oid):
         return jsonify(error="Order not found"), 404
     if role_ok("delivery") and o.delivery_person_id != session.get("user_id"):
         return jsonify(error="Order not assigned to you"), 403
-    status = str((request.json or {}).get("status") or o.status)
+    d = request.json or {}
+    status = str(d.get("status") or o.status)
+    to = "admin" if str(d.get("to") or "customer").lower() == "admin" else "customer"
+
+    if to == "admin":
+        who = session.get("name") or "Delivery partner"
+        lines = [f"Delivery update - order {o.code}",
+                 f"Status: {status}",
+                 f"Customer: {o.customer_name} ({o.mobile})",
+                 f"Amount: Rs {o.total:.0f} | {o.payment_method or '-'} | {o.payment_status}"]
+        if o.payment_method == "COD":
+            lines.append(f"Cash collected: Rs {(o.cash_collected or 0):.0f}")
+        lines.append(f"By: {who}")
+        return jsonify(ok=True, whatsapp_url=wa_link("\n".join(lines)))
+
     messages = {
         "Out for Delivery": f"Hello {o.customer_name}, your Chand Enterprises order {o.code} is out for delivery. Our delivery partner is on the way.",
         "Delivered": f"Hello {o.customer_name}, your Chand Enterprises order {o.code} has been delivered. Thank you!",
