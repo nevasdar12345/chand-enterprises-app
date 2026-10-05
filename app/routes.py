@@ -53,6 +53,10 @@ DEFAULT_SETTINGS = {
     "brochure_subtitle": "Explore our three product collections — Nevas Package Drinking Water, Cold Drinks and Energy Drinks.",
     "instagram_url": "",
     "facebook_url": "",
+    "social_links": "",
+    "about_title": "About Chand Enterprises",
+    "about_text": "Chand Enterprises supplies cold drinks, energy drinks and premium packaged drinking water across Darbhanga, Bihar. We deliver locally, accept QR or cash on delivery, and welcome bulk orders for shops, events and offices.",
+    "footer_tagline": "Drinks & premium water",
     "archive_days": "7",
     "archive_method": "email",
     "archive_email": "",
@@ -133,12 +137,62 @@ def ordering_enabled():
     return _flag("ordering_enabled")
 
 
+SOCIAL_LIMIT = 12
+
+
+def social_links():
+    """
+    Social media links shown in the footer and on the About page.
+    Developer manages them as a list: [{"name": "Instagram", "url": "https://..."}, ...]
+    Older sites that only saved instagram_url / facebook_url keep working.
+    """
+    raw = setting_value("social_links")
+    links = []
+    if raw:
+        try:
+            data = json.loads(raw)
+        except ValueError:
+            data = []
+        for item in data if isinstance(data, list) else []:
+            if not isinstance(item, dict):
+                continue
+            name = str(item.get("name") or "").strip()[:30]
+            url = _clean_http_url(item.get("url"))
+            if name and url:
+                links.append({"name": name, "url": url})
+        return links[:SOCIAL_LIMIT]
+    for name, key in (("Instagram", "instagram_url"), ("Facebook", "facebook_url")):
+        url = _clean_http_url(setting_value(key))
+        if url:
+            links.append({"name": name, "url": url})
+    return links
+
+
+def site_info():
+    """Everything the nav, footer and About page need - all editable by the developer."""
+    mobile = "".join(c for c in setting_value("business_mobile") if c.isdigit())
+    return {
+        "name": setting_value("business_name") or "Chand Enterprises",
+        "mobile": mobile,
+        "tel": ("+91" + mobile[-10:]) if len(mobile) >= 10 else mobile,
+        "location": setting_value("business_location") or "Darbhanga, Bihar",
+        "whatsapp_url": "https://wa.me/" + wa_number(),
+        "tagline": setting_value("footer_tagline") or DEFAULT_SETTINGS["footer_tagline"],
+        "about_title": setting_value("about_title") or DEFAULT_SETTINGS["about_title"],
+        "about_text": setting_value("about_text") or DEFAULT_SETTINGS["about_text"],
+        "social": social_links(),
+    }
+
+
 @main.app_context_processor
 def inject_site_flags():
     try:
-        return {"ordering_on": ordering_enabled()}
+        return {"ordering_on": ordering_enabled(), "site": site_info()}
     except Exception:
-        return {"ordering_on": True}
+        return {"ordering_on": True, "site": {
+            "name": "Chand Enterprises", "mobile": "", "tel": "", "location": "Darbhanga, Bihar",
+            "whatsapp_url": "", "tagline": "Drinks & premium water",
+            "about_title": "About Chand Enterprises", "about_text": "", "social": []}}
 
 
 def offers_list():
@@ -205,7 +259,7 @@ def calculate_coupon(code, subtotal):
 def developer_settings():
     raw = setting_value("offers")
     offers = [x.strip() for x in raw.splitlines() if x.strip()] if raw else DEFAULT_OFFERS[:]
-    return {"business_name": setting_value("business_name"), "business_mobile": setting_value("business_mobile"), "whatsapp": setting_value("whatsapp"), "business_location": setting_value("business_location"), "upi": setting_value("upi"), "payment_name": setting_value("payment_name"), "business_lat": setting_value("business_lat"), "business_lng": setting_value("business_lng"), "delivery_base": setting_value("delivery_base"), "delivery_per_km": setting_value("delivery_per_km"), "delivery_free_above": setting_value("delivery_free_above"), "instagram_url": setting_value("instagram_url"), "facebook_url": setting_value("facebook_url"), "show_prices_home": prices_home(), "show_prices_brochure": prices_brochure(), "ordering_enabled": ordering_enabled(), "brochure_url": setting_value("brochure_url"), "brochure_eyebrow": setting_value("brochure_eyebrow"), "brochure_title": setting_value("brochure_title"), "brochure_subtitle": setting_value("brochure_subtitle"), "archive_days": setting_value("archive_days") or "7", "archive_method": setting_value("archive_method") or "email", "archive_email": setting_value("archive_email"), "archive_whatsapp": setting_value("archive_whatsapp"), "offers": offers}
+    return {"business_name": setting_value("business_name"), "business_mobile": setting_value("business_mobile"), "whatsapp": setting_value("whatsapp"), "business_location": setting_value("business_location"), "upi": setting_value("upi"), "payment_name": setting_value("payment_name"), "business_lat": setting_value("business_lat"), "business_lng": setting_value("business_lng"), "delivery_base": setting_value("delivery_base"), "delivery_per_km": setting_value("delivery_per_km"), "delivery_free_above": setting_value("delivery_free_above"), "instagram_url": setting_value("instagram_url"), "facebook_url": setting_value("facebook_url"), "social_links": social_links(), "about_title": setting_value("about_title"), "about_text": setting_value("about_text"), "footer_tagline": setting_value("footer_tagline"), "show_prices_home": prices_home(), "show_prices_brochure": prices_brochure(), "ordering_enabled": ordering_enabled(), "brochure_url": setting_value("brochure_url"), "brochure_eyebrow": setting_value("brochure_eyebrow"), "brochure_title": setting_value("brochure_title"), "brochure_subtitle": setting_value("brochure_subtitle"), "archive_days": setting_value("archive_days") or "7", "archive_method": setting_value("archive_method") or "email", "archive_email": setting_value("archive_email"), "archive_whatsapp": setting_value("archive_whatsapp"), "offers": offers}
 
 
 def display_datetime(dt):
@@ -451,6 +505,11 @@ def brochure_links(url):
         out.update(kind="docx", docx=url,
                    embed=f"https://view.officeapps.live.com/op/embed.aspx?src={q(url, safe='')}")
     return out
+
+
+@main.route("/about")
+def about():
+    return render_template("about.html", offers=offers_list())
 
 
 @main.route("/brochure")
@@ -815,7 +874,7 @@ def delivery_quote():
 @main.get("/api/config")
 def config():
     cfg = developer_settings()
-    return jsonify(_ok=True, whatsapp=wa_number(), upi=cfg["upi"] or current_app.config["UPI_ID"], business_name=cfg["business_name"], business_mobile=cfg["business_mobile"], business_location=cfg["business_location"], payment_name=cfg["payment_name"], offers=cfg["offers"], show_prices_home=cfg["show_prices_home"], show_prices_brochure=cfg["show_prices_brochure"], ordering_enabled=cfg["ordering_enabled"], instagram_url=cfg["instagram_url"], facebook_url=cfg["facebook_url"], brochure_url=cfg["brochure_url"], categories=[category_dict(c) for c in active_categories()], coupons=[coupon_dict(c) for c in Coupon.query.filter_by(active=True).order_by(Coupon.code).all()])
+    return jsonify(_ok=True, whatsapp=wa_number(), upi=cfg["upi"] or current_app.config["UPI_ID"], business_name=cfg["business_name"], business_mobile=cfg["business_mobile"], business_location=cfg["business_location"], payment_name=cfg["payment_name"], offers=cfg["offers"], show_prices_home=cfg["show_prices_home"], show_prices_brochure=cfg["show_prices_brochure"], ordering_enabled=cfg["ordering_enabled"], instagram_url=cfg["instagram_url"], facebook_url=cfg["facebook_url"], social_links=cfg["social_links"], about_title=cfg["about_title"], about_text=cfg["about_text"], footer_tagline=cfg["footer_tagline"], brochure_url=cfg["brochure_url"], categories=[category_dict(c) for c in active_categories()], coupons=[coupon_dict(c) for c in Coupon.query.filter_by(active=True).order_by(Coupon.code).all()])
 
 
 @main.get("/api/categories")
@@ -2051,7 +2110,36 @@ def developer_save_settings():
     if not role_ok("developer"):
         return jsonify(error="Forbidden"), 403
     d = request.json or {}
-    for key in ["business_name", "business_mobile", "whatsapp", "business_location", "upi", "payment_name", "business_lat", "business_lng", "delivery_base", "delivery_per_km", "delivery_free_above", "instagram_url", "facebook_url", "show_prices_home", "show_prices_brochure", "ordering_enabled", "brochure_url", "brochure_eyebrow", "brochure_title", "brochure_subtitle", "archive_days", "archive_method", "archive_email", "archive_whatsapp"]:
+    if "social_links" in d:
+        raw_links = d.get("social_links")
+        if not isinstance(raw_links, list):
+            return jsonify(error="Social links must be a list"), 400
+        if len(raw_links) > SOCIAL_LIMIT:
+            return jsonify(error=f"You can add up to {SOCIAL_LIMIT} social links"), 400
+        clean_links = []
+        for item in raw_links:
+            name = str((item or {}).get("name") or "").strip()[:30]
+            url = str((item or {}).get("url") or "").strip()
+            if not name and not url:
+                continue                      # ignore empty rows
+            if not name:
+                return jsonify(error="Every social link needs a name"), 400
+            if not _clean_http_url(url):
+                return jsonify(error=f"{name}: link must be a valid http(s) URL"), 400
+            clean_links.append({"name": name, "url": url})
+        set_setting("social_links", json.dumps(clean_links))
+        # keep the two legacy keys in step so nothing else breaks
+        for legacy, label in (("instagram_url", "instagram"), ("facebook_url", "facebook")):
+            match = next((x["url"] for x in clean_links if x["name"].strip().lower() == label), "")
+            set_setting(legacy, match)
+    for key in ["about_title", "about_text", "footer_tagline"]:
+        if key in d:
+            value = str(d.get(key) or "").strip()
+            limit = {"about_title": 80, "about_text": 900, "footer_tagline": 80}[key]
+            if len(value) > limit:
+                return jsonify(error=f"{key.replace('_', ' ').title()} must be {limit} characters or fewer"), 400
+            set_setting(key, value)
+    for key in ["business_name", "business_mobile", "whatsapp", "business_location", "upi", "payment_name", "business_lat", "business_lng", "delivery_base", "delivery_per_km", "delivery_free_above", "show_prices_home", "show_prices_brochure", "ordering_enabled", "brochure_url", "brochure_eyebrow", "brochure_title", "brochure_subtitle", "archive_days", "archive_method", "archive_email", "archive_whatsapp"]:
         if key in d:
             if key in {"show_prices_home", "show_prices_brochure", "ordering_enabled"}:
                 set_setting(key, "0" if str(d.get(key)).strip().lower() in {"0", "false", "no", "off", ""} else "1")
