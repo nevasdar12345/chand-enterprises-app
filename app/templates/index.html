@@ -271,6 +271,30 @@
     </div>
 
 
+    <div class="filters shop-tools" id="shopTools">
+
+        <select id="sortBy" aria-label="Sort products">
+            <option value="featured">Sort: Featured</option>
+            <option value="price-asc">Price: low to high</option>
+            <option value="price-desc">Price: high to low</option>
+            <option value="name">Name: A to Z</option>
+        </select>
+
+        <select id="sizeFilter" aria-label="Filter by size">
+            <option value="">All sizes</option>
+        </select>
+
+        <label class="stock-toggle">
+            <input type="checkbox" id="inStockOnly">
+            <span>In stock only</span>
+        </label>
+
+        <button type="button" id="wishFilter" class="wish-filter" aria-pressed="false">
+            ♥ Wishlist <span id="wishCount"></span>
+        </button>
+
+    </div>
+
     <div
         class="grid premium-grid"
         id="grid"
@@ -301,19 +325,22 @@
     </div>
 
 
-    <button
-        type="button"
-        class="primary enquiry-btn"
-        onclick="enquiry()"
-    >
+    <div class="enquiry-actions">
 
-        Enquire on WhatsApp
+        <button type="button" class="primary enquiry-btn" onclick="enquiry()">
+            Enquire on WhatsApp
+            <span>→</span>
+        </button>
 
-        <span>
-            →
-        </span>
+        <button type="button" class="enquiry-alt" onclick="eventPlanner()">
+            🎉 Plan a function
+        </button>
 
-    </button>
+        <button type="button" class="enquiry-alt" onclick="bulkOrder()">
+            📦 Bulk order
+        </button>
+
+    </div>
 
 </section>
 
