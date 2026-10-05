@@ -327,12 +327,32 @@ async function developerSettings() {
             <input id="ds_free" type="number" min="0" value="${esc(settings.delivery_free_above || '500')}">
         </label>
 
-        <label>Instagram page URL
-            <input id="ds_instagram" type="url" placeholder="https://instagram.com/yourpage" value="${esc(settings.instagram_url || '')}">
+        <fieldset class="ds-social">
+            <legend>Social media links</legend>
+            <p class="muted" style="margin:0 0 8px;font-size:12px">
+                Shown in the website footer and on the About page. Add as many as you need (up to 12).
+            </p>
+            <div id="ds_social_rows">
+                ${socialRowsHtml(settings.social_links)}
+            </div>
+            <button type="button" onclick="addSocialRow()">+ Add social media</button>
+            <datalist id="ds_social_names">
+                <option value="Instagram"><option value="Facebook"><option value="YouTube">
+                <option value="X"><option value="LinkedIn"><option value="Telegram">
+                <option value="WhatsApp Channel"><option value="Threads"><option value="Snapchat"><option value="Pinterest">
+            </datalist>
+        </fieldset>
+
+        <label>About page – heading
+            <input id="ds_about_title" maxlength="80" placeholder="About Chand Enterprises" value="${esc(settings.about_title || '')}">
         </label>
 
-        <label>Facebook page URL
-            <input id="ds_facebook" type="url" placeholder="https://facebook.com/yourpage" value="${esc(settings.facebook_url || '')}">
+        <label>About page – description
+            <textarea id="ds_about_text" rows="4" maxlength="900" placeholder="Tell customers about your business...">${esc(settings.about_text || '')}</textarea>
+        </label>
+
+        <label>Footer tagline
+            <input id="ds_footer_tagline" maxlength="80" placeholder="Drinks &amp; premium water" value="${esc(settings.footer_tagline || '')}">
         </label>
 
         <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
@@ -388,6 +408,45 @@ async function developerSettings() {
 }
 
 
+
+/* =========================================================
+   SOCIAL MEDIA LINKS (developer-managed list)
+   ========================================================= */
+
+function socialRowHtml(item) {
+    item = item || {};
+    return `
+        <div class="ds-social-row" style="display:grid;grid-template-columns:1fr 2fr auto;gap:8px;margin-bottom:8px">
+            <input class="ds-soc-name" list="ds_social_names" maxlength="30" placeholder="Name (e.g. Instagram)" value="${esc(item.name || '')}">
+            <input class="ds-soc-url" type="url" placeholder="https://..." value="${esc(item.url || '')}">
+            <button type="button" onclick="this.closest('.ds-social-row').remove()" aria-label="Remove link" title="Remove">✕</button>
+        </div>`;
+}
+
+function socialRowsHtml(list) {
+    const items = Array.isArray(list) ? list : [];
+    return items.map(socialRowHtml).join('');
+}
+
+function addSocialRow() {
+    const box = $('#ds_social_rows');
+    if (!box) return;
+    if (box.querySelectorAll('.ds-social-row').length >= 12) {
+        return alert('You can add up to 12 social links');
+    }
+    box.insertAdjacentHTML('beforeend', socialRowHtml());
+    box.lastElementChild.querySelector('.ds-soc-name').focus();
+}
+
+function collectSocialRows() {
+    const box = $('#ds_social_rows');
+    if (!box) return undefined;          // settings form not open: leave links unchanged
+    return [...box.querySelectorAll('.ds-social-row')].map(row => ({
+        name: row.querySelector('.ds-soc-name').value.trim(),
+        url: row.querySelector('.ds-soc-url').value.trim()
+    }));
+}
+
 /* =========================================================
    SAVE BUSINESS SETTINGS
    ========================================================= */
@@ -433,8 +492,10 @@ async function saveDeveloperSettings() {
                 delivery_base: $('#ds_base')?.value,
                 delivery_per_km: $('#ds_km')?.value,
                 delivery_free_above: $('#ds_free')?.value,
-                instagram_url: $('#ds_instagram')?.value.trim(),
-                facebook_url: $('#ds_facebook')?.value.trim(),
+                social_links: collectSocialRows(),
+                about_title: $('#ds_about_title')?.value.trim(),
+                about_text: $('#ds_about_text')?.value.trim(),
+                footer_tagline: $('#ds_footer_tagline')?.value.trim(),
                 show_prices_home: $('#ds_prices_home') ? $('#ds_prices_home').checked : undefined,
                 show_prices_brochure: $('#ds_prices_brochure') ? $('#ds_prices_brochure').checked : undefined,
                 ordering_enabled: $('#ds_ordering') ? $('#ds_ordering').checked : undefined,
