@@ -11,6 +11,13 @@
         <span>
             Chand Enterprises
             <small>Darbhanga, Bihar</small>
+            {% if site.mobile %}
+            <span class="logo-phone" role="link" tabindex="0"
+                  onclick="event.preventDefault();event.stopPropagation();location.href='tel:{{ site.tel }}'"
+                  onkeydown="if(event.key==='Enter'){event.preventDefault();location.href='tel:{{ site.tel }}'}">
+                📞 {{ site.mobile }}
+            </span>
+            {% endif %}
         </span>
 
     </a>
@@ -37,16 +44,6 @@
     <!-- ================= NAVIGATION ACTIONS ================= -->
 
     <div class="store-actions">
-
-        <a class="soft nav-action nav-about" href="/about">
-            <span>About</span>
-        </a>
-
-        {% if site.mobile %}
-        <a class="soft nav-action nav-phone" href="tel:{{ site.tel }}" aria-label="Call {{ site.mobile }}">
-            📞 <span>{{ site.mobile }}</span>
-        </a>
-        {% endif %}
 
         <button
             type="button"
