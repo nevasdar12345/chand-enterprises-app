@@ -824,7 +824,7 @@ async function loadAdminProducts() {
 
                     <td>
                         ${product.image_url ? `<img src="${esc(product.image_url)}" alt="" style="width:48px;height:48px;object-fit:cover;border-radius:8px">` : esc(product.icon || '🥤')}
-                        <br><button type="button" onclick="openProductImageManager(${product.id}, ${JSON.stringify(product.image_url || '')})">📷 Image</button>
+                        <br><button type="button" onclick="openProductImageManager(${product.id}, ${esc(JSON.stringify(product.image_url || ''))})">📷 Image</button>
                     </td>
 
                     <td>
