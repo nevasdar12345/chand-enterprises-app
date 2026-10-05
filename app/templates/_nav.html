@@ -37,7 +37,18 @@
     <!-- ================= NAVIGATION ACTIONS ================= -->
 
     <div class="store-actions">
-<button
+
+        <a class="soft nav-action nav-about" href="/about">
+            <span>About</span>
+        </a>
+
+        {% if site.mobile %}
+        <a class="soft nav-action nav-phone" href="tel:{{ site.tel }}" aria-label="Call {{ site.mobile }}">
+            📞 <span>{{ site.mobile }}</span>
+        </a>
+        {% endif %}
+
+        <button
             type="button"
             class="soft nav-action"
             onclick="orders()"
@@ -136,6 +147,18 @@
             <span>Products</span>
         </a>
 
+        <a href="/about" class="ce-menu-link">
+            <span>ℹ️</span>
+            <span>About Us</span>
+        </a>
+
+        {% if site.mobile %}
+        <a href="tel:{{ site.tel }}" class="ce-menu-link">
+            <span>📞</span>
+            <span>Call {{ site.mobile }}</span>
+        </a>
+        {% endif %}
+
         <a href="/brochure" class="ce-menu-link ce-menu-featured">
             <span>📖</span>
             <span>Brochure</span>
@@ -176,7 +199,7 @@
     </nav>
 
     <div class="ce-menu-footer">
-        <span>📍</span> Darbhanga, Bihar
+        <span>📍</span> {{ site.location }}
     </div>
 
 </aside>
