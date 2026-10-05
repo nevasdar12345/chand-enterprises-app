@@ -2159,11 +2159,7 @@ function updateBusinessUI() {
   });
 
   renderCategories();
-  const socialHtml = [
-    CFG.instagram_url ? `<a href="${esc(CFG.instagram_url)}" target="_blank" rel="noopener">Instagram</a>` : "",
-    CFG.facebook_url ? `<a href="${esc(CFG.facebook_url)}" target="_blank" rel="noopener">Facebook</a>` : ""
-  ].filter(Boolean).join(" · ");
-  ["#socialLinks", "#contactSocial"].forEach(sel => { const social = $(sel); if (social) social.innerHTML = socialHtml; });
+  /* Social links are now rendered by the server (footer + About page) from the developer list. */
 }
 
 /* =========================
