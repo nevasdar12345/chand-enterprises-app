@@ -1,0 +1,62 @@
+{% from '_social.html' import social_list %}
+<!-- ================= FOOTER (shared by Home, Brochure and About) ================= -->
+
+<footer class="site-footer">
+
+    <div class="site-footer-grid">
+
+        <!-- Brand -->
+        <div class="sf-col sf-brand">
+            <a class="sf-logo" href="/" aria-label="{{ site.name }} home">
+                <span class="sf-logo-mark">CE</span>
+                <span>
+                    <b>{{ site.name }}</b>
+                    <small>{{ site.tagline }}</small>
+                </span>
+            </a>
+            <p class="sf-about">{{ site.about_text|truncate(150, True, '…') }}</p>
+            <a class="sf-more" href="/about">Read our story →</a>
+        </div>
+
+        <!-- Quick links -->
+        <nav class="sf-col" aria-label="Footer links">
+            <h3>Explore</h3>
+            <a href="/">Home</a>
+            <a href="/#shop">Products</a>
+            <a href="/brochure">Brochure</a>
+            <a href="/about">About us</a>
+            <button type="button" class="sf-link-btn" onclick="orders()">My orders</button>
+        </nav>
+
+        <!-- Contact -->
+        <div class="sf-col">
+            <h3>Contact</h3>
+            {% if site.mobile %}
+            <a class="sf-contact" href="tel:{{ site.tel }}"><span aria-hidden="true">📞</span> {{ site.mobile }}</a>
+            {% endif %}
+            {% if site.whatsapp_url %}
+            <a class="sf-contact" href="{{ site.whatsapp_url }}" target="_blank" rel="noopener"><span aria-hidden="true">💬</span> WhatsApp us</a>
+            {% endif %}
+            <span class="sf-contact"><span aria-hidden="true">📍</span> {{ site.location }}</span>
+        </div>
+
+        <!-- Social -->
+        <div class="sf-col">
+            <h3>Follow us</h3>
+            {% if site.social %}
+                {{ social_list(site.social, 'social-list') }}
+            {% else %}
+                <span class="sf-muted">Social pages coming soon.</span>
+            {% endif %}
+        </div>
+
+    </div>
+
+    <div class="site-footer-bottom">
+        <span>© <span id="sfYear">2026</span> {{ site.name }} · {{ site.location }}</span>
+        <a href="/staff" class="footer-staff">Staff login</a>
+    </div>
+
+    <script>document.getElementById('sfYear').textContent = new Date().getFullYear();</script>
+
+</footer>
