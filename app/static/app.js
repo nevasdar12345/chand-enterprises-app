@@ -89,6 +89,8 @@ let CFG = {
   instagram_url: "",
   facebook_url: "",
   brochure_url: "",
+  /* Developer switch. The server writes the real value into the page, so there is no flash. */
+  show_prices: window.__SHOW_PRICES !== false,
 };
 
 /* =========================
@@ -370,7 +372,7 @@ function cardHtml(product, index, anim) {
       </div>
     </div>
     <div class="p-buy">
-      <div class="price">${money(product.price)}</div>
+      ${CFG.show_prices === false ? "" : `<div class="price">${money(product.price)}</div>`}
       ${action}
     </div>
   </div>`;
@@ -2089,6 +2091,8 @@ async function refreshConfig() {
     return;
   }
 
+  const priceWas = CFG.show_prices;
+
   CFG = Object.assign(CFG, result);
 
   if (Array.isArray(result.offers)) {
@@ -2096,6 +2100,8 @@ async function refreshConfig() {
   }
 
   ticker();
+
+  if (priceWas !== CFG.show_prices) render();
 
   updateBusinessUI();
 
@@ -2291,8 +2297,14 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     ticker();
 
-    // the three requests run at the same time (before: one after another)
-    await Promise.all([refreshMe(), refreshConfig(), refreshProducts()]);
+    // The page already contains the product list, so draw it straight away
+    // instead of waiting for another /api/products round trip.
+    const haveProducts = Array.isArray(window.PRODUCTS) && window.PRODUCTS.length > 0;
+    if (haveProducts) {
+      render();
+      heroArt();
+    }
+    await Promise.all([refreshMe(), refreshConfig(), haveProducts ? Promise.resolve() : refreshProducts()]);
   }
 
   /* Other public pages that share the header (e.g. brochure): wire up
@@ -2300,7 +2312,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (!$("#grid") && $("#ceMobileMenu")) {
     persistCart();
 
-    await Promise.all([refreshMe(), refreshConfig(), refreshProducts()]);
+    // brochure already ships the product list inside the page
+    const haveProducts = Array.isArray(window.PRODUCTS) && window.PRODUCTS.length > 0;
+    await Promise.all([refreshMe(), refreshConfig(), haveProducts ? Promise.resolve() : refreshProducts()]);
   }
 
   /*
