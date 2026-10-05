@@ -4889,3 +4889,193 @@ h1,h2,h3{
 .orders-table-scroll td {
     white-space: nowrap;
 }
+
+
+/* =========================================================
+   DELIVERY PAGE v2
+   Uses the theme variables (--card, --ink, --mut, --line, --pri)
+   so text is readable in BOTH light and dark mode.
+   ========================================================= */
+
+.dlv-board{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:18px;
+    overflow:hidden;
+}
+
+.dlv-board-head{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    padding:18px;
+    border-bottom:1px solid var(--line);
+}
+
+.dlv-board-head h2{margin:0 0 2px;font-size:17px;color:var(--ink)}
+.dlv-board-head small{font-size:12px;color:var(--mut)}
+
+.dlv-badge{
+    padding:6px 12px;
+    border-radius:99px;
+    background:color-mix(in srgb,var(--pri) 14%,transparent);
+    color:var(--pri);
+    font-size:11px;
+    font-weight:800;
+    white-space:nowrap;
+}
+
+.dlv-list{
+    display:grid;
+    gap:14px;
+    padding:14px;
+}
+
+.dlv-empty{
+    padding:28px 12px;
+    text-align:center;
+    color:var(--mut);
+}
+
+.dlv-card{
+    background:var(--bg);
+    border:1px solid var(--line);
+    border-radius:16px;
+    padding:16px;
+    color:var(--ink);
+}
+
+.dlv-card.is-done{opacity:.92}
+
+.dlv-top{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:10px;
+    margin-bottom:12px;
+}
+
+.dlv-code{display:block;font-size:15px;color:var(--ink);word-break:break-all}
+.dlv-top small{color:var(--mut);font-size:12px}
+
+.dlv-status{
+    padding:5px 11px;
+    border-radius:99px;
+    font-size:11px;
+    font-weight:800;
+    white-space:nowrap;
+    background:color-mix(in srgb,var(--mut) 20%,transparent);
+    color:var(--ink);
+}
+.dlv-status.s-confirmed,
+.dlv-status.s-preparing{background:color-mix(in srgb,#3b9bff 20%,transparent);color:#3b9bff}
+.dlv-status.s-out-for-delivery{background:color-mix(in srgb,#f59e0b 22%,transparent);color:#d97706}
+.dlv-status.s-delivered{background:color-mix(in srgb,#22c55e 22%,transparent);color:#16a34a}
+.dlv-status.s-cancelled{background:color-mix(in srgb,#ef4444 20%,transparent);color:#dc2626}
+
+.dlv-grid{
+    display:grid;
+    grid-template-columns:repeat(4,minmax(0,1fr));
+    gap:14px;
+}
+
+.dlv-block{font-size:13px;line-height:1.5;color:var(--ink);min-width:0}
+.dlv-block b{display:block;color:var(--ink)}
+.dlv-block small{display:block;color:var(--mut)}
+.dlv-block a{color:var(--pri);font-weight:700}
+
+.dlv-label{
+    display:block;
+    margin-bottom:3px;
+    font-size:10px;
+    font-weight:800;
+    letter-spacing:.6px;
+    text-transform:uppercase;
+    color:var(--mut);
+}
+
+.dlv-actions{
+    display:flex;
+    flex-wrap:wrap;
+    align-items:center;
+    gap:8px;
+    margin-top:14px;
+    padding-top:14px;
+    border-top:1px dashed var(--line);
+}
+
+.dlv-btn{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    gap:6px;
+    min-height:42px;
+    padding:0 14px;
+    border:1px solid var(--line);
+    border-radius:12px;
+    background:var(--card);
+    color:var(--ink);
+    font:inherit;
+    font-size:13px;
+    font-weight:700;
+    text-decoration:none;
+    cursor:pointer;
+}
+
+.dlv-btn:active{transform:scale(.98)}
+.dlv-call{background:#0a7cff;border-color:#0a7cff;color:#fff}
+.dlv-wa{background:#16a34a;border-color:#16a34a;color:#fff}
+.dlv-wa-admin{background:#0f766e;border-color:#0f766e;color:#fff}
+.dlv-main{background:#f59e0b;border-color:#f59e0b;color:#1a1200;order:-1}
+
+.dlv-done{
+    order:-1;
+    padding:9px 14px;
+    border-radius:12px;
+    font-size:13px;
+    font-weight:800;
+    background:color-mix(in srgb,#22c55e 20%,transparent);
+    color:#16a34a;
+}
+
+.dlv-note{color:var(--mut);font-weight:700}
+
+.dlv-cash{
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+    margin-top:10px;
+}
+.dlv-cash input{
+    flex:1 1 140px;
+    max-width:200px;
+    min-height:42px;
+    padding:0 12px;
+    border:1px solid var(--line);
+    border-radius:12px;
+    background:var(--card);
+    color:var(--ink);
+}
+
+/* "Delivery tip" box: it had a fixed light background, so in dark mode the
+   light text on it could not be read. */
+.staff-help{
+    background:var(--card);
+    border:1px solid var(--line);
+}
+.staff-help b{color:var(--ink)}
+.staff-help small{color:var(--mut)}
+.staff-help-icon{background:color-mix(in srgb,var(--pri) 16%,transparent)}
+
+@media(max-width:900px){
+    .dlv-grid{grid-template-columns:1fr 1fr}
+}
+
+@media(max-width:560px){
+    .dlv-list{padding:10px}
+    .dlv-grid{grid-template-columns:1fr}
+    .dlv-actions .dlv-btn,
+    .dlv-actions .dlv-done{flex:1 1 100%}
+    .dlv-wa,.dlv-wa-admin{flex:1 1 calc(50% - 4px)}
+}
