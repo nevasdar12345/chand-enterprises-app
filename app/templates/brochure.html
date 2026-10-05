@@ -96,6 +96,8 @@
 
 </main>
 
+{% include '_footer.html' %}
+
 <div id="productData" hidden data-products="{{ products|tojson|forceescape }}"></div>
 <script>
     try { window.PRODUCTS = JSON.parse(document.getElementById('productData').dataset.products || '[]'); }
