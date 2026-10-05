@@ -336,8 +336,18 @@ async function developerSettings() {
         </label>
 
         <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
-            <input id="ds_show_prices" type="checkbox" style="width:auto;margin:0" ${settings.show_prices === false ? '' : 'checked'}>
-            <span>Show product prices (store cards &amp; brochure)</span>
+            <input id="ds_prices_home" type="checkbox" style="width:auto;margin:0" ${settings.show_prices_home === false ? '' : 'checked'}>
+            <span>Show prices on Home page</span>
+        </label>
+
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
+            <input id="ds_prices_brochure" type="checkbox" style="width:auto;margin:0" ${settings.show_prices_brochure === false ? '' : 'checked'}>
+            <span>Show prices on Brochure page</span>
+        </label>
+
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
+            <input id="ds_ordering" type="checkbox" style="width:auto;margin:0" ${settings.ordering_enabled === false ? '' : 'checked'}>
+            <span>Allow cart &amp; checkout (untick to pause online ordering)</span>
         </label>
 
         <label>Brochure PDF / document URL
@@ -425,7 +435,9 @@ async function saveDeveloperSettings() {
                 delivery_free_above: $('#ds_free')?.value,
                 instagram_url: $('#ds_instagram')?.value.trim(),
                 facebook_url: $('#ds_facebook')?.value.trim(),
-                show_prices: $('#ds_show_prices') ? $('#ds_show_prices').checked : undefined,
+                show_prices_home: $('#ds_prices_home') ? $('#ds_prices_home').checked : undefined,
+                show_prices_brochure: $('#ds_prices_brochure') ? $('#ds_prices_brochure').checked : undefined,
+                ordering_enabled: $('#ds_ordering') ? $('#ds_ordering').checked : undefined,
                 brochure_url: $('#ds_brochure')?.value.trim(),
                 brochure_eyebrow: $('#ds_bro_eyebrow')?.value.trim(),
                 brochure_title: $('#ds_bro_title')?.value.trim(),
