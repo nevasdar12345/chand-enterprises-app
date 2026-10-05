@@ -5212,6 +5212,7 @@ h1,h2,h3{
 /* ---------- footer ---------- */
 
 .site-footer {
+    display: block;           /* global footer{display:flex} would put the bottom bar beside the columns */
     max-width: 1100px;
     margin: 48px auto 0;
     padding: 36px 16px 22px;
@@ -5337,14 +5338,24 @@ h1,h2,h3{
     }
 }
 
-@media (max-width: 520px) {
+/* mobile: keep only Contact, Follow us, copyright and Staff login */
+@media (max-width: 700px) {
+    .site-footer {
+        padding: 26px 16px 22px;
+    }
     .site-footer-grid {
         grid-template-columns: 1fr;
-        gap: 26px;
+        gap: 22px;
+    }
+    .sf-brand,
+    .site-footer-grid > nav.sf-col {
+        display: none;
     }
     .site-footer-bottom {
-        justify-content: center;
-        text-align: center;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+        margin-top: 24px;
     }
 }
 
@@ -5502,4 +5513,3 @@ a.about-contact-item:hover {
     .about-cards { grid-template-columns: 1fr; }
     .about-connect { padding: 22px; }
 }
-
