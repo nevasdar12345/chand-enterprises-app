@@ -5099,3 +5099,407 @@ h1,h2,h3{
     font-weight:700;
 }
 .order-paused[hidden]{display:none}
+
+
+/* ===== Shared footer + About page + nav phone (kept in style.css so it always loads) ===== */
+/* =========================================================
+   Chand Enterprises - shared footer + About page + nav extras
+   All text/links come from Developer > Business Settings.
+   ========================================================= */
+
+/* ---------- nav: phone number under the brand ---------- */
+
+.store-logo .logo-phone {
+    display: block;
+    margin-top: 3px;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1.2;
+    color: var(--pri);
+    cursor: pointer;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.store-logo .logo-phone:hover {
+    text-decoration: underline;
+}
+
+/* ---------- social pills (footer + about) ---------- */
+
+.social-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+}
+
+.social-pill {
+    --brand: var(--pri);
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px 6px 6px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 700;
+    text-decoration: none;
+    color: var(--ink);
+    background: color-mix(in srgb, var(--brand) 9%, transparent);
+    border: 1px solid color-mix(in srgb, var(--brand) 25%, transparent);
+    transition: transform .2s ease, background .2s ease, border-color .2s ease;
+}
+
+.social-pill:hover {
+    transform: translateY(-2px);
+    background: color-mix(in srgb, var(--brand) 18%, transparent);
+    border-color: var(--brand);
+    text-decoration: none;
+}
+
+.social-badge {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 900;
+    color: #fff;
+    background: var(--brand);
+}
+
+.soc-instagram { --brand: #e1306c; }
+.soc-facebook  { --brand: #1877f2; }
+.soc-youtube   { --brand: #ff0000; }
+.soc-x, .soc-twitter { --brand: #111827; }
+.soc-linkedin  { --brand: #0a66c2; }
+.soc-telegram  { --brand: #229ed9; }
+.soc-whatsapp  { --brand: #25d366; }
+.soc-snapchat  { --brand: #f5c400; }
+.soc-pinterest { --brand: #e60023; }
+.soc-threads   { --brand: #111827; }
+
+.soc-instagram .social-badge {
+    background: linear-gradient(135deg, #f58529, #dd2a7b 55%, #8134af);
+}
+
+:root[data-theme="dark"] .soc-x,
+:root[data-theme="dark"] .soc-twitter,
+:root[data-theme="dark"] .soc-threads { --brand: #e5e7eb; }
+
+:root[data-theme="dark"] .soc-x .social-badge,
+:root[data-theme="dark"] .soc-twitter .social-badge,
+:root[data-theme="dark"] .soc-threads .social-badge { color: #111827; }
+
+.social-list-large .social-pill {
+    font-size: 15px;
+    padding: 8px 18px 8px 8px;
+}
+
+.social-list-large .social-badge {
+    width: 32px;
+    height: 32px;
+    font-size: 14px;
+}
+
+.sf-muted {
+    color: var(--mut);
+    font-size: 13px;
+}
+
+/* ---------- footer ---------- */
+
+.site-footer {
+    max-width: 1100px;
+    margin: 48px auto 0;
+    padding: 36px 16px 22px;
+    border-top: 1px solid var(--line);
+    color: var(--mut);
+}
+
+.site-footer-grid {
+    display: grid;
+    grid-template-columns: 1.6fr 1fr 1.1fr 1.3fr;
+    gap: 32px;
+}
+
+.sf-col {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 9px;
+    min-width: 0;
+}
+
+.sf-col h3 {
+    margin: 0 0 4px;
+    font-size: 12px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--ink);
+}
+
+.sf-col a,
+.sf-link-btn,
+.sf-contact {
+    font-size: 14px;
+    color: var(--mut);
+    text-decoration: none;
+    transition: color .2s ease;
+}
+
+.sf-col a:hover,
+.sf-link-btn:hover {
+    color: var(--pri);
+}
+
+.sf-link-btn {
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    font-size: 14px;
+    cursor: pointer;
+    text-align: left;
+}
+
+.sf-contact {
+    display: inline-flex;
+    gap: 8px;
+    align-items: flex-start;
+}
+
+.sf-logo {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    text-decoration: none;
+}
+
+.sf-logo b {
+    display: block;
+    color: var(--ink);
+    font-size: 16px;
+}
+
+.sf-logo small {
+    font-size: 12px;
+    color: var(--mut);
+}
+
+.sf-logo-mark {
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 900;
+    background: linear-gradient(135deg, #0a7cff, #00c2d1);
+    box-shadow: 0 8px 20px #0a7cff30;
+}
+
+.sf-about {
+    margin: 2px 0 0;
+    font-size: 13px;
+    line-height: 1.6;
+    max-width: 34ch;
+}
+
+.sf-col a.sf-more {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--pri);
+}
+
+.site-footer-bottom {
+    margin-top: 30px;
+    padding-top: 18px;
+    border-top: 1px solid var(--line);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    font-size: 12px;
+}
+
+@media (max-width: 900px) {
+    .site-footer-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+    .sf-brand {
+        grid-column: 1 / -1;
+    }
+}
+
+@media (max-width: 520px) {
+    .site-footer-grid {
+        grid-template-columns: 1fr;
+        gap: 26px;
+    }
+    .site-footer-bottom {
+        justify-content: center;
+        text-align: center;
+    }
+}
+
+/* ---------- about page ---------- */
+
+.about-page {
+    max-width: 1068px;
+    width: calc(100% - 32px);
+    margin: 28px auto 0;
+    display: grid;
+    gap: 22px;
+}
+
+.about-kicker {
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: .14em;
+    color: var(--pri);
+}
+
+.about-hero {
+    padding: clamp(28px, 5vw, 56px);
+    border-radius: 26px;
+    color: #fff;
+    background: linear-gradient(135deg, #0f2a43 0%, #0a5fb8 100%);
+    box-shadow: 0 24px 60px #0a5fb826;
+}
+
+.about-hero .about-kicker {
+    color: #8fd8ff;
+}
+
+.about-hero h1 {
+    margin: 10px 0 14px;
+    font-size: clamp(28px, 4.5vw, 46px);
+    letter-spacing: -1px;
+    line-height: 1.1;
+}
+
+.about-hero p {
+    max-width: 62ch;
+    margin: 0;
+    font-size: 16px;
+    line-height: 1.7;
+    color: #dcebf7;
+}
+
+.about-actions {
+    margin-top: 24px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.about-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 20px;
+    border-radius: 14px;
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.about-hero .about-btn.primary {
+    background: #fff;
+    color: #0a5fb8;
+}
+
+.about-btn-soft {
+    color: #fff;
+    background: rgba(255, 255, 255, .14);
+    border: 1px solid rgba(255, 255, 255, .28);
+}
+
+.about-cards {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+}
+
+.about-card {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 20px;
+    border-radius: 18px;
+    background: var(--card);
+    border: 1px solid var(--line);
+}
+
+.about-card b { color: var(--ink); }
+.about-card small { color: var(--mut); font-size: 13px; }
+.about-card-icon { font-size: 26px; }
+
+.about-connect {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 24px;
+    flex-wrap: wrap;
+    padding: 28px;
+    border-radius: 22px;
+    background: var(--card);
+    border: 1px solid var(--line);
+}
+
+.about-connect h2 {
+    margin: 6px 0 4px;
+    font-size: clamp(22px, 3vw, 28px);
+    color: var(--ink);
+}
+
+.about-connect p {
+    margin: 0;
+    color: var(--mut);
+    font-size: 14px;
+}
+
+.about-contact h2 {
+    margin: 0 0 14px;
+    font-size: 20px;
+    color: var(--ink);
+}
+
+.about-contact-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 14px;
+}
+
+.about-contact-item {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 16px 18px;
+    border-radius: 16px;
+    background: var(--card);
+    border: 1px solid var(--line);
+    text-decoration: none;
+    color: var(--ink);
+    transition: transform .2s ease, border-color .2s ease;
+}
+
+a.about-contact-item:hover {
+    transform: translateY(-2px);
+    border-color: var(--pri);
+}
+
+.about-contact-item > span { font-size: 24px; }
+.about-contact-item small { display: block; color: var(--mut); font-size: 12px; }
+.about-contact-item b { font-size: 15px; }
+
+@media (max-width: 700px) {
+    .about-cards { grid-template-columns: 1fr; }
+    .about-connect { padding: 22px; }
+}
+
