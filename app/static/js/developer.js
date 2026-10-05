@@ -194,146 +194,56 @@ async function loadDeveloperConfig() {
    BUSINESS SETTINGS
    ========================================================= */
 
-async function developerSettings() {
+const SETTINGS_SECTIONS = {
+    home:     { icon: '🏠', title: 'Home Page Settings',  note: 'Customer login, prices and ordering on the storefront.' },
+    about:    { icon: 'ℹ️', title: 'About Page Settings', note: 'About text and social media links.' },
+    brochure: { icon: '📖', title: 'Brochure Settings',   note: 'Brochure link, headings and prices.' },
+    business: { icon: '🏢', title: 'Business Settings',   note: 'Name, mobile, WhatsApp, UPI, location and delivery.' }
+};
 
-    const result =
-        await api(
-            '/api/developer/settings'
-        );
+function settingToggle(id, checked, label, hint) {
+    return `
+        <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;margin:10px 0">
+            <input id="${id}" type="checkbox" style="width:auto;margin:4px 0 0" ${checked ? 'checked' : ''}>
+            <span><b>${label}</b><br><small class="muted">${hint}</small></span>
+        </label>`;
+}
 
-    if (!result._ok) {
+function settingsHomeHtml(st) {
+    return `
+        <p class="muted" style="margin:0 0 6px">Untick a switch to pause that feature on the website.</p>
 
-        return alert(
-            result.error ||
-            'Developer access required'
-        );
-    }
+        ${settingToggle('ds_login', st.customer_login_enabled !== false,
+            'Customer login',
+            'Untick to pause customer login. The Login button is hidden and visitors are asked to use WhatsApp. Staff, admin and developer login are not affected.')}
 
-    /*
-       IMPORTANT:
-       Backend returns:
+        ${settingToggle('ds_prices_home', st.show_prices_home !== false,
+            'Show prices',
+            'Show product prices on the Home page.')}
 
-       {
-           ok: true,
-           settings: {...}
-       }
+        ${settingToggle('ds_ordering', st.ordering_enabled !== false,
+            'Allow orders (cart &amp; checkout)',
+            'Untick to pause online ordering. Customers are asked to order on WhatsApp.')}
+    `;
+}
 
-       So we must use result.settings.
-    */
-
-    const settings =
-        result.settings || {};
-
-    modal(`
-
-        <h2>
-            Business Settings
-        </h2>
-
-        <label>
-            Business name
-
-            <input
-                id="ds_name"
-                value="${esc(
-                    settings.business_name || ''
-                )}"
-            >
+function settingsAboutHtml(st) {
+    return `
+        <label>About page – heading
+            <input id="ds_about_title" maxlength="80" placeholder="About Chand Enterprises" value="${esc(st.about_title || '')}">
         </label>
 
-        <label>
-            Business mobile
-
-            <input
-                id="ds_mobile"
-                value="${esc(
-                    settings.business_mobile || ''
-                )}"
-                maxlength="10"
-            >
-        </label>
-
-        <label>
-            WhatsApp number
-
-            <input
-                id="ds_whatsapp"
-                value="${esc(
-                    settings.whatsapp || ''
-                )}"
-                maxlength="10"
-            >
-        </label>
-
-        <label>
-            Business location
-
-            <input
-                id="ds_location"
-                value="${esc(
-                    settings.business_location || ''
-                )}"
-            >
-        </label>
-
-        <label>
-            UPI ID
-
-            <input
-                id="ds_upi"
-                value="${esc(
-                    settings.upi || ''
-                )}"
-            >
-        </label>
-
-        <label>
-            Payment display name
-
-            <input
-                id="ds_payment"
-                value="${esc(
-                    settings.payment_name || ''
-                )}"
-            >
-        </label>
-
-        <label>
-            Store latitude
-
-            <input id="ds_lat" value="${esc(settings.business_lat || '')}" placeholder="Example: 26.1542">
-        </label>
-
-        <label>
-            Store longitude
-
-            <input id="ds_lng" value="${esc(settings.business_lng || '')}" placeholder="Example: 85.8918">
-        </label>
-
-        <label>
-            Base delivery charge (₹)
-
-            <input id="ds_base" type="number" min="0" value="${esc(settings.delivery_base || '30')}">
-        </label>
-
-        <label>
-            Charge per km (₹)
-
-            <input id="ds_km" type="number" min="0" value="${esc(settings.delivery_per_km || '10')}">
-        </label>
-
-        <label>
-            Free delivery above (₹)
-            <input id="ds_free" type="number" min="0" value="${esc(settings.delivery_free_above || '500')}">
+        <label>About page – description
+            <textarea id="ds_about_text" rows="5" maxlength="900" placeholder="Tell customers about your business...">${esc(st.about_text || '')}</textarea>
         </label>
 
         <fieldset class="ds-social">
             <legend>Social media links</legend>
             <p class="muted" style="margin:0 0 8px;font-size:12px">
-                Shown in the website footer and on the About page. Add as many as you need (up to 12).
+                Shown on the About page and in the website footer. Add as many as you need (up to 12).
             </p>
             <div id="ds_social_rows">
-                ${socialRowsHtml(settings.social_links)}
+                ${socialRowsHtml(st.social_links)}
             </div>
             <button type="button" onclick="addSocialRow()">+ Add social media</button>
             <datalist id="ds_social_names">
@@ -342,71 +252,137 @@ async function developerSettings() {
                 <option value="WhatsApp Channel"><option value="Threads"><option value="Snapchat"><option value="Pinterest">
             </datalist>
         </fieldset>
+    `;
+}
 
-        <label>About page – heading
-            <input id="ds_about_title" maxlength="80" placeholder="About Chand Enterprises" value="${esc(settings.about_title || '')}">
-        </label>
-
-        <label>About page – description
-            <textarea id="ds_about_text" rows="4" maxlength="900" placeholder="Tell customers about your business...">${esc(settings.about_text || '')}</textarea>
-        </label>
-
-        <label>Footer tagline
-            <input id="ds_footer_tagline" maxlength="80" placeholder="Drinks &amp; premium water" value="${esc(settings.footer_tagline || '')}">
-        </label>
-
-        <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
-            <input id="ds_prices_home" type="checkbox" style="width:auto;margin:0" ${settings.show_prices_home === false ? '' : 'checked'}>
-            <span>Show prices on Home page</span>
-        </label>
-
-        <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
-            <input id="ds_prices_brochure" type="checkbox" style="width:auto;margin:0" ${settings.show_prices_brochure === false ? '' : 'checked'}>
-            <span>Show prices on Brochure page</span>
-        </label>
-
-        <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
-            <input id="ds_ordering" type="checkbox" style="width:auto;margin:0" ${settings.ordering_enabled === false ? '' : 'checked'}>
-            <span>Allow cart &amp; checkout (untick to pause online ordering)</span>
-        </label>
+function settingsBrochureHtml(st) {
+    return `
+        ${settingToggle('ds_prices_brochure', st.show_prices_brochure !== false,
+            'Show prices',
+            'Show product prices on the Brochure page.')}
 
         <label>Brochure PDF / document URL
-            <input id="ds_brochure" type="url" placeholder="https://..." value="${esc(settings.brochure_url || '')}">
+            <input id="ds_brochure" type="url" placeholder="https://..." value="${esc(st.brochure_url || '')}">
         </label>
 
         <label>Brochure page – top line
-            <input id="ds_bro_eyebrow" maxlength="80" placeholder="CHAND ENTERPRISES · DARBHANGA, BIHAR" value="${esc(settings.brochure_eyebrow || '')}">
+            <input id="ds_bro_eyebrow" maxlength="80" placeholder="CHAND ENTERPRISES · DARBHANGA, BIHAR" value="${esc(st.brochure_eyebrow || '')}">
         </label>
 
         <label>Brochure page – heading
-            <input id="ds_bro_title" maxlength="80" placeholder="Premium Product Brochure" value="${esc(settings.brochure_title || '')}">
+            <input id="ds_bro_title" maxlength="80" placeholder="Premium Product Brochure" value="${esc(st.brochure_title || '')}">
         </label>
 
         <label>Brochure page – description
-            <textarea id="ds_bro_subtitle" rows="3" maxlength="300" placeholder="Explore our product collections...">${esc(settings.brochure_subtitle || '')}</textarea>
+            <textarea id="ds_bro_subtitle" rows="3" maxlength="300" placeholder="Explore our product collections...">${esc(st.brochure_subtitle || '')}</textarea>
+        </label>
+    `;
+}
+
+function settingsBusinessHtml(st) {
+    return `
+        <label>Business name
+            <input id="ds_name" value="${esc(st.business_name || '')}">
         </label>
 
-        <p
-            class="err"
-            id="ds_err"
-        ></p>
+        <label>Business mobile
+            <input id="ds_mobile" value="${esc(st.business_mobile || '')}" maxlength="10">
+        </label>
 
-        <button
-            class="primary"
-            onclick="saveDeveloperSettings()"
-        >
-            Save settings
-        </button>
+        <label>WhatsApp number
+            <input id="ds_whatsapp" value="${esc(st.whatsapp || '')}" maxlength="10">
+        </label>
 
-        <button
-            onclick="closeModal()"
-        >
-            Close
-        </button>
+        <label>Business location
+            <input id="ds_location" value="${esc(st.business_location || '')}">
+        </label>
 
+        <label>Footer tagline
+            <input id="ds_footer_tagline" maxlength="80" placeholder="Drinks &amp; premium water" value="${esc(st.footer_tagline || '')}">
+        </label>
+
+        <label>UPI ID
+            <input id="ds_upi" value="${esc(st.upi || '')}">
+        </label>
+
+        <label>Payment display name
+            <input id="ds_payment" value="${esc(st.payment_name || '')}">
+        </label>
+
+        <label>Store latitude
+            <input id="ds_lat" value="${esc(st.business_lat || '')}" placeholder="Example: 26.1542">
+        </label>
+
+        <label>Store longitude
+            <input id="ds_lng" value="${esc(st.business_lng || '')}" placeholder="Example: 85.8918">
+        </label>
+
+        <label>Base delivery charge (₹)
+            <input id="ds_base" type="number" min="0" value="${esc(st.delivery_base || '30')}">
+        </label>
+
+        <label>Charge per km (₹)
+            <input id="ds_km" type="number" min="0" value="${esc(st.delivery_per_km || '10')}">
+        </label>
+
+        <label>Free delivery above (₹)
+            <input id="ds_free" type="number" min="0" value="${esc(st.delivery_free_above || '500')}">
+        </label>
+    `;
+}
+
+function settingsPicker() {
+    modal(`
+        <h2>Settings</h2>
+        <p class="muted">Choose what you want to change.</p>
+        <div style="display:grid;gap:10px;margin:12px 0">
+            ${Object.entries(SETTINGS_SECTIONS).map(([key, sec]) => `
+                <button type="button" onclick="developerSettings('${key}')"
+                        style="display:flex;align-items:center;gap:12px;text-align:left;padding:12px 14px">
+                    <span style="font-size:22px">${sec.icon}</span>
+                    <span><b>${sec.title}</b><br><small class="muted">${sec.note}</small></span>
+                </button>`).join('')}
+        </div>
+        <button type="button" onclick="closeModal()">Close</button>
     `);
 }
 
+async function developerSettings(section) {
+
+    /* No section given (top "Settings" button): show the four departments */
+    if (!SETTINGS_SECTIONS[section]) {
+        return settingsPicker();
+    }
+
+    const result = await api('/api/developer/settings');
+
+    if (!result._ok) {
+        return alert(result.error || 'Developer access required');
+    }
+
+    /* Backend returns { ok: true, settings: {...} } */
+    const st = result.settings || {};
+    const sec = SETTINGS_SECTIONS[section];
+
+    const body = {
+        home: settingsHomeHtml,
+        about: settingsAboutHtml,
+        brochure: settingsBrochureHtml,
+        business: settingsBusinessHtml
+    }[section](st);
+
+    modal(`
+        <h2>${sec.icon} ${sec.title}</h2>
+
+        ${body}
+
+        <p class="err" id="ds_err"></p>
+
+        <button class="primary" onclick="saveDeveloperSettings('${section}')">Save ${sec.title.replace(' Settings', '').toLowerCase()} settings</button>
+        <button onclick="developerSettings()">← All settings</button>
+        <button onclick="closeModal()">Close</button>
+    `);
+}
 
 
 /* =========================================================
@@ -451,102 +427,63 @@ function collectSocialRows() {
    SAVE BUSINESS SETTINGS
    ========================================================= */
 
-async function saveDeveloperSettings() {
+async function saveDeveloperSettings(section) {
 
-    const result =
-        await api(
-            '/api/developer/settings',
-            'PUT',
-            {
-                business_name:
-                    $('#ds_name')
-                        ?.value
-                        .trim(),
+    /* Only the fields of the open department exist on screen; missing ones
+       come back undefined and are left out of the request, so other
+       departments' settings are never touched. */
+    const text = id => $(id)?.value.trim();
+    const check = id => $(id) ? $(id).checked : undefined;
 
-                business_mobile:
-                    $('#ds_mobile')
-                        ?.value
-                        .trim(),
+    const result = await api('/api/developer/settings', 'PUT', {
+        /* Home page */
+        customer_login_enabled: check('#ds_login'),
+        show_prices_home: check('#ds_prices_home'),
+        ordering_enabled: check('#ds_ordering'),
 
-                whatsapp:
-                    $('#ds_whatsapp')
-                        ?.value
-                        .trim(),
+        /* About page */
+        about_title: text('#ds_about_title'),
+        about_text: text('#ds_about_text'),
+        social_links: collectSocialRows(),
 
-                business_location:
-                    $('#ds_location')
-                        ?.value
-                        .trim(),
+        /* Brochure */
+        show_prices_brochure: check('#ds_prices_brochure'),
+        brochure_url: text('#ds_brochure'),
+        brochure_eyebrow: text('#ds_bro_eyebrow'),
+        brochure_title: text('#ds_bro_title'),
+        brochure_subtitle: text('#ds_bro_subtitle'),
 
-                upi:
-                    $('#ds_upi')
-                        ?.value
-                        .trim(),
-
-                payment_name:
-                    $('#ds_payment')
-                        ?.value
-                        .trim(),
-                business_lat: $('#ds_lat')?.value.trim(),
-                business_lng: $('#ds_lng')?.value.trim(),
-                delivery_base: $('#ds_base')?.value,
-                delivery_per_km: $('#ds_km')?.value,
-                delivery_free_above: $('#ds_free')?.value,
-                social_links: collectSocialRows(),
-                about_title: $('#ds_about_title')?.value.trim(),
-                about_text: $('#ds_about_text')?.value.trim(),
-                footer_tagline: $('#ds_footer_tagline')?.value.trim(),
-                show_prices_home: $('#ds_prices_home') ? $('#ds_prices_home').checked : undefined,
-                show_prices_brochure: $('#ds_prices_brochure') ? $('#ds_prices_brochure').checked : undefined,
-                ordering_enabled: $('#ds_ordering') ? $('#ds_ordering').checked : undefined,
-                brochure_url: $('#ds_brochure')?.value.trim(),
-                brochure_eyebrow: $('#ds_bro_eyebrow')?.value.trim(),
-                brochure_title: $('#ds_bro_title')?.value.trim(),
-                brochure_subtitle: $('#ds_bro_subtitle')?.value.trim()
-            }
-        );
+        /* Business */
+        business_name: text('#ds_name'),
+        business_mobile: text('#ds_mobile'),
+        whatsapp: text('#ds_whatsapp'),
+        business_location: text('#ds_location'),
+        footer_tagline: text('#ds_footer_tagline'),
+        upi: text('#ds_upi'),
+        payment_name: text('#ds_payment'),
+        business_lat: text('#ds_lat'),
+        business_lng: text('#ds_lng'),
+        delivery_base: $('#ds_base')?.value,
+        delivery_per_km: $('#ds_km')?.value,
+        delivery_free_above: $('#ds_free')?.value
+    });
 
     if (!result._ok) {
-
-        const error =
-            $('#ds_err');
-
+        const error = $('#ds_err');
         if (error) {
-            error.textContent =
-                result.error ||
-                'Could not save settings';
+            error.textContent = result.error || 'Could not save settings';
         }
-
         return;
     }
 
-    /*
-       PUT response may contain updated
-       settings or flat values.
-    */
-
-    if (result.settings) {
-
-        CFG = Object.assign(
-            CFG,
-            result.settings
-        );
-
-    } else {
-
-        CFG = Object.assign(
-            CFG,
-            result
-        );
-    }
+    /* PUT response may contain updated settings or flat values. */
+    CFG = Object.assign(CFG, result.settings || result);
 
     closeModal();
-
     ticker();
 
-    alert(
-        'Business settings saved'
-    );
+    const label = (SETTINGS_SECTIONS[section] || {}).title || 'Settings';
+    alert(label + ' saved');
 }
 
 
