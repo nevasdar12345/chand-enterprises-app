@@ -113,6 +113,7 @@ Developer · Chand Enterprises
 
         </div>
 
+
     </section>
 
 
@@ -152,6 +153,14 @@ Developer · Chand Enterprises
             <b>Business Settings</b>
             <small>Business name, mobile, WhatsApp, UPI, location and delivery.</small>
             <button class="primary" onclick="developerSettings('business')">Manage</button>
+        </div>
+
+
+        <div class="card">
+            <div class="ic">🔐</div>
+            <b>Login &amp; OTP</b>
+            <small>Choose how customers get their login code. Connect the Telegram bot.</small>
+            <button class="primary" onclick="developerSettings('login')">Manage</button>
         </div>
 
 
@@ -199,9 +208,7 @@ Developer · Chand Enterprises
 
             <button
                 class="primary"
-                onclick="
-                    loadDeveloperProducts()
-                "
+                onclick="loadDeveloperProducts()"
             >
                 Refresh
             </button>
@@ -242,9 +249,7 @@ Developer · Chand Enterprises
 
 
             <button
-                onclick="
-                    developerSettings('business')
-                "
+                onclick="developerSettings('business')"
             >
                 Edit
             </button>
@@ -339,6 +344,19 @@ Developer · Chand Enterprises
             </div>
 
 
+            <div>
+
+                <small>
+                    Login code via
+                </small>
+
+                <b>
+                    {{ settings.otp_provider }}
+                </b>
+
+            </div>
+
+
         </div>
 
     </section>
@@ -423,9 +441,7 @@ Developer · Chand Enterprises
 
             <button
                 class="primary"
-                onclick="
-                    addDeveloperProduct()
-                "
+                onclick="addDeveloperProduct()"
             >
                 + Add Product
             </button>
@@ -534,9 +550,7 @@ Developer · Chand Enterprises
 
             <button
                 class="primary"
-                onclick="
-                    developerOffers()
-                "
+                onclick="developerOffers()"
             >
                 Manage Offers
             </button>
