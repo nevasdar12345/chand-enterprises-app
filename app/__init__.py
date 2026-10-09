@@ -102,6 +102,10 @@ def create_app():
             "MASTER_OTP",
             ""
         ),
+
+        TELEGRAM_BOT_TOKEN=os.getenv("TELEGRAM_BOT_TOKEN", "").strip(),
+        TELEGRAM_WEBHOOK_SECRET=os.getenv("TELEGRAM_WEBHOOK_SECRET", "").strip(),
+        PUBLIC_BASE_URL=os.getenv("PUBLIC_BASE_URL", "").strip(),
     )
 
     if database_url:
