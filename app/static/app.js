@@ -78,6 +78,11 @@ let ORD = {};
 /* Remember if login was started from checkout */
 let LOGIN_FROM_CHECKOUT = false;
 
+/* Telegram login: mobile being verified + link-polling state */
+let LOGIN_MOBILE = "";
+let TG_POLL = null;
+let TG_BUSY = false;
+
 let DELIVERY_QUOTE = null;
 
 let deferredInstallPrompt = null;
@@ -597,113 +602,53 @@ function cart() {
 
   if (!ids.length) {
     return modal(`
-
-            <h2>
-                Your cart
-            </h2>
-
-
-            <p class="muted">
-                Cart is empty.
-            </p>
-
-
-            <button
-                onclick="closeModal()"
-            >
-                Close
-            </button>
-
+            <h2>Your cart</h2>
+            <p class="muted">Cart is empty.</p>
+            <button onclick="closeModal()">Close</button>
         `);
   }
 
   const total = totals();
 
   modal(`
-
-        <h2>
-            Your cart
-        </h2>
-
+        <h2>Your cart</h2>
 
         ${ids
           .map((id) => {
             const product = find(id);
 
             return `
-
                         <div class="row">
-
                             <span>
                                 ${esc(product.icon)}
                                 ${esc(cleanName(product.name))}
                                 ${product.size ? `(${esc(product.size)})` : ""}
                                 × ${CART[id]}
                             </span>
-
-
-                            <b>
-                                ${money(product.price * CART[id])}
-                            </b>
-
+                            <b>${money(product.price * CART[id])}</b>
                         </div>
                     `;
           })
           .join("")}
 
-
         <div class="row">
-
-            <span>
-                Delivery
-            </span>
-
-
-            <span>
-                ${total.del ? money(total.del) : "Free"}
-            </span>
-
+            <span>Delivery</span>
+            <span>${total.del ? money(total.del) : "Free"}</span>
         </div>
 
-
         <div class="row">
-
-            <b>
-                Subtotal
-            </b>
-
-
-            <b>
-                ${money(total.sub)}
-            </b>
-
+            <b>Subtotal</b>
+            <b>${money(total.sub)}</b>
         </div>
-
 
         ${freeDeliveryProgress(total)}
 
-        <small>
-            ${couponHint()}
-        </small>
-
+        <small>${couponHint()}</small>
 
         <br>
 
-
-        <button
-            class="primary"
-            onclick="checkout()"
-        >
-            Checkout
-        </button>
-
-
-        <button
-            onclick="closeModal()"
-        >
-            Close
-        </button>
-
+        <button class="primary" onclick="checkout()">Checkout</button>
+        <button onclick="closeModal()">Close</button>
     `);
 }
 
@@ -730,107 +675,45 @@ async function checkout() {
   }
 
   modal(`
-
-        <h2>
-            Checkout
-        </h2>
-
+        <h2>Checkout</h2>
 
         <label>
-
             Name
-
-            <input
-                id="cn"
-                value="${esc(ME.name === "Customer" ? "" : ME.name)}"
-            >
-
+            <input id="cn" value="${esc(ME.name === "Customer" ? "" : ME.name)}">
         </label>
 
-
         <label>
-
             Delivery address
-
-            <textarea
-                id="ca"
-                rows="3"
-            >${esc(ME.address || "")}</textarea>
-
+            <textarea id="ca" rows="3">${esc(ME.address || "")}</textarea>
         </label>
 
         ${LocPicker.html()}
 
-
         <label>
-
             Coupon (optional)
-
-            <input
-                id="cc"
-                oninput="cTot()"
-                autocapitalize="characters"
-                autocomplete="off"
-            >
-
+            <input id="cc" oninput="cTot()" autocapitalize="characters" autocomplete="off">
         </label>
         <div id="couponMsg" class="muted" style="margin:-6px 0 8px;font-size:.9rem"></div>
 
-
         <label>
-
             Payment
-
             <select id="cp">
-
-                <option value="COD">
-                    Cash on delivery
-                </option>
-
-                <option value="QR">
-                    Pay by QR (UPI)
-                </option>
-
+                <option value="COD">Cash on delivery</option>
+                <option value="QR">Pay by QR (UPI)</option>
             </select>
-
         </label>
-
 
         <div id="deliveryInfo" class="muted">Delivery charge will be calculated from your location.</div>
 
         <div class="row">
-
-            <b>
-                Total
-            </b>
-
-
-            <b id="ctot">
-            </b>
-
+            <b>Total</b>
+            <b id="ctot"></b>
         </div>
 
+        <p class="err" id="cerr"></p>
 
-        <p
-            class="err"
-            id="cerr"
-        ></p>
-
-
-        <button
-            class="primary"
-            onclick="placeOrder()"
-        >
-            Place order
-        </button>
-
-
-        <button
-            onclick="cart()"
-        >
-            Back
-        </button>
-
+        <button class="primary" onclick="placeOrder()">Place order</button>
+        <button onclick="cart()">Back</button>
     `);
 
   LocPicker.mount();
@@ -923,18 +806,11 @@ function payQR(code, total) {
   const order = ORD[code] || {};
 
   modal(`
-
         <div class="qrbox">
 
-            <h2>
-                Scan &amp; pay
-            </h2>
+            <h2>Scan &amp; pay</h2>
 
-
-            <div class="amt">
-                ${money(total)}
-            </div>
-
+            <div class="amt">${money(total)}</div>
 
             <small>
                 The amount is already filled
@@ -942,38 +818,22 @@ function payQR(code, total) {
                 Paytm or any UPI app and scan.
             </small>
 
-
             <div class="qrwrap">
-
                 <img
                     src="/api/orders/${encodeURIComponent(code)}/qr.svg?t=${Date.now()}"
                     alt="UPI QR for ${money(total)}"
                 >
-
             </div>
 
-
             <p>
-
-                <small>
-                    Paying to
-                </small>
-
-
-                <b>
-                    ${esc(CFG.upi)}
-                </b>
-
+                <small>Paying to</small>
+                <b>${esc(CFG.upi)}</b>
             </p>
-
 
             ${
               order.upi_url
                 ? `
-                    <a
-                        class="add upilink"
-                        href="${esc(order.upi_url)}"
-                    >
+                    <a class="add upilink" href="${esc(order.upi_url)}">
                         📱 Pay with UPI app
                         (on phone)
                     </a>
@@ -981,52 +841,24 @@ function payQR(code, total) {
                 : ""
             }
 
-
             <label>
-
                 UPI reference / UTR
                 (after paying)
-
-                <input
-                    id="utr"
-                    inputmode="numeric"
-                    placeholder="12-digit reference"
-                >
-
+                <input id="utr" inputmode="numeric" placeholder="12-digit reference">
             </label>
 
+            <p class="err" id="uerr"></p>
 
-            <p
-                class="err"
-                id="uerr"
-            ></p>
-
-
-            <button
-                class="primary"
-                onclick="
-                    paid('${esc(code)}')
-                "
-            >
+            <button class="primary" onclick="paid('${esc(code)}')">
                 I have paid
                 ${money(total)}
             </button>
 
-
-            <button
-                onclick="
-                    done({
-                        order_id:
-                            '${esc(code)}',
-                        pay_later: 1
-                    })
-                "
-            >
+            <button onclick="done({order_id: '${esc(code)}', pay_later: 1})">
                 Pay later
             </button>
 
         </div>
-
     `);
 }
 
@@ -1052,98 +884,32 @@ async function paid(code) {
 
 async function done(result) {
   modal(`
-
-        <svg
-            class="tick"
-            viewBox="0 0 52 52"
-        >
-
-            <circle
-                cx="26"
-                cy="26"
-                r="24"
-                fill="none"
-                stroke="#12a150"
-                stroke-width="3"
-            />
-
-
-            <path
-                d="M14 27l8 8 16-16"
-                fill="none"
-                stroke="#12a150"
-                stroke-width="4"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-            />
-
+        <svg class="tick" viewBox="0 0 52 52">
+            <circle cx="26" cy="26" r="24" fill="none" stroke="#12a150" stroke-width="3"/>
+            <path d="M14 27l8 8 16-16" fill="none" stroke="#12a150" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
 
-
-        <h2
-            style="text-align:center"
-        >
-            Order placed
-        </h2>
-
+        <h2 style="text-align:center">Order placed</h2>
 
         <p>
-
             Order ID:
-
-            <b>
-                ${esc(result.order_id)}
-            </b>
-
+            <b>${esc(result.order_id)}</b>
         </p>
-
 
         ${
           result.verifying
-            ? `
-                <p>
-                    Payment is being
-                    verified by our team.
-                </p>
-            `
+            ? `<p>Payment is being verified by our team.</p>`
             : result.pay_later
-              ? `
-                <p>
-                    Please complete the
-                    payment from My Orders.
-                </p>
-            `
+              ? `<p>Please complete the payment from My Orders.</p>`
               : ""
         }
 
-
-        <p class="muted">
-            We will confirm your
-            delivery shortly.
-        </p>
-
+        <p class="muted">We will confirm your delivery shortly.</p>
 
         <span id="waSlot"></span>
 
-
-        <button
-            class="add"
-            onclick="
-                bill(
-                    '${esc(result.order_id)}'
-                )
-            "
-        >
-            View bill
-        </button>
-
-
-        <button
-            onclick="closeModal()"
-        >
-            Close
-        </button>
-
+        <button class="add" onclick="bill('${esc(result.order_id)}')">View bill</button>
+        <button onclick="closeModal()">Close</button>
     `);
 
   // The confirmation is already on screen; the WhatsApp button appears
@@ -1186,208 +952,68 @@ async function bill(code) {
           : ["PAYMENT PENDING", ""];
 
   modal(`
-
         <div class="bill">
 
             <div class="billhead">
-
-                <b>
-                    ${esc(CFG.business_name || "Chand Enterprises")}
-                </b>
-
-
+                <b>${esc(CFG.business_name || "Chand Enterprises")}</b>
                 <small>
                     ${esc(CFG.business_location || "Darbhanga, Bihar")}
                     · Bill
                 </small>
-
             </div>
 
+            <div class="row"><span>Order</span><b>${esc(order.code)}</b></div>
+
+            <div class="row"><span>Date</span><span>${esc(order.created)}</span></div>
+
+            <div class="row"><span>Customer</span><span>${esc(order.customer)}</span></div>
+
+            <div class="row"><span>Mobile</span><span>${esc(order.mobile)}</span></div>
 
             <div class="row">
-
-                <span>
-                    Order
-                </span>
-
-
-                <b>
-                    ${esc(order.code)}
-                </b>
-
-            </div>
-
-
-            <div class="row">
-
-                <span>
-                    Date
-                </span>
-
-
-                <span>
-                    ${esc(order.created)}
-                </span>
-
-            </div>
-
-
-            <div class="row">
-
-                <span>
-                    Customer
-                </span>
-
-
-                <span>
-                    ${esc(order.customer)}
-                </span>
-
-            </div>
-
-
-            <div class="row">
-
-                <span>
-                    Mobile
-                </span>
-
-
-                <span>
-                    ${esc(order.mobile)}
-                </span>
-
-            </div>
-
-
-            <div class="row">
-
-                <span>
-                    Address
-                </span>
-
-
+                <span>Address</span>
                 <span>
                     ${esc(order.address)}
                     ${order.map_url ? `<br><a class="loc-map-link" target="_blank" rel="noopener" href="${esc(order.map_url)}">📍 View on map</a>` : ""}
                 </span>
-
             </div>
 
-
             <hr>
-
 
             ${order.lines
               .map(
                 (item) => `
-
                             <div class="row">
-
                                 <span>
                                     ${esc(item.name)}
                                     ${item.size ? `(${esc(item.size)})` : ""}
                                     × ${item.qty}
                                 </span>
-
-
-                                <b>
-                                    ${money(item.total)}
-                                </b>
-
+                                <b>${money(item.total)}</b>
                             </div>
-
                         `,
               )
               .join("")}
 
-
             <hr>
 
+            <div class="row"><span>Subtotal</span><span>${money(order.subtotal)}</span></div>
+
+            <div class="row"><span>Discount</span><span>${money(order.discount)}</span></div>
 
             <div class="row">
-
-                <span>
-                    Subtotal
-                </span>
-
-
-                <span>
-                    ${money(order.subtotal)}
-                </span>
-
+                <span>Delivery</span>
+                <span>${order.delivery_charge ? money(order.delivery_charge) : "Free"}</span>
             </div>
 
+            <div class="row total"><b>Total</b><b>${money(order.total)}</b></div>
 
-            <div class="row">
+            <div class="billstatus ${status[1]}">${status[0]}</div>
 
-                <span>
-                    Discount
-                </span>
-
-
-                <span>
-                    ${money(order.discount)}
-                </span>
-
-            </div>
-
-
-            <div class="row">
-
-                <span>
-                    Delivery
-                </span>
-
-
-                <span>
-                    ${
-                      order.delivery_charge
-                        ? money(order.delivery_charge)
-                        : "Free"
-                    }
-                </span>
-
-            </div>
-
-
-            <div class="row total">
-
-                <b>
-                    Total
-                </b>
-
-
-                <b>
-                    ${money(order.total)}
-                </b>
-
-            </div>
-
-
-            <div
-                class="billstatus ${status[1]}"
-            >
-                ${status[0]}
-            </div>
-
-
-            <button
-                class="primary"
-                onclick="window.print()"
-            >
-                Print bill
-            </button>
-
-
-            <button
-                onclick="closeModal()"
-            >
-                Close
-            </button>
+            <button class="primary" onclick="window.print()">Print bill</button>
+            <button onclick="closeModal()">Close</button>
 
         </div>
-
     `);
 }
 
@@ -1398,57 +1024,19 @@ async function bill(code) {
 async function account(message = "") {
   if (CFG.customer_login_enabled === false) return loginPausedModal();
   modal(`
+        <h2>Customer Login</h2>
 
-        <h2>
-            Customer Login
-        </h2>
-
-
-        ${
-          message
-            ? `
-                <p class="muted">
-                    ${esc(message)}
-                </p>
-            `
-            : ""
-        }
-
+        ${message ? `<p class="muted">${esc(message)}</p>` : ""}
 
         <label>
-
             Mobile number
-
-            <input
-                id="lm"
-                maxlength="10"
-                inputmode="numeric"
-                placeholder="10-digit mobile number"
-            >
-
+            <input id="lm" maxlength="10" inputmode="numeric" placeholder="10-digit mobile number">
         </label>
 
+        <p class="err" id="lerr"></p>
 
-        <p
-            class="err"
-            id="lerr"
-        ></p>
-
-
-        <button
-            class="primary"
-            onclick="sendOTP()"
-        >
-            Continue
-        </button>
-
-
-        <button
-            onclick="closeModal()"
-        >
-            Close
-        </button>
-
+        <button class="primary" onclick="sendOTP()">Continue</button>
+        <button onclick="closeModal()">Close</button>
     `);
 }
 
@@ -1469,80 +1057,110 @@ async function sendOTP() {
     return ($("#lerr").textContent = result.error || "Could not send OTP");
   }
 
+  LOGIN_MOBILE = mobile;
+
+  if (result.needs_link) return telegramLinkModal(mobile, result);
+
+  otpModal(mobile, result);
+}
+
+function otpModal(mobile, result) {
+  const where =
+    result.channel === "telegram"
+      ? "Login code sent to your <b>Telegram</b>"
+      : `OTP sent to <b>${esc(mobile)}</b>`;
+
   modal(`
+        <h2>Verify OTP</h2>
 
-        <h2>
-            Verify OTP
-        </h2>
-
-
-        <p>
-            OTP sent to
-            <b>${esc(mobile)}</b>
-        </p>
-
+        <p>${where}</p>
 
         ${
           result.dev_otp
-            ? `
-                <p class="muted">
-                    Demo OTP:
-                    <b>
-                        ${esc(result.dev_otp)}
-                    </b>
-                </p>
-            `
+            ? `<p class="muted">Demo OTP: <b>${esc(result.dev_otp)}</b></p>`
             : ""
         }
 
-
         <label>
-
             Enter OTP
-
-            <input
-                id="otp"
-                maxlength="4"
-                inputmode="numeric"
-                autofocus
-            >
-
+            <input id="otp" maxlength="4" inputmode="numeric" autofocus>
         </label>
 
+        <p class="err" id="oerr"></p>
 
-        <p
-            class="err"
-            id="oerr"
-        ></p>
-
-
-        <button
-            class="primary"
-            onclick="verifyOTP()"
-        >
-            Verify
-        </button>
-
-
-        <button
-            onclick="resendOTP()"
-        >
-            Resend OTP
-        </button>
-
+        <button class="primary" onclick="verifyOTP()">Verify</button>
+        <button onclick="resendOTP()">Resend OTP</button>
     `);
+}
+
+/* One-time Telegram connection (first login only) */
+function telegramLinkModal(mobile, result) {
+  modal(`
+        <h2>Connect Telegram</h2>
+
+        <p>We send your login code on Telegram. One-time setup for <b>${esc(mobile)}</b>:</p>
+
+        <ol class="muted" style="text-align:left;margin:8px 0 14px 18px">
+            <li>Tap <b>Open Telegram</b> and press <b>Start</b></li>
+            <li>Tap <b>Share my number</b></li>
+        </ol>
+
+        <a class="primary" target="_blank" rel="noopener" href="${esc(result.link)}">✈️ Open Telegram</a>
+
+        <p class="muted" id="tgWait">Waiting for you to press Start…</p>
+        <p class="err" id="oerr"></p>
+
+        <button onclick="tgCheckLink('${esc(mobile)}','${esc(result.token)}')">I have pressed Start</button>
+        <button onclick="closeModal()">Cancel</button>
+    `);
+
+  clearInterval(TG_POLL);
+  const started = Date.now();
+  TG_POLL = setInterval(() => {
+    if (!$("#tgWait") || Date.now() - started > 10 * 60 * 1000) {
+      return clearInterval(TG_POLL);
+    }
+    tgCheckLink(mobile, result.token);
+  }, 3000);
+}
+
+async function tgCheckLink(mobile, token) {
+  if (TG_BUSY || !$("#tgWait")) return;
+  TG_BUSY = true;
+
+  try {
+    const status = await api(
+      "/api/telegram/link-status?token=" + encodeURIComponent(token) + "&_=" + Date.now(),
+    );
+    if (!status._ok || !status.linked) return;
+
+    const sent = await api("/api/otp/resend", "POST");
+    if (!sent._ok) {
+      clearInterval(TG_POLL);
+      const err = $("#oerr");
+      if (err) err.textContent = (sent.error || "Could not send the code.") + " Tap “I have pressed Start” to retry.";
+      return;
+    }
+
+    clearInterval(TG_POLL);
+    if (sent.needs_link) return telegramLinkModal(mobile, sent);
+    otpModal(mobile, sent);
+  } finally {
+    TG_BUSY = false;
+  }
 }
 
 async function resendOTP() {
   const result = await api("/api/otp/resend", "POST");
+  const err = $("#oerr");
 
   if (!result._ok) {
-    return ($("#oerr").textContent = result.error || "Could not resend OTP");
+    return (err.textContent = result.error || "Could not resend OTP");
   }
 
-  if (result.dev_otp) {
-    $("#oerr").textContent = "Demo OTP: " + result.dev_otp;
-  }
+  if (result.needs_link) return telegramLinkModal(LOGIN_MOBILE, result);
+
+  err.textContent = result.dev_otp ? "Demo OTP: " + result.dev_otp : "New code sent.";
 }
 
 async function verifyOTP() {
@@ -1636,80 +1254,32 @@ function profile() {
   }
 
   modal(`
-
-        <h2>
-            My Profile
-        </h2>
-
+        <h2>My Profile</h2>
 
         <label>
-
             Name
-
-            <input
-                id="pn"
-                value="${esc(ME.name || "")}"
-            >
-
+            <input id="pn" value="${esc(ME.name || "")}">
         </label>
 
-
         <label>
-
             Mobile
-
-            <input
-                value="${esc(ME.mobile || "")}"
-                disabled
-            >
-
+            <input value="${esc(ME.mobile || "")}" disabled>
         </label>
 
-
         <label>
-
             Address
-
-            <textarea
-                id="pa"
-                rows="3"
-            >${esc(ME.address || "")}</textarea>
-
+            <textarea id="pa" rows="3">${esc(ME.address || "")}</textarea>
         </label>
-
 
         <label>
-
             Landmark
-
-            <input
-                id="pl"
-                value="${esc(ME.landmark || "")}"
-            >
-
+            <input id="pl" value="${esc(ME.landmark || "")}">
         </label>
 
+        <p class="err" id="perr"></p>
 
-        <p
-            class="err"
-            id="perr"
-        ></p>
-
-
-        <button
-            class="primary"
-            onclick="saveProfile()"
-        >
-            Save
-        </button>
-
-
-        <button
-            onclick="closeModal()"
-        >
-            Close
-        </button>
-
+        <button class="primary" onclick="saveProfile()">Save</button>
+        <button onclick="closeModal()">Close</button>
     `);
 }
 
@@ -1757,134 +1327,61 @@ async function orders() {
   });
 
   modal(`
-
-        <h2>
-            My Orders
-        </h2>
-
+        <h2>My Orders</h2>
 
         ${
           rows.length
             ? rows
                 .map(
                   (order) => `
-
-                        <div
-                            class="ordercard"
-                        >
+                        <div class="ordercard">
 
                             <div class="row">
-
-                                <b>
-                                    ${esc(order.code)}
-                                </b>
-
-
-                                <span>
-                                    ${esc(order.status)}
-                                </span>
-
+                                <b>${esc(order.code)}</b>
+                                <span>${esc(order.status)}</span>
                             </div>
-
 
                             <div class="row">
-
-                                <span>
-                                    ${esc(order.created)}
-                                </span>
-
-
-                                <b>
-                                    ${money(order.total)}
-                                </b>
-
+                                <span>${esc(order.created)}</span>
+                                <b>${money(order.total)}</b>
                             </div>
 
-
-                            <small>
-                                ${order.items.map(esc).join(" · ")}
-                            </small>
-
+                            <small>${order.items.map(esc).join(" · ")}</small>
 
                             <br>
 
+                            <button class="add" onclick="bill('${esc(order.code)}')">View bill</button>
 
-                            <button
-                                class="add"
-                                onclick="
-                                    bill(
-                                        '${esc(order.code)}'
-                                    )
-                                "
-                            >
-                                View bill
-                            </button>
-
-
-                            <button
-                                onclick="reorder('${esc(order.code)}')"
-                            >
-                                🔄 Reorder
-                            </button>
-
+                            <button onclick="reorder('${esc(order.code)}')">🔄 Reorder</button>
 
                             ${
                               order.payment_method === "QR" &&
                               order.payment_status !== "Paid" &&
                               order.status !== "Cancelled"
                                 ? `
-                                    <button
-                                        class="primary"
-                                        onclick="
-                                            payQR(
-                                                '${esc(order.code)}',
-                                                ${order.total}
-                                            )
-                                        "
-                                    >
-                                        Pay
-                                        ${money(order.total)}
+                                    <button class="primary" onclick="payQR('${esc(order.code)}', ${order.total})">
+                                        Pay ${money(order.total)}
                                     </button>
                                 `
                                 : ""
                             }
 
-
                             ${
                               order.status === "Confirmed"
                                 ? `
-                                    <button
-                                        onclick="
-                                            cancelMyOrder(
-                                                '${esc(order.code)}'
-                                            )
-                                        "
-                                    >
-                                        Cancel
-                                    </button>
+                                    <button onclick="cancelMyOrder('${esc(order.code)}')">Cancel</button>
                                 `
                                 : ""
                             }
 
                         </div>
-
                     `,
                 )
                 .join("")
-            : `
-                <p class="muted">
-                    No orders yet.
-                </p>
-            `
+            : `<p class="muted">No orders yet.</p>`
         }
 
-
-        <button
-            onclick="closeModal()"
-        >
-            Close
-        </button>
-
+        <button onclick="closeModal()">Close</button>
     `);
 }
 
@@ -1904,66 +1401,27 @@ async function cancelMyOrder(code) {
 
 async function enquiry() {
   modal(`
-
-        <h2>
-            Contact us
-        </h2>
-
+        <h2>Contact us</h2>
 
         <label>
-
             Name
-
             <input id="en">
-
         </label>
 
-
         <label>
-
             Mobile
-
-            <input
-                id="em"
-                maxlength="10"
-                inputmode="numeric"
-            >
-
+            <input id="em" maxlength="10" inputmode="numeric">
         </label>
-
 
         <label>
-
             Message
-
-            <textarea
-                id="et"
-                rows="4"
-            ></textarea>
-
+            <textarea id="et" rows="4"></textarea>
         </label>
 
+        <p class="err" id="eerr"></p>
 
-        <p
-            class="err"
-            id="eerr"
-        ></p>
-
-
-        <button
-            class="primary"
-            onclick="sendEnquiry()"
-        >
-            Send enquiry
-        </button>
-
-
-        <button
-            onclick="closeModal()"
-        >
-            Close
-        </button>
-
+        <button class="primary" onclick="sendEnquiry()">Send enquiry</button>
+        <button onclick="closeModal()">Close</button>
     `);
 }
 
@@ -1993,45 +1451,17 @@ async function sendEnquiry() {
 
 async function whatsappMessage() {
   modal(`
-
-        <h2>
-            WhatsApp
-        </h2>
-
+        <h2>WhatsApp</h2>
 
         <label>
-
             Message
-
-            <textarea
-                id="wm"
-                rows="5"
-                placeholder="Type your message..."
-            ></textarea>
-
+            <textarea id="wm" rows="5" placeholder="Type your message..."></textarea>
         </label>
 
+        <p class="err" id="werr"></p>
 
-        <p
-            class="err"
-            id="werr"
-        ></p>
-
-
-        <button
-            class="primary"
-            onclick="sendWhatsAppMessage()"
-        >
-            Open WhatsApp
-        </button>
-
-
-        <button
-            onclick="closeModal()"
-        >
-            Close
-        </button>
-
+        <button class="primary" onclick="sendWhatsAppMessage()">Open WhatsApp</button>
+        <button onclick="closeModal()">Close</button>
     `);
 }
 
@@ -2266,24 +1696,11 @@ function formatNumber(value) {
 
 function showMessage(message) {
   modal(`
+        <h2>Message</h2>
 
-        <h2>
-            Message
-        </h2>
+        <p>${esc(message)}</p>
 
-
-        <p>
-            ${esc(message)}
-        </p>
-
-
-        <button
-            class="primary"
-            onclick="closeModal()"
-        >
-            OK
-        </button>
-
+        <button class="primary" onclick="closeModal()">OK</button>
     `);
 }
 
@@ -2855,6 +2272,8 @@ window.sendOTP = sendOTP;
 window.resendOTP = resendOTP;
 
 window.verifyOTP = verifyOTP;
+
+window.tgCheckLink = tgCheckLink;
 
 window.profile = profile;
 
