@@ -586,3 +586,25 @@ class LedgerEntry(db.Model):
         db.DateTime,
         default=datetime.utcnow
     )
+
+
+# ============================================================
+# TELEGRAM LOGIN
+# ============================================================
+
+class TelegramLink(db.Model):
+    """Permanent link: customer mobile <-> Telegram chat (created after 'Share my number')."""
+    id = db.Column(db.Integer, primary_key=True)
+    mobile = db.Column(db.String(20), unique=True, nullable=False, index=True)
+    chat_id = db.Column(db.BigInteger, nullable=False, index=True)
+    linked_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class TelegramToken(db.Model):
+    """Short-lived token carried in the t.me/<bot>?start=<token> link."""
+    id = db.Column(db.Integer, primary_key=True)
+    token = db.Column(db.String(40), unique=True, nullable=False, index=True)
+    mobile = db.Column(db.String(20), nullable=False, index=True)
+    chat_id = db.Column(db.BigInteger, nullable=True, index=True)
+    used = db.Column(db.Boolean, default=False, nullable=False)
+    expires_at = db.Column(db.DateTime, nullable=False)
