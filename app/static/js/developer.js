@@ -198,7 +198,8 @@ const SETTINGS_SECTIONS = {
     home:     { icon: '🏠', title: 'Home Page Settings',  note: 'Customer login, prices and ordering on the storefront.' },
     about:    { icon: 'ℹ️', title: 'About Page Settings', note: 'About text and social media links.' },
     brochure: { icon: '📖', title: 'Brochure Settings',   note: 'Brochure link, headings and prices.' },
-    business: { icon: '🏢', title: 'Business Settings',   note: 'Name, mobile, WhatsApp, UPI, location and delivery.' }
+    business: { icon: '🏢', title: 'Business Settings',   note: 'Name, mobile, WhatsApp, UPI, location and delivery.' },
+    login:    { icon: '🔐', title: 'Login and OTP Settings', note: 'How customers receive their login code (Telegram now, WhatsApp / SMS later).' }
 };
 
 function settingToggle(id, checked, label, hint) {
@@ -331,6 +332,67 @@ function settingsBusinessHtml(st) {
     `;
 }
 
+function settingsLoginHtml(st) {
+    const p = st.otp_provider || 'demo';
+    const opt = (value, label, disabled) =>
+        `<option value="${value}" ${p === value ? 'selected' : ''} ${disabled ? 'disabled' : ''}>${label}</option>`;
+
+    return `
+        <label>Send customer login code via
+            <select id="ds_otp_provider">
+                ${opt('demo', 'Demo (code shown on screen, testing only)')}
+                ${opt('telegram', 'Telegram bot (free)')}
+                ${opt('whatsapp', 'WhatsApp (coming soon)', true)}
+                ${opt('sms', 'SMS (coming soon)', true)}
+            </select>
+        </label>
+
+        <div id="tg_status" class="muted" style="margin:12px 0;line-height:1.7">Checking Telegram bot…</div>
+
+        <button type="button" onclick="connectTelegramBot()">🔗 Connect / refresh Telegram bot</button>
+
+        <p class="muted" style="font-size:12px;margin-top:10px">
+            Setup: create a bot with @BotFather, add <b>TELEGRAM_BOT_TOKEN</b> and
+            <b>TELEGRAM_WEBHOOK_SECRET</b> in Render → Environment, redeploy, then press Connect.
+            Telegram only becomes selectable after the bot is connected.
+        </p>
+    `;
+}
+
+async function loadTelegramStatus() {
+    const box = $('#tg_status');
+    if (!box) return;
+
+    const r = await api('/api/developer/telegram/status');
+    if (!r._ok) {
+        box.textContent = r.error || 'Could not check Telegram';
+        return;
+    }
+
+    const lines = [
+        r.token_set ? '✅ Bot token found' : '❌ TELEGRAM_BOT_TOKEN is missing in Render',
+        r.secret_set ? '✅ Webhook secret found' : '❌ TELEGRAM_WEBHOOK_SECRET is missing in Render',
+        r.bot_username ? `✅ Bot connected: @${esc(r.bot_username)}` : '⚠️ Bot not connected yet. Press Connect.'
+    ];
+    if (r.webhook_url) lines.push('✅ Webhook active');
+    if (r.last_error) lines.push('⚠️ Telegram reported: ' + esc(r.last_error));
+    lines.push('👥 Customers linked: ' + r.linked_count);
+
+    box.innerHTML = lines.join('<br>');
+}
+
+async function connectTelegramBot() {
+    const box = $('#tg_status');
+    if (box) box.textContent = 'Connecting…';
+
+    const r = await api('/api/developer/telegram/setup', 'POST');
+    if (!r._ok) {
+        if (box) box.textContent = '❌ ' + (r.error || 'Could not connect the bot');
+        return;
+    }
+    loadTelegramStatus();
+}
+
 function settingsPicker() {
     modal(`
         <h2>Settings</h2>
@@ -349,7 +411,7 @@ function settingsPicker() {
 
 async function developerSettings(section) {
 
-    /* No section given (top "Settings" button): show the four departments */
+    /* No section given (top "Settings" button): show the settings departments */
     if (!SETTINGS_SECTIONS[section]) {
         return settingsPicker();
     }
@@ -368,7 +430,8 @@ async function developerSettings(section) {
         home: settingsHomeHtml,
         about: settingsAboutHtml,
         brochure: settingsBrochureHtml,
-        business: settingsBusinessHtml
+        business: settingsBusinessHtml,
+        login: settingsLoginHtml
     }[section](st);
 
     modal(`
@@ -382,6 +445,8 @@ async function developerSettings(section) {
         <button onclick="developerSettings()">← All settings</button>
         <button onclick="closeModal()">Close</button>
     `);
+
+    if (section === 'login') loadTelegramStatus();
 }
 
 
@@ -465,7 +530,10 @@ async function saveDeveloperSettings(section) {
         business_lng: text('#ds_lng'),
         delivery_base: $('#ds_base')?.value,
         delivery_per_km: $('#ds_km')?.value,
-        delivery_free_above: $('#ds_free')?.value
+        delivery_free_above: $('#ds_free')?.value,
+
+        /* Login & OTP */
+        otp_provider: $('#ds_otp_provider')?.value
     });
 
     if (!result._ok) {
@@ -1426,6 +1494,9 @@ window.closeModal =
 
 window.logout =
     logout;
+
+window.loadTelegramStatus = loadTelegramStatus;
+window.connectTelegramBot = connectTelegramBot;
 
 
 /* =========================================================
