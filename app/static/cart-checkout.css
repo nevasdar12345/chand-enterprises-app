@@ -264,16 +264,102 @@ header.nav.store-nav .premium-cart b{
 .cx-head small{margin-top:2px;font-size:12px}
 .cx-x{width:36px;height:36px;padding:0!important;border-radius:50%!important;display:grid;place-items:center;font-size:15px;color:var(--mut);background:var(--cx-glass)!important;border:1px solid var(--cx-edge)!important}
 
-/* delivery tracker */
-.cx-track{margin:16px 0 14px;padding:14px 14px 30px;border-radius:18px;border:1px solid rgb(0 194 209 / 28%);background:linear-gradient(135deg,rgb(10 124 255 / 14%),rgb(0 194 209 / 9%))}
-.cx-track p{margin:0;font-size:13px;font-weight:600}
-.cx-track p b{color:var(--cx-teal)}
-.cx-bar{position:relative;height:8px;margin-top:14px;border-radius:9px;background:color-mix(in srgb,var(--ink) 12%,transparent)}
-.cx-bar i{display:block;height:100%;border-radius:9px;background:linear-gradient(90deg,#0a7cff,#2fd0b5);box-shadow:0 0 14px rgb(47 208 181 / 50%);animation:ccBar .9s cubic-bezier(.2,.8,.2,1);transition:width .5s ease}
-.cx-bar span{position:absolute;top:-11px;transform:translateX(-50%);font-size:18px;filter:drop-shadow(0 3px 4px rgb(0 0 0 / 35%));transition:left .5s ease}
-.cx-bar em{position:absolute;right:0;top:14px;font-style:normal;font-size:10px;font-weight:700;color:var(--mut)}
-.cx-track.done{padding-bottom:14px;border-color:rgb(34 197 94 / 40%);background:rgb(34 197 94 / 12%);animation:ccPop .45s both}
-.cx-track.done .cx-bar span{transform:translateX(-100%)}
+
+/* Delivery tracker */
+.cx-track {
+    margin: 16px 0 14px;
+    padding: 14px 14px 30px;
+    border-radius: 18px;
+    border: 1px solid rgb(0 194 209 / 28%);
+    background: linear-gradient(
+        135deg,
+        rgb(10 124 255 / 14%),
+        rgb(0 194 209 / 9%)
+    );
+}
+
+.cx-track p {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.cx-track p b {
+    color: var(--cx-teal);
+}
+
+/* Progress bar */
+.cx-bar {
+    position: relative;
+    height: 8px;
+    margin-top: 14px;
+    border-radius: 9px;
+    background: color-mix(in srgb, var(--ink) 12%, transparent);
+    direction: ltr;
+}
+
+/* Progress fill grows from left to right */
+.cx-bar i {
+    display: block;
+    height: 100%;
+    border-radius: 9px;
+    background: linear-gradient(90deg, #0a7cff, #2fd0b5);
+    box-shadow: 0 0 14px rgb(47 208 181 / 50%);
+    animation: ccBar .9s cubic-bezier(.2, .8, .2, 1);
+    transition: width .5s ease;
+}
+
+/* Truck faces right and follows the progress */
+.cx-bar span {
+    position: absolute;
+    top: -11px;
+    left: 0;
+    display: block;
+    direction: ltr;
+    transform: translateX(-50%) scaleX(-1);
+    transform-origin: center;
+    font-size: 18px;
+    line-height: 1;
+    filter: drop-shadow(0 3px 4px rgb(0 0 0 / 35%));
+    transition: left .5s ease;
+}
+
+/* Free delivery label */
+.cx-bar em {
+    position: absolute;
+    right: 0;
+    top: 14px;
+    font-style: normal;
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--mut);
+}
+
+/* Free delivery unlocked */
+.cx-track.done {
+    padding-bottom: 14px;
+    border-color: rgb(34 197 94 / 40%);
+    background: rgb(34 197 94 / 12%);
+    animation: ccPop .45s both;
+}
+
+.cx-track.done .cx-bar span {
+    left: 100%;
+    transform: translateX(-100%) scaleX(-1);
+}
+
+/* Respect reduced-motion settings */
+@media (prefers-reduced-motion: reduce) {
+    .cx-bar i {
+        animation: none;
+        transition: none;
+    }
+
+    .cx-bar span {
+        transition: none;
+    }
+}
+
 
 /* product rows */
 .cx-item{display:flex;align-items:center;gap:12px;padding:12px;margin-bottom:10px;border-radius:20px;background:var(--cx-glass);border:1px solid var(--cx-edge);animation:ccSlideUp .4s both;animation-delay:calc(var(--i,0)*70ms)}
