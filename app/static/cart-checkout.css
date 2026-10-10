@@ -79,3 +79,165 @@
 .cc-done p{animation-delay:.5s}
 
 @media(prefers-reduced-motion:reduce){.cc-item,.cc-sec,.cc-cta::after,.cc-empty .big,.cc-conf i{animation:none!important}}
+
+
+/* =========================================================
+   PREMIUM NAV + CART BUTTON  (deep navy, one cyan accent)
+   Replaces the flat bright-blue cart button and the red badge.
+   ========================================================= */
+
+/* nav bar */
+header.nav.store-nav{
+    position:sticky;
+}
+
+header.nav.store-nav::after{
+    content:"";
+    position:absolute;
+    left:0;
+    right:0;
+    bottom:-1px;
+    height:1px;
+    pointer-events:none;
+    background:linear-gradient(90deg,transparent,rgb(0 194 209 / 55%),rgb(10 124 255 / 55%),transparent);
+}
+
+:root[data-theme="dark"] header.nav.store-nav{
+    background:linear-gradient(180deg,rgb(15 29 44 / 97%),rgb(9 18 28 / 97%));
+    border-bottom-color:rgb(255 255 255 / 5%);
+    box-shadow:0 10px 30px -12px rgb(0 0 0 / 70%);
+}
+
+/* logo: never squash the "CE" mark, let the text shrink instead */
+.store-logo{
+    min-width:0;
+}
+
+.store-logo .store-logo-mark{
+    flex:none;
+}
+
+.store-logo > span:last-child{
+    min-width:0;
+}
+
+.store-logo .logo-phone{
+    font-weight:600;
+    letter-spacing:.01em;
+}
+
+:root[data-theme="dark"] .store-logo .logo-phone{
+    color:#7fd9e6;
+}
+
+/* theme + menu buttons */
+:root[data-theme="dark"] .theme-toggle,
+:root[data-theme="dark"] .nav-hamburger{
+    background:linear-gradient(145deg,#1a2c3e,#121f2d);
+    border-color:rgb(255 255 255 / 10%);
+}
+
+:root[data-theme="dark"] .theme-toggle:hover,
+:root[data-theme="dark"] .nav-hamburger:hover{
+    border-color:rgb(0 194 209 / 55%);
+}
+
+/* cart button */
+header.nav.store-nav .premium-cart{
+    background:linear-gradient(145deg,#173a57,#0c2134);
+    border:1px solid rgb(255 255 255 / 12%);
+    color:#fff;
+    box-shadow:0 8px 18px -8px rgb(8 30 52 / 70%),inset 0 1px 0 rgb(255 255 255 / 10%);
+    transition:transform .2s ease,box-shadow .2s ease,border-color .2s ease;
+}
+
+:root[data-theme="dark"] header.nav.store-nav .premium-cart{
+    background:linear-gradient(145deg,#1f4a6d,#12304a);
+    border-color:rgb(255 255 255 / 14%);
+}
+
+header.nav.store-nav .premium-cart:hover{
+    border-color:rgb(0 194 209 / 65%);
+    box-shadow:0 10px 24px -8px rgb(0 194 209 / 45%),inset 0 1px 0 rgb(255 255 255 / 12%);
+}
+
+/* count badge: small gold dot instead of the big red one; hidden while the cart is empty */
+header.nav.store-nav .premium-cart b{
+    min-width:20px;
+    height:20px;
+    padding:0 5px;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    line-height:1;
+    font-size:11px;
+    font-weight:800;
+    color:#241700;
+    background:linear-gradient(135deg,#ffd166,#f5a524);
+    border:2px solid #fff;
+    box-shadow:0 2px 6px rgb(0 0 0 / 25%);
+}
+
+:root[data-theme="dark"] header.nav.store-nav .premium-cart b{
+    border-color:#0c1824;
+}
+
+#count[data-zero="1"]{
+    display:none;
+}
+
+/* popup call-to-action: fixed deep blue so white text is readable in dark mode too */
+.cc-cta,
+.box .primary.cc-cta{
+    background:linear-gradient(135deg,#0a7cff,#0b5fd6);
+    color:#fff;
+    box-shadow:0 10px 22px -8px rgb(10 124 255 / 55%);
+}
+
+@media(max-width:380px){
+    .store-logo .logo-phone{
+        font-size:10px;
+    }
+}
+
+/* very narrow screens (or heavy browser zoom): shrink instead of overlapping */
+@media(max-width:340px){
+    header.nav.store-nav{
+        padding:8px 8px;
+        gap:6px;
+    }
+    .store-logo{
+        gap:7px;
+    }
+    .store-logo .store-logo-mark{
+        width:32px;
+        height:32px;
+        font-size:11px;
+        border-radius:10px;
+    }
+    .store-logo > span:last-child{
+        font-size:11px;
+        overflow:hidden;
+    }
+    .store-logo .logo-phone{
+        font-size:9.5px;
+    }
+    .store-logo small{
+        display:none;
+    }
+    .nav-tools,
+    .store-actions{
+        gap:4px;
+    }
+    .theme-toggle,
+    .nav-hamburger{
+        width:34px;
+        height:34px;
+        font-size:16px;
+    }
+    header.nav.store-nav .premium-cart{
+        min-width:38px;
+        height:36px;
+        padding:0 8px;
+    }
+}
