@@ -57,10 +57,6 @@ async function api(url, method = "GET", body = undefined) {
 
 let CART = JSON.parse(localStorage.getItem("cart") || "{}");
 
-/* Temporary UI-only confirmation for successful add-to-cart actions. */
-const RECENTLY_ADDED = new Set();
-const ADDED_FEEDBACK_TIMERS = new Map();
-
 let CAT = "All";
 
 /* Shop filters, sort and wishlist */
@@ -383,7 +379,7 @@ function cardHtml(product, index, anim) {
     : soldOut
     ? ""
     : quantity
-      ? `${RECENTLY_ADDED.has(Number(product.id)) || RECENTLY_ADDED.has(product.id) ? `<span class="cart-added-feedback" role="status">✓ Added</span>` : ""}<div class="qty"><button aria-label="Remove one" onclick="chg(${product.id}, -1)">−</button><b>${quantity}</b><button aria-label="Add one more" onclick="chg(${product.id}, 1)">+</button></div>`
+      ? `<div class="qty"><button aria-label="Remove one" onclick="chg(${product.id}, -1)">−</button><b>${quantity}</b><button aria-label="Add one more" onclick="chg(${product.id}, 1)">+</button></div>`
       : `<button class="primary" aria-label="Add ${esc(cleanName(product.name))} to cart" onclick="chg(${product.id}, 1)">Add</button>`;
 
   const liked = WISH.has(Number(product.id));
@@ -518,27 +514,8 @@ function chg(id, change) {
     CART[id] = quantity;
   }
 
-  if (change > 0 && quantity > 0) {
-    const numericId = Number(id);
-    RECENTLY_ADDED.add(numericId);
-    const oldTimer = ADDED_FEEDBACK_TIMERS.get(numericId);
-    if (oldTimer) clearTimeout(oldTimer);
-    ADDED_FEEDBACK_TIMERS.set(numericId, setTimeout(() => {
-      RECENTLY_ADDED.delete(numericId);
-      ADDED_FEEDBACK_TIMERS.delete(numericId);
-      updateCard(id);
-    }, 900));
-
-    const cartButton = document.querySelector(".premium-cart, .cart");
-    if (cartButton) {
-      cartButton.classList.remove("cart-bounce");
-      void cartButton.offsetWidth;
-      cartButton.classList.add("cart-bounce");
-      setTimeout(() => cartButton.classList.remove("cart-bounce"), 450);
-    }
-  }
-
   persistCart();
+
   updateCard(id);
 }
 
@@ -619,60 +596,77 @@ async function refreshDeliveryQuote() {
    CART MODAL
    ========================= */
 
-function cart() {
-  if (CFG.ordering_enabled === false) return orderingPausedModal();
-  const ids = Object.keys(CART);
+function cartHtml() {
+  const ids = Object.keys(CART).filter((id) => find(id));
 
   if (!ids.length) {
-    return modal(`
-            <h2>Your cart</h2>
-            <p class="muted">Cart is empty.</p>
-            <button onclick="closeModal()">Close</button>
-        `);
+    return `
+      <div class="cc-empty">
+        <div class="big">🛒</div>
+        <h2>Your cart is empty</h2>
+        <p class="muted">Add some cold drinks or water to get started.</p>
+        <button class="primary" onclick="closeModal()">Browse products</button>
+      </div>`;
   }
 
   const total = totals();
 
-  modal(`
-        <h2>Your cart</h2>
+  return `
+    <div class="cc-head">
+      <h2>Your cart</h2>
+      <button class="cc-x" aria-label="Close" onclick="closeModal()">✕</button>
+    </div>
 
-        ${ids
-          .map((id) => {
-            const product = find(id);
+    <div class="cc-steps">
+      <span class="on"><i>1</i>Cart</span><hr><span><i>2</i>Details</span><hr><span><i>3</i>Pay</span>
+    </div>
 
-            return `
-                        <div class="row">
-                            <span>
-                                ${esc(product.icon)}
-                                ${esc(cleanName(product.name))}
-                                ${product.size ? `(${esc(product.size)})` : ""}
-                                × ${CART[id]}
-                            </span>
-                            <b>${money(product.price * CART[id])}</b>
-                        </div>
-                    `;
-          })
-          .join("")}
+    ${ids
+      .map((id, n) => {
+        const product = find(id);
+        return `
+        <div class="cc-item" style="--i:${n}">
+          <div class="cc-ic">${esc(product.icon || "🥤")}</div>
+          <div class="cc-info">
+            <b>${esc(cleanName(product.name))}</b>
+            <small>${product.size ? esc(product.size) + " · " : ""}${money(product.price)} each</small>
+            <div class="cc-step">
+              <button onclick="cartChg(${product.id}, -1)" aria-label="Remove one">−</button>
+              <b>${CART[id]}</b>
+              <button onclick="cartChg(${product.id}, 1)" aria-label="Add one more">+</button>
+            </div>
+          </div>
+          <div class="cc-price">${money(product.price * CART[id])}</div>
+        </div>`;
+      })
+      .join("")}
 
-        <div class="row">
-            <span>Delivery</span>
-            <span>${total.del ? money(total.del) : "Free"}</span>
-        </div>
+    ${freeDeliveryProgress(total)}
 
-        <div class="row">
-            <b>Subtotal</b>
-            <b>${money(total.sub)}</b>
-        </div>
+    <div class="cc-sum">
+      <div class="row"><span>Delivery</span><span>${total.del ? money(total.del) : "Free"}</span></div>
+      <div class="row cc-total"><b>Subtotal</b><b>${money(total.sub)}</b></div>
+      <small class="muted">${couponHint()}</small>
+    </div>
 
-        ${freeDeliveryProgress(total)}
+    <div class="cc-foot">
+      <button class="primary cc-cta" onclick="checkout()">Checkout →</button>
+    </div>`;
+}
 
-        <small>${couponHint()}</small>
+function cart() {
+  if (CFG.ordering_enabled === false) return orderingPausedModal();
+  modal(cartHtml());
+}
 
-        <br>
-
-        <button class="primary" onclick="checkout()">Checkout</button>
-        <button onclick="closeModal()">Close</button>
-    `);
+/* +/- inside the cart popup: updates in place (no pop-in replay) */
+function cartChg(id, change) {
+  chg(id, change);
+  const box = $("#modal .box");
+  if (!box) return;
+  if (!Object.keys(CART).length) return cart();
+  box.innerHTML = cartHtml();
+  box.querySelectorAll(".cc-item").forEach((el) => (el.style.animation = "none"));
 }
 
 /* =========================
@@ -698,45 +692,55 @@ async function checkout() {
   }
 
   modal(`
-        <h2>Checkout</h2>
+        <div class="cc-head">
+          <h2>Checkout</h2>
+          <button class="cc-x" aria-label="Close" onclick="closeModal()">✕</button>
+        </div>
 
-        <label>
+        <div class="cc-steps">
+          <span class="ok"><i>✓</i>Cart</span><hr class="on"><span class="on"><i>2</i>Details</span><hr><span><i>3</i>Pay</span>
+        </div>
+
+        <div class="cc-sec" style="--i:0">
+          <h4>Your details</h4>
+          <label>
             Name
             <input id="cn" value="${esc(ME.name === "Customer" ? "" : ME.name)}">
-        </label>
-
-        <label>
+          </label>
+          <label>
             Delivery address
             <textarea id="ca" rows="3">${esc(ME.address || "")}</textarea>
-        </label>
+          </label>
+        </div>
 
-        ${LocPicker.html()}
+        <div class="cc-sec" style="--i:1">
+          <h4>Delivery location</h4>
+          ${LocPicker.html()}
+          <div id="deliveryInfo" class="muted">Delivery charge will be calculated from your location.</div>
+        </div>
 
-        <label>
+        <div class="cc-sec" style="--i:2">
+          <h4>Payment</h4>
+          <div class="cc-pay">
+            <label><input type="radio" name="cpm" value="COD" checked onchange="$('#cp').value=this.value"><span>💵</span><b>Cash on delivery</b></label>
+            <label><input type="radio" name="cpm" value="QR" onchange="$('#cp').value=this.value"><span>📱</span><b>Pay by QR (UPI)</b></label>
+          </div>
+          <input type="hidden" id="cp" value="COD">
+          <label style="margin-top:12px">
             Coupon (optional)
             <input id="cc" oninput="cTot()" autocapitalize="characters" autocomplete="off">
-        </label>
-        <div id="couponMsg" class="muted" style="margin:-6px 0 8px;font-size:.9rem"></div>
-
-        <label>
-            Payment
-            <select id="cp">
-                <option value="COD">Cash on delivery</option>
-                <option value="QR">Pay by QR (UPI)</option>
-            </select>
-        </label>
-
-        <div id="deliveryInfo" class="muted">Delivery charge will be calculated from your location.</div>
-
-        <div class="row">
-            <b>Total</b>
-            <b id="ctot"></b>
+          </label>
+          <div id="couponMsg" class="muted" style="margin:-4px 0 0;font-size:.9rem"></div>
         </div>
+
+        <div class="row cc-total" style="font-size:1.15rem"><b>Total</b><b id="ctot"></b></div>
 
         <p class="err" id="cerr"></p>
 
-        <button class="primary" onclick="placeOrder()">Place order</button>
-        <button onclick="cart()">Back</button>
+        <div class="cc-foot">
+          <button onclick="cart()">← Back</button>
+          <button class="primary cc-cta" id="placeBtn" onclick="placeOrder()">Place order</button>
+        </div>
     `);
 
   LocPicker.mount();
@@ -763,6 +767,12 @@ function cTot() {
    ========================= */
 
 async function placeOrder() {
+  const btn = $("#placeBtn");
+  if (btn) {
+    if (btn.disabled) return;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="cc-spin"></span>Placing order…';
+  }
   const items = Object.entries(CART).map(([id, quantity]) => ({
     id: Number(id),
     qty: quantity,
@@ -783,6 +793,10 @@ async function placeOrder() {
   });
 
   if (!result._ok) {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = "Place order";
+    }
     return ($("#cerr").textContent = result.error || "Could not place order");
   }
 
@@ -905,8 +919,17 @@ async function paid(code) {
    ORDER COMPLETE
    ========================= */
 
+function confetti() {
+  const colors = ["#0a7cff", "#12a150", "#ffb300", "#ff5470", "#2fd0b5"];
+  return `<div class="cc-conf">${Array.from({ length: 28 }, (_, i) =>
+    `<i style="left:${Math.random() * 100}%;background:${colors[i % 5]};animation-delay:${(Math.random() * 0.5).toFixed(2)}s"></i>`
+  ).join("")}</div>`;
+}
+
 async function done(result) {
   modal(`
+        <div class="cc-done">
+        ${confetti()}
         <svg class="tick" viewBox="0 0 52 52">
             <circle cx="26" cy="26" r="24" fill="none" stroke="#12a150" stroke-width="3"/>
             <path d="M14 27l8 8 16-16" fill="none" stroke="#12a150" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
@@ -933,6 +956,7 @@ async function done(result) {
 
         <button class="add" onclick="bill('${esc(result.order_id)}')">View bill</button>
         <button onclick="closeModal()">Close</button>
+        </div>
     `);
 
   // The confirmation is already on screen; the WhatsApp button appears
