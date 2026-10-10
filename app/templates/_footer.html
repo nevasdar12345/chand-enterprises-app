@@ -30,12 +30,12 @@
 
         <!-- Contact -->
         <div class="sf-col">
-            <h3>Contact</h3>
+            <h3>{{ site.footer_contact_title }}</h3>
             {% if site.mobile %}
             <a class="sf-contact" href="tel:{{ site.tel }}"><span aria-hidden="true">📞</span> {{ site.mobile }}</a>
             {% endif %}
             {% if site.whatsapp_url %}
-            <a class="sf-contact" href="{{ site.whatsapp_url }}" target="_blank" rel="noopener"><span aria-hidden="true">💬</span> WhatsApp us</a>
+            <a class="sf-contact" href="{{ site.whatsapp_url }}" target="_blank" rel="noopener"><span aria-hidden="true">💬</span> {{ site.footer_whatsapp_label }}</a>
             {% endif %}
             <span class="sf-contact"><span aria-hidden="true">📍</span> {{ site.location }}</span>
         </div>
@@ -53,7 +53,7 @@
     </div>
 
     <div class="site-footer-bottom">
-        <span>© <span id="sfYear">2026</span> {{ site.name }} · {{ site.location }}</span>
+        <span>{{ site.copyright_prefix }} <span id="sfYear">2026</span> {{ site.name }} · {{ site.location }}</span>
         <a href="/staff" class="footer-staff">Staff login</a>
     </div>
 
