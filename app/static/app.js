@@ -597,6 +597,24 @@ async function refreshDeliveryQuote() {
    CART MODAL
    ========================= */
 
+/* delivery tracker: bar + truck that moves as the cart fills */
+function cartTrack(t) {
+  const above = freeDeliveryAbove();
+  if (above <= 0) return "";
+
+  const amount = t.sub - t.disc;
+
+  if (amount >= above) {
+    return `<div class="cx-track done"><p>🎉 <b>FREE delivery</b> unlocked on this order!</p>
+      <div class="cx-bar"><i style="width:100%"></i><span style="left:100%">🚚</span></div></div>`;
+  }
+
+  const pct = Math.max(4, Math.min(96, Math.round((amount / above) * 100)));
+
+  return `<div class="cx-track"><p>🚚 Add <b>${money(Math.ceil(above - amount))}</b> more for <b>FREE delivery</b></p>
+    <div class="cx-bar"><i style="width:${pct}%"></i><span style="left:${pct}%">🚚</span><em>FREE at ${money(above)}</em></div></div>`;
+}
+
 function cartHtml() {
   const ids = Object.keys(CART).filter((id) => find(id));
 
@@ -611,47 +629,62 @@ function cartHtml() {
   }
 
   const total = totals();
+  const pieces = ids.reduce((sum, id) => sum + CART[id], 0);
+  const codes = (CFG.coupons || []).filter((c) => c.active).map((c) => esc(c.code));
 
   return `
-    <div class="cc-head">
-      <h2>Your cart</h2>
-      <button class="cc-x" aria-label="Close" onclick="closeModal()">✕</button>
-    </div>
+    <div class="cx">
+      <div class="cx-grab"></div>
 
-    <div class="cc-steps">
-      <span class="on"><i>1</i>Cart</span><hr><span><i>2</i>Details</span><hr><span><i>3</i>Pay</span>
-    </div>
+      <div class="cx-head">
+        <div>
+          <h2>Your cart</h2>
+          <small>${ids.length} product${ids.length > 1 ? "s" : ""} · ${pieces} item${pieces > 1 ? "s" : ""}</small>
+        </div>
+        <button class="cx-x" aria-label="Close" onclick="closeModal()">✕</button>
+      </div>
 
-    ${ids
-      .map((id, n) => {
-        const product = find(id);
-        return `
-        <div class="cc-item" style="--i:${n}">
-          <div class="cc-ic">${esc(product.icon || "🥤")}</div>
-          <div class="cc-info">
+      ${cartTrack(total)}
+
+      ${ids
+        .map((id, n) => {
+          const product = find(id);
+          const art = product.image_url
+            ? `<img src="${esc(imgSrc(product.image_url))}" alt="" loading="lazy" decoding="async" onerror="this.onerror=null;this.src='${esc(product.image_url)}'">`
+            : `<span>${esc(product.icon || "🥤")}</span>`;
+          return `
+        <div class="cx-item" style="--i:${n}">
+          <div class="cx-art kind-${artKind(product)}">${art}</div>
+          <div class="cx-info">
             <b>${esc(cleanName(product.name))}</b>
             <small>${product.size ? esc(product.size) + " · " : ""}${money(product.price)} each</small>
-            <div class="cc-step">
-              <button onclick="cartChg(${product.id}, -1)" aria-label="Remove one">−</button>
-              <b>${CART[id]}</b>
-              <button onclick="cartChg(${product.id}, 1)" aria-label="Add one more">+</button>
+            <div class="cx-row">
+              <div class="cx-step">
+                <button onclick="cartChg(${product.id}, -1)" aria-label="Remove one">−</button>
+                <b>${CART[id]}</b>
+                <button onclick="cartChg(${product.id}, 1)" aria-label="Add one more">+</button>
+              </div>
+              <div class="cx-price">${money(product.price * CART[id])}</div>
             </div>
           </div>
-          <div class="cc-price">${money(product.price * CART[id])}</div>
         </div>`;
-      })
-      .join("")}
+        })
+        .join("")}
 
-    ${freeDeliveryProgress(total)}
+      ${codes.length ? `<div class="cx-coupon"><i>🏷️</i><div>Have a coupon? Use <b>${codes.join(", ")}</b> at checkout</div></div>` : ""}
 
-    <div class="cc-sum">
-      <div class="row"><span>Delivery</span><span>${total.del ? money(total.del) : "Free"}</span></div>
-      <div class="row cc-total"><b>Subtotal</b><b>${money(total.sub)}</b></div>
-      <small class="muted">${couponHint()}</small>
-    </div>
+      <div class="cx-sum">
+        <div><span>Subtotal</span><span>${money(total.sub)}</span></div>
+        <div><span>Delivery</span><span>${total.del ? money(total.del) : "Free"}</span></div>
+        <div class="cx-tot"><span>Total</span><span>${money(total.total)}</span></div>
+      </div>
 
-    <div class="cc-foot">
-      <button class="primary cc-cta" onclick="checkout()">Checkout →</button>
+      <button class="cx-cta" onclick="checkout()">
+        <span><small>Total to pay</small>Checkout · ${money(total.total)}</span>
+        <em>→</em>
+      </button>
+
+      <div class="cx-trust"><span>🔒 Secure</span><span>💵 COD / UPI</span><span>⚡ Fast local delivery</span></div>
     </div>`;
 }
 
@@ -667,7 +700,7 @@ function cartChg(id, change) {
   if (!box) return;
   if (!Object.keys(CART).length) return cart();
   box.innerHTML = cartHtml();
-  box.querySelectorAll(".cc-item").forEach((el) => (el.style.animation = "none"));
+  box.querySelectorAll(".cx-item").forEach((el) => (el.style.animation = "none"));
 }
 
 /* =========================
