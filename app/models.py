@@ -608,3 +608,11 @@ class TelegramToken(db.Model):
     chat_id = db.Column(db.BigInteger, nullable=True, index=True)
     used = db.Column(db.Boolean, default=False, nullable=False)
     expires_at = db.Column(db.DateTime, nullable=False)
+
+
+class StaffTelegramLink(db.Model):
+    """Telegram chat of an admin / delivery person (receives order, assignment and summary alerts)."""
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), unique=True, nullable=False, index=True)
+    chat_id = db.Column(db.BigInteger, nullable=False, index=True)
+    linked_at = db.Column(db.DateTime, default=datetime.utcnow)
