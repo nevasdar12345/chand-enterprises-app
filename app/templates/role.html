@@ -270,6 +270,14 @@
             <div class="dlv-badge">🚚 Delivery</div>
         </div>
 
+        <section class="ce-delivery-map-panel" id="ceDeliveryMapPanel">
+            <div class="ce-admin-map-head">
+                <div><h2>🗺️ My delivery map</h2><small>Assigned orders with saved coordinates.</small></div>
+                <button type="button" onclick="loadDeliveryMap()">Refresh map</button>
+            </div>
+            <div id="ceDeliveryMap" role="region" aria-label="Assigned delivery orders map"></div>
+            <p id="ceDeliveryMapNote" class="muted">Loading map…</p>
+        </section>
         <div id="deliveryRows" class="dlv-list"></div>
 
     </section>
