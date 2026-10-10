@@ -1724,12 +1724,82 @@ window.removeBrochure = removeBrochure;
    DASHBOARD STARTUP
    ========================================================= */
 
+let ceAdminLeafletPromise = null;
+let ceAdminMap = null;
+let ceAdminMarkers = null;
+
+function loadLeafletForAdminMap() {
+    if (window.L) return Promise.resolve();
+    if (ceAdminLeafletPromise) return ceAdminLeafletPromise;
+    ceAdminLeafletPromise = new Promise((resolve, reject) => {
+        if (!document.getElementById('ce-leaflet-css')) {
+            const css = document.createElement('link');
+            css.id = 'ce-leaflet-css'; css.rel = 'stylesheet';
+            css.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+            document.head.appendChild(css);
+        }
+        const script = document.createElement('script');
+        script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+        script.onload = resolve;
+        script.onerror = () => reject(new Error('Map library could not load'));
+        document.head.appendChild(script);
+    });
+    return ceAdminLeafletPromise;
+}
+
+async function loadAdminDeliveryMap() {
+    const panel = document.getElementById('ceAdminMapPanel');
+    const mapBox = document.getElementById('ceAdminDeliveryMap');
+    const note = document.getElementById('ceAdminMapNote');
+    if (!panel || !mapBox || !note) return;
+    const result = await api('/api/admin/delivery-map');
+    if (!result || result._ok === false) {
+        note.textContent = result?.error || 'Could not load delivery map.';
+        return;
+    }
+    if (!result.enabled) {
+        panel.style.display = 'none';
+        return;
+    }
+    panel.style.display = '';
+    const orders = Array.isArray(result.orders) ? result.orders : [];
+    try {
+        await loadLeafletForAdminMap();
+        if (!ceAdminMap) {
+            ceAdminMap = L.map(mapBox).setView([26.15, 85.90], 12);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            }).addTo(ceAdminMap);
+            ceAdminMarkers = L.layerGroup().addTo(ceAdminMap);
+        }
+        ceAdminMarkers.clearLayers();
+        const bounds = [];
+        orders.forEach(order => {
+            const lat = Number(order.latitude), lng = Number(order.longitude);
+            if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+            const marker = L.marker([lat, lng]).bindPopup(
+                `<b>${esc(order.code)}</b><br>${esc(order.customer)}<br>${esc(order.status)}<br>Delivery: ${esc(order.delivery_person)}<br>${esc(order.address)}<br><a target="_blank" rel="noopener" href="${esc(order.directions_url || order.map_url)}">Open directions</a>`
+            );
+            ceAdminMarkers.addLayer(marker); bounds.push([lat, lng]);
+        });
+        if (bounds.length) ceAdminMap.fitBounds(bounds, {padding: [24, 24], maxZoom: 14});
+        setTimeout(() => ceAdminMap.invalidateSize(), 100);
+        note.textContent = orders.length ? `${orders.length} active order(s) with saved map coordinates.` : 'No active orders have saved coordinates yet.';
+    } catch (error) {
+        console.error('Delivery map error:', error);
+        note.textContent = 'Map could not load. You can still open individual directions from order details.';
+    }
+}
+window.loadAdminDeliveryMap = loadAdminDeliveryMap;
+
 async function adminStartup() {
     await loadAdminCategories();
 
     try {
 
         await loadAdminOrders();
+        await loadAdminDeliveryMap();
 
         await loadAdminProducts();
 
