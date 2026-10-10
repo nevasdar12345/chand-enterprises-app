@@ -747,69 +747,40 @@
 }
 
 
-/* =========================================================
-   CART MICROINTERACTIONS
-   UI-only feedback; does not alter cart or checkout behaviour.
-   ========================================================= */
-
+/* Cart add microinteractions */
 .premium-cart.cart-bounce,
 .cart.cart-bounce {
-    animation: ce-cart-bounce .42s cubic-bezier(.2,.8,.25,1);
-    transform-origin: center;
+  animation: ce-cart-bounce .42s cubic-bezier(.2,.8,.25,1);
+  transform-origin: center;
 }
-
 @keyframes ce-cart-bounce {
-    0%, 100% { transform: translateY(0) scale(1); }
-    35% { transform: translateY(-4px) scale(1.08); }
-    65% { transform: translateY(1px) scale(.97); }
+  0%, 100% { transform: translateY(0) scale(1); }
+  35% { transform: translateY(-4px) scale(1.08); }
+  65% { transform: translateY(1px) scale(.97); }
 }
-
-#count.bump {
-    animation: ce-count-pop .28s ease-out;
-}
-
+#count.bump { animation: ce-count-pop .28s ease-out; }
 @keyframes ce-count-pop {
-    0% { transform: scale(1); }
-    45% { transform: scale(1.28); }
-    100% { transform: scale(1); }
+  0% { transform: scale(1); }
+  45% { transform: scale(1.28); }
+  100% { transform: scale(1); }
 }
-
 .premium-grid .card .cart-added-feedback {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    margin: 0 0 8px;
-    padding: 5px 9px;
-    border-radius: 999px;
-    color: #15803d;
-    background: rgb(34 197 94 / 12%);
-    font-size: 12px;
-    font-weight: 750;
-    animation: ce-added-in .22s ease-out both;
+  display: inline-flex;
+  align-items: center;
+  margin: 0 0 8px;
+  padding: 5px 9px;
+  border-radius: 999px;
+  color: #15803d;
+  background: rgb(34 197 94 / 12%);
+  font-size: 12px;
+  font-weight: 750;
+  animation: ce-added-in .22s ease-out both;
 }
-
-.premium-grid .card .add-to-cart-btn {
-    transition: transform .16s ease, box-shadow .16s ease, background-color .16s ease;
-}
-
-.premium-grid .card .add-to-cart-btn:active,
-.premium-grid .card .qty button:active {
-    transform: scale(.94);
-}
-
 @keyframes ce-added-in {
-    from { opacity: 0; transform: translateY(4px) scale(.96); }
-    to { opacity: 1; transform: translateY(0) scale(1); }
+  from { opacity: 0; transform: translateY(4px) scale(.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
-
 @media (prefers-reduced-motion: reduce) {
-    .premium-cart.cart-bounce,
-    .cart.cart-bounce,
-    #count.bump,
-    .premium-grid .card .cart-added-feedback {
-        animation: none !important;
-    }
-    .premium-grid .card .add-to-cart-btn {
-        transition: none;
-    }
+  .premium-cart.cart-bounce, .cart.cart-bounce, #count.bump,
+  .premium-grid .card .cart-added-feedback { animation: none !important; }
 }
