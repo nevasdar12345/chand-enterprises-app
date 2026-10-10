@@ -226,6 +226,28 @@ function settingsHomeHtml(st) {
         ${settingToggle('ds_ordering', st.ordering_enabled !== false,
             'Allow orders (cart &amp; checkout)',
             'Untick to pause online ordering. Customers are asked to order on WhatsApp.')}
+
+        <h3 style="margin:18px 0 8px">Homepage content</h3>
+        <p class="muted" style="margin:0 0 10px">Edit the visible homepage text below. These fields are stored in the database, so the same template can be reused for another business.</p>
+        <label>Delivery card – heading<input id="ds_home_delivery_title" maxlength="80" value="${esc(st.home_delivery_title || '')}"></label>
+        <label>Delivery card – description<input id="ds_home_delivery_text" maxlength="180" value="${esc(st.home_delivery_text || '')}"></label>
+        <label>Payment card – heading<input id="ds_home_payment_title" maxlength="80" value="${esc(st.home_payment_title || '')}"></label>
+        <label>Payment card – description<input id="ds_home_payment_text" maxlength="180" value="${esc(st.home_payment_text || '')}"></label>
+        <label>Support card – heading<input id="ds_home_support_title" maxlength="80" value="${esc(st.home_support_title || '')}"></label>
+        <label>Support card – description<input id="ds_home_support_text" maxlength="180" value="${esc(st.home_support_text || '')}"></label>
+        <label>Products section – small heading<input id="ds_home_store_eyebrow" maxlength="80" value="${esc(st.home_store_eyebrow || '')}"></label>
+        <label>Products section – title<input id="ds_home_products_title" maxlength="100" value="${esc(st.home_products_title || '')}"></label>
+        <label>Products section – description<input id="ds_home_products_text" maxlength="240" value="${esc(st.home_products_text || '')}"></label>
+        <label>Bulk enquiry – badge<input id="ds_home_bulk_badge" maxlength="80" value="${esc(st.home_bulk_badge || '')}"></label>
+        <label>Bulk enquiry – heading<input id="ds_home_bulk_title" maxlength="120" value="${esc(st.home_bulk_title || '')}"></label>
+        <label>Bulk enquiry – description<textarea id="ds_home_bulk_text" rows="3" maxlength="500">${esc(st.home_bulk_text || '')}</textarea></label>
+        <label>WhatsApp enquiry button<input id="ds_home_bulk_button" maxlength="80" value="${esc(st.home_bulk_button || '')}"></label>
+        <label>Function button<input id="ds_home_event_button" maxlength="80" value="${esc(st.home_event_button || '')}"></label>
+        <label>Bulk order button<input id="ds_home_bulk_order_button" maxlength="80" value="${esc(st.home_bulk_order_button || '')}"></label>
+        <h3 style="margin:18px 0 8px">Footer labels</h3>
+        <label>Contact section heading<input id="ds_footer_contact_title" maxlength="80" value="${esc(st.footer_contact_title || '')}"></label>
+        <label>WhatsApp link label<input id="ds_footer_whatsapp_label" maxlength="80" value="${esc(st.footer_whatsapp_label || '')}"></label>
+        <label>Copyright prefix<input id="ds_footer_copyright_prefix" maxlength="20" value="${esc(st.footer_copyright_prefix || '')}"></label>
     `;
 }
 
@@ -669,6 +691,24 @@ async function saveDeveloperSettings(section) {
         customer_login_enabled: check('#ds_login'),
         show_prices_home: check('#ds_prices_home'),
         ordering_enabled: check('#ds_ordering'),
+        home_delivery_title: text('#ds_home_delivery_title'),
+        home_delivery_text: text('#ds_home_delivery_text'),
+        home_payment_title: text('#ds_home_payment_title'),
+        home_payment_text: text('#ds_home_payment_text'),
+        home_support_title: text('#ds_home_support_title'),
+        home_support_text: text('#ds_home_support_text'),
+        home_store_eyebrow: text('#ds_home_store_eyebrow'),
+        home_products_title: text('#ds_home_products_title'),
+        home_products_text: text('#ds_home_products_text'),
+        home_bulk_badge: text('#ds_home_bulk_badge'),
+        home_bulk_title: text('#ds_home_bulk_title'),
+        home_bulk_text: text('#ds_home_bulk_text'),
+        home_bulk_button: text('#ds_home_bulk_button'),
+        home_event_button: text('#ds_home_event_button'),
+        home_bulk_order_button: text('#ds_home_bulk_order_button'),
+        footer_contact_title: text('#ds_footer_contact_title'),
+        footer_whatsapp_label: text('#ds_footer_whatsapp_label'),
+        footer_copyright_prefix: text('#ds_footer_copyright_prefix'),
 
         /* About page */
         about_title: text('#ds_about_title'),
