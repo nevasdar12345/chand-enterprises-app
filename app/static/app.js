@@ -1432,7 +1432,7 @@ async function orders() {
                             <br>
 
                             <button class="add" onclick="bill('${esc(order.code)}')">View bill</button>
-
+                            ${order.map_features?.customer_tracking !== false ? `<button onclick="trackOrder('${esc(order.code)}')">📍 Track order</button>` : ""}
                             <button onclick="reorder('${esc(order.code)}')">🔄 Reorder</button>
 
                             ${
@@ -1464,6 +1464,41 @@ async function orders() {
 
         <button onclick="closeModal()">Close</button>
     `);
+}
+
+async function trackOrder(code) {
+  const result = await api(`/api/orders/${encodeURIComponent(code)}/tracking`);
+  if (!result || result._ok === false || !result.ok) {
+    return alert(result?.error || "Could not load order tracking");
+  }
+  const order = result.order || {};
+  const events = Array.isArray(result.events) ? result.events : [];
+  const features = result.features || {};
+  const steps = ["Confirmed", "Preparing", "Out for Delivery", "Delivered"];
+  const cancelled = order.status === "Cancelled";
+  const activeIndex = steps.indexOf(order.status);
+  const timeline = events.length ? events.map(event => `
+    <div class="ce-track-event">
+      <span class="ce-track-dot"></span>
+      <div><b>${esc(event.title || event.status || "Order updated")}</b>
+      <small>${esc(event.at || "")}</small>
+      ${event.note ? `<p>${esc(event.note)}</p>` : ""}</div>
+    </div>`).join("") : `<div class="ce-track-event"><span class="ce-track-dot"></span><div><b>${esc(order.status || "Order placed")}</b><small>Detailed history will appear as new updates happen.</small></div></div>`;
+  const mapLinks = features.customer_tracking && order.map_url ? `
+    <div class="ce-track-maplinks">
+      <a class="primary" target="_blank" rel="noopener" href="${esc(order.map_url)}">Open Google Maps ↗</a>
+      <a target="_blank" rel="noopener" href="https://www.openstreetmap.org/?mlat=${encodeURIComponent(order.latitude)}&mlon=${encodeURIComponent(order.longitude)}#map=16/${encodeURIComponent(order.latitude)}/${encodeURIComponent(order.longitude)}">Open OpenStreetMap ↗</a>
+    </div>` : `<p class="muted">${features.customer_tracking ? "A map location was not saved for this order." : "Map tracking is currently disabled by the store."}</p>`;
+  const contact = order.delivery_person ? `<div class="ce-track-assignee"><b>Delivery partner</b><span>${esc(order.delivery_person)}</span>${order.delivery_mobile ? `<a href="tel:${esc(order.delivery_mobile)}">Call delivery partner</a>` : ""}</div>` : `<p class="muted">Delivery partner has not been assigned yet.</p>`;
+  modal(`<div class="ce-track-modal">
+    <div class="ce-track-head"><div><small>ORDER TRACKING</small><h2>${esc(order.code)}</h2></div><span class="ce-track-status">${esc(order.status || "Pending")}</span></div>
+    ${cancelled ? `<p class="ce-track-cancelled">This order was cancelled.</p>` : `<div class="ce-track-steps">${steps.map((step,i)=>`<div class="ce-track-step ${activeIndex >= i ? "is-done" : ""} ${step === order.status ? "is-current" : ""}"><span>${activeIndex > i ? "✓" : i+1}</span><small>${esc(step)}</small></div>`).join("")}</div>`}
+    <div class="ce-track-section"><h3>Order history</h3><div class="ce-track-timeline">${timeline}</div></div>
+    <div class="ce-track-section"><h3>Delivery address</h3><p>${esc(order.address || "No address saved")}</p>${mapLinks}</div>
+    <div class="ce-track-section">${contact}</div>
+    <div class="ce-track-section"><small>Payment status</small><b>${esc(order.payment_status || "Pending")}</b></div>
+    <button class="primary" onclick="closeModal()">Close tracking</button>
+  </div>`);
 }
 
 async function cancelMyOrder(code) {
