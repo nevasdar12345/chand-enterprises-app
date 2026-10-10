@@ -18,7 +18,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 from . import db
 
-from .models import User, Product, Category, Order, OrderItem, Enquiry, Payment, OtpChallenge, SiteSetting, Coupon, LedgerEntry, OrderArchive, ArchivedOrder, TelegramLink, TelegramToken, StaffTelegramLink
+from .models import User, Product, Category, Order, OrderItem, Enquiry, Payment, OtpChallenge, SiteSetting, Coupon, LedgerEntry, OrderArchive, ArchivedOrder, OrderTrackingEvent, TelegramLink, TelegramToken, StaffTelegramLink
 
 
 main = Blueprint("main", __name__)
@@ -44,6 +44,10 @@ DEFAULT_SETTINGS = {
     "delivery_base": "30",
     "delivery_per_km": "10",
     "delivery_free_above": "500",
+    "maps_enabled": "1",
+    "map_customer_tracking": "1",
+    "map_delivery_navigation": "1",
+    "map_admin_view": "1",
     "show_prices_home": "1",
     "show_prices_brochure": "1",
     "ordering_enabled": "1",
@@ -299,7 +303,10 @@ def calculate_coupon(code, subtotal):
 def developer_settings():
     raw = setting_value("offers")
     offers = [x.strip() for x in raw.splitlines() if x.strip()] if raw else DEFAULT_OFFERS[:]
-    return {"business_name": setting_value("business_name"), "business_mobile": setting_value("business_mobile"), "whatsapp": setting_value("whatsapp"), "business_location": setting_value("business_location"), "upi": setting_value("upi"), "payment_name": setting_value("payment_name"), "business_lat": setting_value("business_lat"), "business_lng": setting_value("business_lng"), "delivery_base": setting_value("delivery_base"), "delivery_per_km": setting_value("delivery_per_km"), "delivery_free_above": setting_value("delivery_free_above"), "instagram_url": setting_value("instagram_url"), "facebook_url": setting_value("facebook_url"), "social_links": social_links(), "about_title": setting_value("about_title"), "about_text": setting_value("about_text"), "footer_tagline": setting_value("footer_tagline"), "home_delivery_title": setting_value("home_delivery_title"), "home_delivery_text": setting_value("home_delivery_text"), "home_payment_title": setting_value("home_payment_title"), "home_payment_text": setting_value("home_payment_text"), "home_support_title": setting_value("home_support_title"), "home_support_text": setting_value("home_support_text"), "home_store_eyebrow": setting_value("home_store_eyebrow"), "home_products_title": setting_value("home_products_title"), "home_products_text": setting_value("home_products_text"), "home_bulk_badge": setting_value("home_bulk_badge"), "home_bulk_title": setting_value("home_bulk_title"), "home_bulk_text": setting_value("home_bulk_text"), "home_bulk_button": setting_value("home_bulk_button"), "home_event_button": setting_value("home_event_button"), "home_bulk_order_button": setting_value("home_bulk_order_button"), "footer_contact_title": setting_value("footer_contact_title"), "footer_whatsapp_label": setting_value("footer_whatsapp_label"), "footer_copyright_prefix": setting_value("footer_copyright_prefix"), "show_prices_home": prices_home(), "show_prices_brochure": prices_brochure(), "ordering_enabled": ordering_enabled(), "customer_login_enabled": customer_login_enabled(), "brochure_url": setting_value("brochure_url"), "brochure_eyebrow": setting_value("brochure_eyebrow"), "brochure_title": setting_value("brochure_title"), "brochure_subtitle": setting_value("brochure_subtitle"), "archive_days": setting_value("archive_days") or "7", "archive_method": setting_value("archive_method") or "email", "archive_email": setting_value("archive_email"), "archive_whatsapp": setting_value("archive_whatsapp"), "offers": offers, "otp_provider": setting_value("otp_provider") or "demo", "telegram_bot_username": setting_value("telegram_bot_username"), "notify_customer_status": _flag("notify_customer_status"), "notify_admin_orders": _flag("notify_admin_orders"), "notify_admin_low_stock": _flag("notify_admin_low_stock"), "notify_delivery_assign": _flag("notify_delivery_assign"), "notify_daily_summary": _flag("notify_daily_summary"), "summary_time": setting_value("summary_time") or "21:30"}
+    return {"business_name": setting_value("business_name"), "business_mobile": setting_value("business_mobile"), "whatsapp": setting_value("whatsapp"), "business_location": setting_value("business_location"), "upi": setting_value("upi"), "payment_name": setting_value("payment_name"), "business_lat": setting_value("business_lat"), "business_lng": setting_value("business_lng"), "delivery_base": setting_value("delivery_base"), "delivery_per_km": setting_value("delivery_per_km"), "delivery_free_above": setting_value("delivery_free_above"), "instagram_url": setting_value("instagram_url"), "facebook_url": setting_value("facebook_url"), "social_links": social_links(), "about_title": setting_value("about_title"), "about_text": setting_value("about_text"), "footer_tagline": setting_value("footer_tagline"), "home_delivery_title": setting_value("home_delivery_title"), "home_delivery_text": setting_value("home_delivery_text"), "home_payment_title": setting_value("home_payment_title"), "home_payment_text": setting_value("home_payment_text"), "home_support_title": setting_value("home_support_title"), "home_support_text": setting_value("home_support_text"), "home_store_eyebrow": setting_value("home_store_eyebrow"), "home_products_title": setting_value("home_products_title"), "home_products_text": setting_value("home_products_text"), "home_bulk_badge": setting_value("home_bulk_badge"), "home_bulk_title": setting_value("home_bulk_title"), "home_bulk_text": setting_value("home_bulk_text"), "home_bulk_button": setting_value("home_bulk_button"), "home_event_button": setting_value("home_event_button"), "home_bulk_order_button": setting_value("home_bulk_order_button"), "footer_contact_title": setting_value("footer_contact_title"), "footer_whatsapp_label": setting_value("footer_whatsapp_label"), "footer_copyright_prefix": setting_value("footer_copyright_prefix"), "show_prices_home": prices_home(), "show_prices_brochure": prices_brochure(), "ordering_enabled": ordering_enabled(), "customer_login_enabled": customer_login_enabled(), "brochure_url": setting_value("brochure_url"), "brochure_eyebrow": setting_value("brochure_eyebrow"), "brochure_title": setting_value("brochure_title"), "brochure_subtitle": setting_value("brochure_subtitle"), "archive_days": setting_value("archive_days") or "7", "archive_method": setting_value("archive_method") or "email", "archive_email": setting_value("archive_email"), "archive_whatsapp": setting_value("archive_whatsapp"), "offers": offers, "otp_provider": setting_value("otp_provider") or "demo", "telegram_bot_username": setting_value("telegram_bot_username"), "notify_customer_status": _flag("notify_customer_status"), "notify_admin_orders": _flag("notify_admin_orders"), "notify_admin_low_stock": _flag("notify_admin_low_stock"), "notify_delivery_assign": _flag("notify_delivery_assign"), "notify_daily_summary": _flag("notify_daily_summary"), "summary_time": setting_value("summary_time") or "21:30",
+            "maps_enabled": _flag("maps_enabled"), "map_customer_tracking": _flag("map_customer_tracking"),
+            "map_delivery_navigation": _flag("map_delivery_navigation"), "map_admin_view": _flag("map_admin_view"),
+            }
 
 
 def display_datetime(dt):
@@ -428,7 +435,12 @@ def order_dict(o):
 
     return dict(id=o.id, code=o.code, customer=o.customer_name, mobile=o.mobile,
                 address=o.address, latitude=o.latitude, longitude=o.longitude,
-                map_url=o.map_url, total=o.total, subtotal=o.subtotal, discount=o.discount,
+                map_url=o.map_url, directions_url=o.directions_url,
+                map_features={"enabled": _flag("maps_enabled"),
+                              "customer_tracking": _flag("maps_enabled") and _flag("map_customer_tracking"),
+                              "delivery_navigation": _flag("maps_enabled") and _flag("map_delivery_navigation"),
+                              "admin_view": _flag("maps_enabled") and _flag("map_admin_view")},
+                total=o.total, subtotal=o.subtotal, discount=o.discount,
                 delivery_charge=o.delivery_charge, payment=o.payment_method,
                 payment_status=o.payment_status, status=o.status,
                 created=display_datetime(o.created_at),
@@ -464,10 +476,27 @@ def restock(o):
             p.stock += i.quantity
 
 
+def add_tracking_event(o, title, event_type="status", status=None, note="", actor_user_id=None):
+    """Append a customer-safe order timeline event; caller commits the transaction."""
+    db.session.add(OrderTrackingEvent(
+        order_id=o.id, event_type=event_type, status=status or o.status,
+        title=str(title or "Order updated")[:120], note=str(note or "")[:500],
+        actor_user_id=actor_user_id if actor_user_id is not None else session.get("user_id")
+    ))
+
+
 def set_status(o, status):
-    if status == "Cancelled" and o.status != "Cancelled":
+    old_status = o.status
+    if status == "Cancelled" and old_status != "Cancelled":
         restock(o)
     o.status = status
+    if old_status != status:
+        labels = {
+            "Confirmed": "Order confirmed", "Preparing": "Order is being prepared",
+            "Out for Delivery": "Order is out for delivery", "Delivered": "Order delivered",
+            "Cancelled": "Order cancelled"
+        }
+        add_tracking_event(o, labels.get(status, f"Status changed to {status}"), status=status)
 
 
 # ---------- login code (OTP) delivery ----------
@@ -1346,7 +1375,7 @@ def delivery_quote():
 @main.get("/api/config")
 def config():
     cfg = developer_settings()
-    return jsonify(_ok=True, whatsapp=wa_number(), upi=cfg["upi"] or current_app.config["UPI_ID"], business_name=cfg["business_name"], business_mobile=cfg["business_mobile"], business_location=cfg["business_location"], payment_name=cfg["payment_name"], offers=cfg["offers"], show_prices_home=cfg["show_prices_home"], show_prices_brochure=cfg["show_prices_brochure"], ordering_enabled=cfg["ordering_enabled"], customer_login_enabled=cfg["customer_login_enabled"], free_delivery_above=float_setting("delivery_free_above", 500), instagram_url=cfg["instagram_url"], facebook_url=cfg["facebook_url"], social_links=cfg["social_links"], about_title=cfg["about_title"], about_text=cfg["about_text"], footer_tagline=cfg["footer_tagline"], brochure_url=cfg["brochure_url"], categories=[category_dict(c) for c in active_categories()], coupons=[coupon_dict(c) for c in Coupon.query.filter_by(active=True).order_by(Coupon.code).all()])
+    return jsonify(_ok=True, whatsapp=wa_number(), upi=cfg["upi"] or current_app.config["UPI_ID"], business_name=cfg["business_name"], business_mobile=cfg["business_mobile"], business_location=cfg["business_location"], payment_name=cfg["payment_name"], offers=cfg["offers"], show_prices_home=cfg["show_prices_home"], show_prices_brochure=cfg["show_prices_brochure"], ordering_enabled=cfg["ordering_enabled"], customer_login_enabled=cfg["customer_login_enabled"], maps_enabled=cfg["maps_enabled"], map_customer_tracking=cfg["map_customer_tracking"], map_delivery_navigation=cfg["map_delivery_navigation"], map_admin_view=cfg["map_admin_view"], free_delivery_above=float_setting("delivery_free_above", 500), instagram_url=cfg["instagram_url"], facebook_url=cfg["facebook_url"], social_links=cfg["social_links"], about_title=cfg["about_title"], about_text=cfg["about_text"], footer_tagline=cfg["footer_tagline"], brochure_url=cfg["brochure_url"], categories=[category_dict(c) for c in active_categories()], coupons=[coupon_dict(c) for c in Coupon.query.filter_by(active=True).order_by(Coupon.code).all()])
 
 
 @main.get("/api/categories")
@@ -1422,6 +1451,7 @@ def create_order():
 
     db.session.add(o)
     db.session.flush()
+    add_tracking_event(o, "Order placed", status=o.status, note="Your order has been received.", actor_user_id=u.id)
 
     for p, qty in lines:
         p.stock -= qty
@@ -1478,6 +1508,38 @@ def my_orders():
     return jsonify([order_dict(o) for o in rows])
 
 
+@main.get("/api/orders/<code>/tracking")
+def order_tracking(code):
+    u = current_user()
+    if not u:
+        return jsonify(error="Please login to view order tracking"), 401
+    o = Order.query.filter_by(code=code).first()
+    if not o:
+        return jsonify(error="Order not found"), 404
+    if u.role == "customer" and u.mobile != o.mobile:
+        return jsonify(error="You can only track your own orders"), 403
+    if u.role == "delivery" and o.delivery_person_id != u.id:
+        return jsonify(error="This order is not assigned to you"), 403
+    if u.role not in {"customer", "admin", "developer", "delivery"}:
+        return jsonify(error="Forbidden"), 403
+    if not _flag("maps_enabled") or not _flag("map_customer_tracking"):
+        return jsonify(error="Customer order tracking is disabled by the store"), 403
+    events = OrderTrackingEvent.query.filter_by(order_id=o.id).order_by(OrderTrackingEvent.created_at.asc(), OrderTrackingEvent.id.asc()).all()
+    flags = {
+        "maps_enabled": _flag("maps_enabled"),
+        "customer_tracking": _flag("maps_enabled") and _flag("map_customer_tracking"),
+        "delivery_navigation": _flag("maps_enabled") and _flag("map_delivery_navigation"),
+    }
+    return jsonify(ok=True, order={"code": o.code, "status": o.status, "created": display_datetime(o.created_at),
+                                  "address": o.address, "latitude": o.latitude, "longitude": o.longitude,
+                                  "map_url": o.map_url, "directions_url": o.directions_url, "delivery_person": o.delivery_person.name if o.delivery_person else "",
+                                  "delivery_mobile": o.delivery_person.mobile if o.delivery_person else "",
+                                  "payment_status": o.payment_status},
+                   events=[{"title": e.title, "type": e.event_type, "status": e.status,
+                            "note": e.note or "", "at": display_datetime(e.created_at)} for e in events],
+                   features=flags)
+
+
 @main.get("/api/orders/<code>/qr.svg")
 def order_qr(code):
     """Scannable UPI QR for exactly this order's total."""
@@ -1505,6 +1567,7 @@ def mark_paid(code):
     if utr and not Payment.query.filter(Payment.transaction_id == utr, Payment.id != pay.id).first():
         pay.transaction_id = utr
     o.payment_status = pay.status = "Verifying"
+    add_tracking_event(o, "UPI payment submitted for verification", event_type="payment", status=o.status)
     db.session.commit()
     safe_notify(notify_admins_order, o, "💳 Payment to verify (UPI)", f"UTR: {pay.transaction_id or 'not given'}")
     return jsonify(ok=True, status="Verifying")
@@ -1571,6 +1634,25 @@ def enquiry():
 
 # ---------- admin ----------
 
+@main.get("/api/admin/delivery-map")
+def admin_delivery_map():
+    if not role_ok("admin"):
+        return jsonify(error="Forbidden"), 403
+    if not _flag("maps_enabled") or not _flag("map_admin_view"):
+        return jsonify(ok=True, enabled=False, orders=[])
+    rows = Order.query.options(joinedload(Order.delivery_person)).filter(
+        Order.latitude.isnot(None), Order.longitude.isnot(None),
+        db.or_(Order.latitude != 0, Order.longitude != 0),
+        Order.status.notin_(["Delivered", "Cancelled"])
+    ).order_by(Order.created_at.desc()).limit(250).all()
+    return jsonify(ok=True, enabled=True, orders=[{
+        "code": o.code, "customer": o.customer_name, "address": o.address,
+        "latitude": o.latitude, "longitude": o.longitude, "status": o.status,
+        "delivery_person": o.delivery_person.name if o.delivery_person else "Unassigned",
+        "map_url": o.map_url, "directions_url": o.directions_url
+    } for o in rows])
+
+
 @main.get("/api/admin/orders")
 def admin_orders():
     if not role_ok("admin"):
@@ -1628,6 +1710,7 @@ def update_order(oid):
         if d["payment_status"] not in PAY_STATUSES:
             return jsonify(error="Invalid payment status"), 400
         o.payment_status = d["payment_status"]
+        add_tracking_event(o, f"Payment status: {d['payment_status']}", event_type="payment", status=o.status)
         pay = Payment.query.filter_by(order_id=o.id).order_by(Payment.id.desc()).first()
         if pay:
             pay.status = d["payment_status"]
@@ -1651,6 +1734,10 @@ def assign_delivery(oid):
     old_person = o.delivery_person_id
     val = (request.json or {}).get("delivery_person_id")
     o.delivery_person_id = int(val) if val else None
+    if o.delivery_person_id != old_person:
+        assigned = db.session.get(User, o.delivery_person_id) if o.delivery_person_id else None
+        add_tracking_event(o, "Delivery partner assigned" if assigned else "Delivery partner unassigned",
+                           event_type="assignment", note=(assigned.name if assigned else "Assignment removed"))
     db.session.commit()
     if o.delivery_person_id and o.delivery_person_id != old_person:
         safe_notify(notify_delivery_assigned, o)
@@ -1927,11 +2014,13 @@ def delivery_status(oid):
         return jsonify(error="Order is cancelled"), 400
 
     old_status, old_pay = o.status, o.payment_status
-    o.status = s
+    set_status(o, s)
 
     if s == "Delivered" and o.payment_method == "COD":
         if (o.cash_collected or 0) >= o.total:
             o.payment_status = "Paid"
+            add_tracking_event(o, "Cash payment recorded", event_type="payment", status=o.status,
+                               note=f"₹{(o.cash_collected or 0):.0f} collected")
             pay = Payment.query.filter_by(order_id=o.id).order_by(Payment.id.desc()).first()
             if pay:
                 pay.status = "Paid"
@@ -2610,6 +2699,7 @@ def developer_get_settings():
 
 NOTIFY_FLAGS = {"notify_customer_status", "notify_admin_orders", "notify_admin_low_stock",
                 "notify_delivery_assign", "notify_daily_summary"}
+MAP_FLAGS = {"maps_enabled", "map_customer_tracking", "map_delivery_navigation", "map_admin_view"}
 
 
 @main.put("/api/developer/settings")
@@ -2663,9 +2753,9 @@ def developer_save_settings():
             if len(value) > limit:
                 return jsonify(error=f"{key.replace('_', ' ').title()} must be {limit} characters or fewer"), 400
             set_setting(key, value)
-    for key in ["business_name", "business_mobile", "whatsapp", "business_location", "upi", "payment_name", "business_lat", "business_lng", "delivery_base", "delivery_per_km", "delivery_free_above", "show_prices_home", "show_prices_brochure", "ordering_enabled", "customer_login_enabled", "brochure_url", "brochure_eyebrow", "brochure_title", "brochure_subtitle", "archive_days", "archive_method", "archive_email", "archive_whatsapp", "summary_time"] + sorted(NOTIFY_FLAGS):
+    for key in ["business_name", "business_mobile", "whatsapp", "business_location", "upi", "payment_name", "business_lat", "business_lng", "delivery_base", "delivery_per_km", "delivery_free_above", "show_prices_home", "show_prices_brochure", "ordering_enabled", "customer_login_enabled", "brochure_url", "brochure_eyebrow", "brochure_title", "brochure_subtitle", "archive_days", "archive_method", "archive_email", "archive_whatsapp", "summary_time"] + sorted(NOTIFY_FLAGS | MAP_FLAGS):
         if key in d:
-            if key in {"show_prices_home", "show_prices_brochure", "ordering_enabled", "customer_login_enabled"} | NOTIFY_FLAGS:
+            if key in {"show_prices_home", "show_prices_brochure", "ordering_enabled", "customer_login_enabled"} | NOTIFY_FLAGS | MAP_FLAGS:
                 set_setting(key, "0" if str(d.get(key)).strip().lower() in {"0", "false", "no", "off", ""} else "1")
                 continue
             value = str(d.get(key) or "").strip()
