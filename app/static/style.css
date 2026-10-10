@@ -856,7 +856,6 @@ button:active,
 
 .admin-nav{
     padding:12px 24px;
-    backdrop-filter:blur(14px);
     background:rgba(255,255,255,.94);
 }
 
@@ -1608,8 +1607,6 @@ button:active,
 .store-nav{
     padding:12px 24px;
     background:rgba(255,255,255,.94);
-    backdrop-filter:blur(18px);
-    -webkit-backdrop-filter:blur(18px);
     box-shadow:0 4px 20px #0f223308;
 }
 
@@ -1678,6 +1675,7 @@ button:active,
 /* ---------- HERO ---------- */
 
 .premium-hero{
+    animation:rise .7s both;
     min-height:460px;
     margin-top:8px;
     padding:52px 58px;
@@ -1798,7 +1796,6 @@ button:active,
     background:#ffffff10;
     color:#fff;
     border:1px solid #ffffff22;
-    backdrop-filter:blur(8px);
 }
 
 .hero-secondary:hover{
@@ -1837,7 +1834,6 @@ button:active,
     align-items:center;
     justify-content:center;
     border-radius:28px;
-    backdrop-filter:blur(15px);
     border:1px solid #ffffff20;
     box-shadow:0 25px 50px #00000025;
 }
@@ -1876,7 +1872,6 @@ button:active,
     border-radius:13px;
     background:#ffffff12;
     border:1px solid #ffffff20;
-    backdrop-filter:blur(15px);
     color:#fff;
 }
 
@@ -2272,7 +2267,6 @@ button:active,
 .staff-nav{
     padding:12px 24px;
     background:rgba(255,255,255,.94);
-    backdrop-filter:blur(18px);
     box-shadow:0 4px 20px #0f223308;
 }
 
@@ -2891,7 +2885,6 @@ button:active,
     border:1px solid #ffffff10;
     border-radius:13px;
     background:#ffffff09;
-    backdrop-filter:blur(10px);
 }
 
 .staff-login-features > div > span{
@@ -3437,7 +3430,6 @@ button:active,
     border:1px solid #ffffff12;
     border-radius:14px;
     background:#ffffff0b;
-    backdrop-filter:blur(12px);
 }
 
 .wa-contact-icon{
@@ -4409,11 +4401,18 @@ body.ce-menu-open{
 
 body{
     font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;
+    background:var(--bg);
+}
+
+body::before{
+    content:"";
+    position:fixed;
+    inset:0;
+    z-index:-1;
+    pointer-events:none;
     background:
         radial-gradient(900px 500px at 8% -5%,rgb(10 124 255 / 7%),transparent 60%),
-        radial-gradient(800px 480px at 100% 0,rgb(0 194 209 / 7%),transparent 60%),
-        var(--bg);
-    background-attachment:fixed;
+        radial-gradient(800px 480px at 100% 0,rgb(0 194 209 / 7%),transparent 60%);
 }
 
 h1,h2,h3{
