@@ -7,7 +7,7 @@
 //    used only when the phone is offline.
 //  - /api/, /admin/, /dashboard, /staff, /logout, /health are never touched.
 
-const CACHE = "chand-enterprises-v10";
+const CACHE = "chand-enterprises-v12";
 
 const APP_SHELL = [
   "/",
