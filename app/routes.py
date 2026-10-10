@@ -34,8 +34,8 @@ PAY_STATUSES = {"Pending", "Verifying", "Paid", "Failed"}
 # ---------- developer settings ----------
 DEFAULT_SETTINGS = {
     "business_name": "Chand Enterprises",
-    "business_mobile": "9304295574",
-    "whatsapp": "9304295574",
+    "business_mobile": "9304285574",
+    "whatsapp": "9304285574",
     "business_location": "Darbhanga, Bihar",
     "upi": "chandenterprises@upi",
     "payment_name": "Chand Enterprises",
@@ -58,6 +58,24 @@ DEFAULT_SETTINGS = {
     "about_title": "About Chand Enterprises",
     "about_text": "Chand Enterprises supplies cold drinks, energy drinks and premium packaged drinking water across Darbhanga, Bihar. We deliver locally, accept QR or cash on delivery, and welcome bulk orders for shops, events and offices.",
     "footer_tagline": "Drinks & premium water",
+    "home_delivery_title": "Local delivery",
+    "home_delivery_text": "Fast delivery across Darbhanga",
+    "home_payment_title": "Easy payment",
+    "home_payment_text": "Pay by QR or Cash on Delivery",
+    "home_support_title": "WhatsApp support",
+    "home_support_text": "Bulk orders are welcome",
+    "home_store_eyebrow": "OUR STORE",
+    "home_products_title": "Popular products",
+    "home_products_text": "Quality drinks, simple pricing.",
+    "home_bulk_badge": "WhatsApp enquiry",
+    "home_bulk_title": "Need a bulk order?",
+    "home_bulk_text": "Tell us what you need and we'll help you arrange your order directly.",
+    "home_bulk_button": "Enquire on WhatsApp",
+    "home_event_button": "🎉 Plan a function",
+    "home_bulk_order_button": "📦 Bulk order",
+    "footer_contact_title": "Contact",
+    "footer_whatsapp_label": "WhatsApp us",
+    "footer_copyright_prefix": "©",
     "archive_days": "7",
     "archive_method": "email",
     "archive_email": "",
@@ -200,6 +218,9 @@ def site_info():
         "about_title": setting_value("about_title") or DEFAULT_SETTINGS["about_title"],
         "about_text": setting_value("about_text") or DEFAULT_SETTINGS["about_text"],
         "social": social_links(),
+        "footer_contact_title": setting_value("footer_contact_title") or DEFAULT_SETTINGS["footer_contact_title"],
+        "footer_whatsapp_label": setting_value("footer_whatsapp_label") or DEFAULT_SETTINGS["footer_whatsapp_label"],
+        "copyright_prefix": setting_value("footer_copyright_prefix") or DEFAULT_SETTINGS["footer_copyright_prefix"],
     }
 
 
@@ -278,7 +299,7 @@ def calculate_coupon(code, subtotal):
 def developer_settings():
     raw = setting_value("offers")
     offers = [x.strip() for x in raw.splitlines() if x.strip()] if raw else DEFAULT_OFFERS[:]
-    return {"business_name": setting_value("business_name"), "business_mobile": setting_value("business_mobile"), "whatsapp": setting_value("whatsapp"), "business_location": setting_value("business_location"), "upi": setting_value("upi"), "payment_name": setting_value("payment_name"), "business_lat": setting_value("business_lat"), "business_lng": setting_value("business_lng"), "delivery_base": setting_value("delivery_base"), "delivery_per_km": setting_value("delivery_per_km"), "delivery_free_above": setting_value("delivery_free_above"), "instagram_url": setting_value("instagram_url"), "facebook_url": setting_value("facebook_url"), "social_links": social_links(), "about_title": setting_value("about_title"), "about_text": setting_value("about_text"), "footer_tagline": setting_value("footer_tagline"), "show_prices_home": prices_home(), "show_prices_brochure": prices_brochure(), "ordering_enabled": ordering_enabled(), "customer_login_enabled": customer_login_enabled(), "brochure_url": setting_value("brochure_url"), "brochure_eyebrow": setting_value("brochure_eyebrow"), "brochure_title": setting_value("brochure_title"), "brochure_subtitle": setting_value("brochure_subtitle"), "archive_days": setting_value("archive_days") or "7", "archive_method": setting_value("archive_method") or "email", "archive_email": setting_value("archive_email"), "archive_whatsapp": setting_value("archive_whatsapp"), "offers": offers, "otp_provider": setting_value("otp_provider") or "demo", "telegram_bot_username": setting_value("telegram_bot_username"), "notify_customer_status": _flag("notify_customer_status"), "notify_admin_orders": _flag("notify_admin_orders"), "notify_admin_low_stock": _flag("notify_admin_low_stock"), "notify_delivery_assign": _flag("notify_delivery_assign"), "notify_daily_summary": _flag("notify_daily_summary"), "summary_time": setting_value("summary_time") or "21:30"}
+    return {"business_name": setting_value("business_name"), "business_mobile": setting_value("business_mobile"), "whatsapp": setting_value("whatsapp"), "business_location": setting_value("business_location"), "upi": setting_value("upi"), "payment_name": setting_value("payment_name"), "business_lat": setting_value("business_lat"), "business_lng": setting_value("business_lng"), "delivery_base": setting_value("delivery_base"), "delivery_per_km": setting_value("delivery_per_km"), "delivery_free_above": setting_value("delivery_free_above"), "instagram_url": setting_value("instagram_url"), "facebook_url": setting_value("facebook_url"), "social_links": social_links(), "about_title": setting_value("about_title"), "about_text": setting_value("about_text"), "footer_tagline": setting_value("footer_tagline"), "home_delivery_title": setting_value("home_delivery_title"), "home_delivery_text": setting_value("home_delivery_text"), "home_payment_title": setting_value("home_payment_title"), "home_payment_text": setting_value("home_payment_text"), "home_support_title": setting_value("home_support_title"), "home_support_text": setting_value("home_support_text"), "home_store_eyebrow": setting_value("home_store_eyebrow"), "home_products_title": setting_value("home_products_title"), "home_products_text": setting_value("home_products_text"), "home_bulk_badge": setting_value("home_bulk_badge"), "home_bulk_title": setting_value("home_bulk_title"), "home_bulk_text": setting_value("home_bulk_text"), "home_bulk_button": setting_value("home_bulk_button"), "home_event_button": setting_value("home_event_button"), "home_bulk_order_button": setting_value("home_bulk_order_button"), "footer_contact_title": setting_value("footer_contact_title"), "footer_whatsapp_label": setting_value("footer_whatsapp_label"), "footer_copyright_prefix": setting_value("footer_copyright_prefix"), "show_prices_home": prices_home(), "show_prices_brochure": prices_brochure(), "ordering_enabled": ordering_enabled(), "customer_login_enabled": customer_login_enabled(), "brochure_url": setting_value("brochure_url"), "brochure_eyebrow": setting_value("brochure_eyebrow"), "brochure_title": setting_value("brochure_title"), "brochure_subtitle": setting_value("brochure_subtitle"), "archive_days": setting_value("archive_days") or "7", "archive_method": setting_value("archive_method") or "email", "archive_email": setting_value("archive_email"), "archive_whatsapp": setting_value("archive_whatsapp"), "offers": offers, "otp_provider": setting_value("otp_provider") or "demo", "telegram_bot_username": setting_value("telegram_bot_username"), "notify_customer_status": _flag("notify_customer_status"), "notify_admin_orders": _flag("notify_admin_orders"), "notify_admin_low_stock": _flag("notify_admin_low_stock"), "notify_delivery_assign": _flag("notify_delivery_assign"), "notify_daily_summary": _flag("notify_daily_summary"), "summary_time": setting_value("summary_time") or "21:30"}
 
 
 def display_datetime(dt):
@@ -569,7 +590,12 @@ def new_otp(mobile):
 @main.route("/")
 def home():
     prods = [product_dict(p) for p in Product.query.filter_by(active=True)]
-    return render_template("index.html", products=prods, show_prices=prices_home())
+    home_keys = ["home_delivery_title", "home_delivery_text", "home_payment_title", "home_payment_text",
+                 "home_support_title", "home_support_text", "home_store_eyebrow", "home_products_title",
+                 "home_products_text", "home_bulk_badge", "home_bulk_title", "home_bulk_text",
+                 "home_bulk_button", "home_event_button", "home_bulk_order_button"]
+    home_copy = {key: setting_value(key) for key in home_keys}
+    return render_template("index.html", products=prods, show_prices=prices_home(), home_copy=home_copy)
 
 
 def _clean_http_url(value):
@@ -2613,6 +2639,23 @@ def developer_save_settings():
         for legacy, label in (("instagram_url", "instagram"), ("facebook_url", "facebook")):
             match = next((x["url"] for x in clean_links if x["name"].strip().lower() == label), "")
             set_setting(legacy, match)
+    home_text_limits = {
+        "home_delivery_title": 80, "home_delivery_text": 180,
+        "home_payment_title": 80, "home_payment_text": 180,
+        "home_support_title": 80, "home_support_text": 180,
+        "home_store_eyebrow": 80, "home_products_title": 100,
+        "home_products_text": 240, "home_bulk_badge": 80,
+        "home_bulk_title": 120, "home_bulk_text": 500,
+        "home_bulk_button": 80, "home_event_button": 80,
+        "home_bulk_order_button": 80, "footer_contact_title": 80,
+        "footer_whatsapp_label": 80, "footer_copyright_prefix": 20,
+    }
+    for key, limit in home_text_limits.items():
+        if key in d:
+            value = str(d.get(key) or "").strip()
+            if len(value) > limit:
+                return jsonify(error=f"{key.replace('_', ' ').title()} must be {limit} characters or fewer"), 400
+            set_setting(key, value)
     for key in ["about_title", "about_text", "footer_tagline"]:
         if key in d:
             value = str(d.get(key) or "").strip()
