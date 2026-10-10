@@ -139,11 +139,11 @@
         <div>
 
             <b>
-                Local delivery
+                {{ home_copy.home_delivery_title }}
             </b>
 
             <small>
-                Fast delivery across Darbhanga
+                {{ home_copy.home_delivery_text }}
             </small>
 
         </div>
@@ -160,11 +160,11 @@
         <div>
 
             <b>
-                Easy payment
+                {{ home_copy.home_payment_title }}
             </b>
 
             <small>
-                Pay by QR or Cash on Delivery
+                {{ home_copy.home_payment_text }}
             </small>
 
         </div>
@@ -181,11 +181,11 @@
         <div>
 
             <b>
-                WhatsApp support
+                {{ home_copy.home_support_title }}
             </b>
 
             <small>
-                Bulk orders are welcome
+                {{ home_copy.home_support_text }}
             </small>
 
         </div>
@@ -238,15 +238,15 @@
         <div>
 
             <span class="section-kicker">
-                OUR STORE
+                {{ home_copy.home_store_eyebrow }}
             </span>
 
             <h2>
-                Popular products
+                {{ home_copy.home_products_title }}
             </h2>
 
             <p>
-                Quality drinks, simple pricing.
+                {{ home_copy.home_products_text }}
             </p>
 
         </div>
@@ -310,16 +310,15 @@
     <div class="enquiry-content">
 
         <span class="pill">
-            WhatsApp enquiry
+            {{ home_copy.home_bulk_badge }}
         </span>
 
         <h2>
-            Need a bulk order?
+            {{ home_copy.home_bulk_title }}
         </h2>
 
         <p>
-            Tell us what you need and we'll help you
-            arrange your order directly.
+            {{ home_copy.home_bulk_text }}
         </p>
 
     </div>
@@ -328,16 +327,16 @@
     <div class="enquiry-actions">
 
         <button type="button" class="primary enquiry-btn" onclick="enquiry()">
-            Enquire on WhatsApp
+            {{ home_copy.home_bulk_button }}
             <span>→</span>
         </button>
 
         <button type="button" class="enquiry-alt" onclick="eventPlanner()">
-            🎉 Plan a function
+            {{ home_copy.home_event_button }}
         </button>
 
         <button type="button" class="enquiry-alt" onclick="bulkOrder()">
-            📦 Bulk order
+            {{ home_copy.home_bulk_order_button }}
         </button>
 
     </div>
