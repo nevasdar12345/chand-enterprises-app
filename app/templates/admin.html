@@ -316,6 +316,15 @@
 
 
 
+        <section class="ce-admin-map-panel" id="ceAdminMapPanel">
+            <div class="ce-admin-map-head">
+                <div><h2>🗺️ Active delivery map</h2><small>Orders with saved coordinates that have not been delivered or cancelled.</small></div>
+                <button type="button" onclick="loadAdminDeliveryMap()">Refresh map</button>
+            </div>
+            <div id="ceAdminDeliveryMap" role="region" aria-label="Active delivery orders map"></div>
+            <p id="ceAdminMapNote" class="muted">Loading map…</p>
+        </section>
+
         <!-- Filters -->
 
         <div class="admin-toolbar">
