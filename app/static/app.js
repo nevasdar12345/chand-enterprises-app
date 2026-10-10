@@ -57,6 +57,10 @@ async function api(url, method = "GET", body = undefined) {
 
 let CART = JSON.parse(localStorage.getItem("cart") || "{}");
 
+/* Temporary UI-only confirmation for successful add-to-cart actions. */
+const RECENTLY_ADDED = new Set();
+const ADDED_FEEDBACK_TIMERS = new Map();
+
 let CAT = "All";
 
 /* Shop filters, sort and wishlist */
@@ -379,7 +383,7 @@ function cardHtml(product, index, anim) {
     : soldOut
     ? ""
     : quantity
-      ? `<div class="qty"><button aria-label="Remove one" onclick="chg(${product.id}, -1)">−</button><b>${quantity}</b><button aria-label="Add one more" onclick="chg(${product.id}, 1)">+</button></div>`
+      ? `${RECENTLY_ADDED.has(Number(product.id)) || RECENTLY_ADDED.has(product.id) ? `<span class="cart-added-feedback" role="status">✓ Added</span>` : ""}<div class="qty"><button aria-label="Remove one" onclick="chg(${product.id}, -1)">−</button><b>${quantity}</b><button aria-label="Add one more" onclick="chg(${product.id}, 1)">+</button></div>`
       : `<button class="primary" aria-label="Add ${esc(cleanName(product.name))} to cart" onclick="chg(${product.id}, 1)">Add</button>`;
 
   const liked = WISH.has(Number(product.id));
@@ -514,8 +518,27 @@ function chg(id, change) {
     CART[id] = quantity;
   }
 
-  persistCart();
+  if (change > 0 && quantity > 0) {
+    const numericId = Number(id);
+    RECENTLY_ADDED.add(numericId);
+    const oldTimer = ADDED_FEEDBACK_TIMERS.get(numericId);
+    if (oldTimer) clearTimeout(oldTimer);
+    ADDED_FEEDBACK_TIMERS.set(numericId, setTimeout(() => {
+      RECENTLY_ADDED.delete(numericId);
+      ADDED_FEEDBACK_TIMERS.delete(numericId);
+      updateCard(id);
+    }, 900));
 
+    const cartButton = document.querySelector(".premium-cart, .cart");
+    if (cartButton) {
+      cartButton.classList.remove("cart-bounce");
+      void cartButton.offsetWidth;
+      cartButton.classList.add("cart-bounce");
+      setTimeout(() => cartButton.classList.remove("cart-bounce"), 450);
+    }
+  }
+
+  persistCart();
   updateCard(id);
 }
 
