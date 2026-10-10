@@ -70,6 +70,8 @@ DEFAULT_SETTINGS = {
     "notify_delivery_assign": "1",
     "notify_daily_summary": "1",
     "last_summary_date": "",
+    "summary_time": "21:30",
+    "last_cron_tick": "",
 }
 
 # Maximum length of the brochure heading texts the developer can edit
@@ -276,7 +278,7 @@ def calculate_coupon(code, subtotal):
 def developer_settings():
     raw = setting_value("offers")
     offers = [x.strip() for x in raw.splitlines() if x.strip()] if raw else DEFAULT_OFFERS[:]
-    return {"business_name": setting_value("business_name"), "business_mobile": setting_value("business_mobile"), "whatsapp": setting_value("whatsapp"), "business_location": setting_value("business_location"), "upi": setting_value("upi"), "payment_name": setting_value("payment_name"), "business_lat": setting_value("business_lat"), "business_lng": setting_value("business_lng"), "delivery_base": setting_value("delivery_base"), "delivery_per_km": setting_value("delivery_per_km"), "delivery_free_above": setting_value("delivery_free_above"), "instagram_url": setting_value("instagram_url"), "facebook_url": setting_value("facebook_url"), "social_links": social_links(), "about_title": setting_value("about_title"), "about_text": setting_value("about_text"), "footer_tagline": setting_value("footer_tagline"), "show_prices_home": prices_home(), "show_prices_brochure": prices_brochure(), "ordering_enabled": ordering_enabled(), "customer_login_enabled": customer_login_enabled(), "brochure_url": setting_value("brochure_url"), "brochure_eyebrow": setting_value("brochure_eyebrow"), "brochure_title": setting_value("brochure_title"), "brochure_subtitle": setting_value("brochure_subtitle"), "archive_days": setting_value("archive_days") or "7", "archive_method": setting_value("archive_method") or "email", "archive_email": setting_value("archive_email"), "archive_whatsapp": setting_value("archive_whatsapp"), "offers": offers, "otp_provider": setting_value("otp_provider") or "demo", "telegram_bot_username": setting_value("telegram_bot_username"), "notify_customer_status": _flag("notify_customer_status"), "notify_admin_orders": _flag("notify_admin_orders"), "notify_admin_low_stock": _flag("notify_admin_low_stock"), "notify_delivery_assign": _flag("notify_delivery_assign"), "notify_daily_summary": _flag("notify_daily_summary")}
+    return {"business_name": setting_value("business_name"), "business_mobile": setting_value("business_mobile"), "whatsapp": setting_value("whatsapp"), "business_location": setting_value("business_location"), "upi": setting_value("upi"), "payment_name": setting_value("payment_name"), "business_lat": setting_value("business_lat"), "business_lng": setting_value("business_lng"), "delivery_base": setting_value("delivery_base"), "delivery_per_km": setting_value("delivery_per_km"), "delivery_free_above": setting_value("delivery_free_above"), "instagram_url": setting_value("instagram_url"), "facebook_url": setting_value("facebook_url"), "social_links": social_links(), "about_title": setting_value("about_title"), "about_text": setting_value("about_text"), "footer_tagline": setting_value("footer_tagline"), "show_prices_home": prices_home(), "show_prices_brochure": prices_brochure(), "ordering_enabled": ordering_enabled(), "customer_login_enabled": customer_login_enabled(), "brochure_url": setting_value("brochure_url"), "brochure_eyebrow": setting_value("brochure_eyebrow"), "brochure_title": setting_value("brochure_title"), "brochure_subtitle": setting_value("brochure_subtitle"), "archive_days": setting_value("archive_days") or "7", "archive_method": setting_value("archive_method") or "email", "archive_email": setting_value("archive_email"), "archive_whatsapp": setting_value("archive_whatsapp"), "offers": offers, "otp_provider": setting_value("otp_provider") or "demo", "telegram_bot_username": setting_value("telegram_bot_username"), "notify_customer_status": _flag("notify_customer_status"), "notify_admin_orders": _flag("notify_admin_orders"), "notify_admin_low_stock": _flag("notify_admin_low_stock"), "notify_delivery_assign": _flag("notify_delivery_assign"), "notify_daily_summary": _flag("notify_daily_summary"), "summary_time": setting_value("summary_time") or "21:30"}
 
 
 def display_datetime(dt):
@@ -1201,19 +1203,69 @@ def build_daily_summary():
     return day_ist.strftime("%Y-%m-%d"), "\n".join(lines)
 
 
+def _ist_today():
+    return (datetime.utcnow() + timedelta(hours=5, minutes=30)).strftime("%Y-%m-%d")
+
+
+def claim_summary_day(day):
+    """Atomically mark `day` as sent. True only for the ONE caller that wins (safe with several workers)."""
+    if not SiteSetting.query.filter_by(key="last_summary_date").first():
+        try:
+            db.session.add(SiteSetting(key="last_summary_date", value=""))
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+    won = SiteSetting.query.filter(SiteSetting.key == "last_summary_date", SiteSetting.value != day) \
+        .update({"value": day}, synchronize_session=False)
+    db.session.commit()
+    _settings_cache()["last_summary_date"] = day
+    return won == 1
+
+
 def send_daily_summary(force=False):
+    """force=True is the manual 'send now' button: it never blocks the scheduled summary."""
     if not telegram_bot_ready():
         return {"ok": False, "error": "Telegram bot is not connected yet"}
-    day, text = build_daily_summary()
-    if not force and setting_value("last_summary_date") == day:
+    today = _ist_today()
+    if not force and setting_value("last_summary_date") == today:
         return {"ok": True, "skipped": "already sent today"}
     chats = admin_chat_ids()
     if not chats:
         return {"ok": False, "error": "No admin has linked Telegram yet"}
+    if not force and not claim_summary_day(today):
+        return {"ok": True, "skipped": "already sent today"}
+    try:
+        _, text = build_daily_summary()
+    except Exception:
+        if not force:
+            set_setting("last_summary_date", "")
+            db.session.commit()
+        raise
     tg_send_async(chats, text)
-    set_setting("last_summary_date", day)
-    db.session.commit()
     return {"ok": True, "sent_to": len(chats)}
+
+
+TIME_RE = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
+
+
+def cron_run():
+    """One scheduler pass. A free pinger calls this every few minutes (and the Developer
+    'Run check now' button). It decides what is due, using the settings the developer chose."""
+    now_utc = datetime.utcnow()
+    set_setting("last_cron_tick", now_utc.strftime("%Y-%m-%d %H:%M:%S"))
+    db.session.commit()
+    result = {"ok": True, "tick": True, "summary": "switched off"}
+    if _flag("notify_daily_summary"):
+        hhmm = setting_value("summary_time") or "21:30"
+        if not TIME_RE.match(hhmm):
+            hhmm = "21:30"
+        ist = now_utc + timedelta(hours=5, minutes=30)
+        if ist.strftime("%H:%M") < hhmm:
+            result["summary"] = f"waiting for {hhmm} India time"
+        else:
+            r = send_daily_summary()
+            result["summary"] = ("sent" if r.get("sent_to") else (r.get("skipped") or r.get("error") or "not sent"))
+    return result
 
 
 def _staff_link_payload(u):
@@ -2568,7 +2620,7 @@ def developer_save_settings():
             if len(value) > limit:
                 return jsonify(error=f"{key.replace('_', ' ').title()} must be {limit} characters or fewer"), 400
             set_setting(key, value)
-    for key in ["business_name", "business_mobile", "whatsapp", "business_location", "upi", "payment_name", "business_lat", "business_lng", "delivery_base", "delivery_per_km", "delivery_free_above", "show_prices_home", "show_prices_brochure", "ordering_enabled", "customer_login_enabled", "brochure_url", "brochure_eyebrow", "brochure_title", "brochure_subtitle", "archive_days", "archive_method", "archive_email", "archive_whatsapp"] + sorted(NOTIFY_FLAGS):
+    for key in ["business_name", "business_mobile", "whatsapp", "business_location", "upi", "payment_name", "business_lat", "business_lng", "delivery_base", "delivery_per_km", "delivery_free_above", "show_prices_home", "show_prices_brochure", "ordering_enabled", "customer_login_enabled", "brochure_url", "brochure_eyebrow", "brochure_title", "brochure_subtitle", "archive_days", "archive_method", "archive_email", "archive_whatsapp", "summary_time"] + sorted(NOTIFY_FLAGS):
         if key in d:
             if key in {"show_prices_home", "show_prices_brochure", "ordering_enabled", "customer_login_enabled"} | NOTIFY_FLAGS:
                 set_setting(key, "0" if str(d.get(key)).strip().lower() in {"0", "false", "no", "off", ""} else "1")
@@ -2587,6 +2639,8 @@ def developer_save_settings():
                     return jsonify(error="Archive days must be a positive number"), 400
             if key == "archive_method" and value not in {"email", "whatsapp"}:
                 return jsonify(error="Archive method must be email or whatsapp"), 400
+            if key == "summary_time" and not TIME_RE.match(value):
+                return jsonify(error="Summary time must look like 21:30 (24-hour, India time)"), 400
             set_setting(key, value)
     if "otp_provider" in d:
         provider = str(d.get("otp_provider") or "").strip().lower()
@@ -2945,14 +2999,44 @@ def developer_telegram_summary_now():
     return jsonify(result), (200 if result.get("ok") else 400)
 
 
-@main.route("/api/cron/daily-summary", methods=["GET", "POST"])
-def cron_daily_summary():
-    """Call once a day from a free scheduler (e.g. cron-job.org) at about 9:30 PM India time.
-    Needs env CRON_SECRET, sent as header X-Cron-Key (or ?key=)."""
+def _cron_authorised():
     secret = os.getenv("CRON_SECRET", "")
     got = request.headers.get("X-Cron-Key") or request.args.get("key") or ""
-    if not secret or not secrets.compare_digest(got.encode("utf-8"), secret.encode("utf-8")):
+    return bool(secret) and secrets.compare_digest(got.encode("utf-8"), secret.encode("utf-8"))
+
+
+@main.route("/api/cron/tick", methods=["GET", "POST"])
+@main.route("/api/cron/daily-summary", methods=["GET", "POST"])        # old address keeps working
+def cron_tick():
+    """Call every 5-15 minutes from a free scheduler (cron-job.org). Needs env CRON_SECRET,
+    sent as header X-Cron-Key (or ?key=). Keeps the free Render service awake as a bonus."""
+    if not _cron_authorised():
         return "", 403
-    if not _flag("notify_daily_summary"):
-        return jsonify(ok=True, skipped="daily summary is switched off")
-    return jsonify(send_daily_summary())
+    return jsonify(cron_run())
+
+
+@main.get("/api/developer/scheduler/status")
+def developer_scheduler_status():
+    if not role_ok("developer"):
+        return jsonify(error="Forbidden"), 403
+    last = setting_value("last_cron_tick")
+    ago = None
+    if last:
+        try:
+            ago = max(0, int((datetime.utcnow() - datetime.strptime(last, "%Y-%m-%d %H:%M:%S")).total_seconds()))
+        except ValueError:
+            ago = None
+    return jsonify(ok=True, cron_secret_set=bool(os.getenv("CRON_SECRET")), last_tick_seconds_ago=ago,
+                   summary_enabled=_flag("notify_daily_summary"),
+                   summary_time=setting_value("summary_time") or "21:30",
+                   last_summary_date=setting_value("last_summary_date"), today=_ist_today(),
+                   ist_now=(datetime.utcnow() + timedelta(hours=5, minutes=30)).strftime("%d %b %Y %I:%M %p"),
+                   bot_ready=telegram_bot_ready(), admins_linked=len(admin_chat_ids()))
+
+
+@main.post("/api/developer/scheduler/run")
+def developer_scheduler_run():
+    """Same pass the pinger makes, for testing from the Developer panel."""
+    if not role_ok("developer"):
+        return jsonify(error="Forbidden"), 403
+    return jsonify(cron_run())
