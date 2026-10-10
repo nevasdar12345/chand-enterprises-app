@@ -30,6 +30,10 @@ let CART = JSON.parse(
     localStorage.getItem('cart') || '{}'
 );
 
+// Temporary UI-only feedback; cart data and checkout logic remain unchanged.
+const CART_ADD_FEEDBACK = new Set();
+const CART_ADD_FEEDBACK_TIMERS = new Map();
+
 let CAT = 'All';
 
 let ME = null;
@@ -185,6 +189,13 @@ function save(anim = false) {
         count.textContent = totalItems;
     }
 
+    const cartButton = document.querySelector('.premium-cart, .cart');
+    if (cartButton) {
+        cartButton.classList.remove('cart-bounce');
+        void cartButton.offsetWidth;
+        cartButton.classList.add('cart-bounce');
+    }
+
     render(anim === true);
 }
 
@@ -319,10 +330,14 @@ function render(anim = false) {
                             quantity
 
                             ? `
+                                ${CART_ADD_FEEDBACK.has(String(product.id)) ? `
+                                    <span class="cart-added-feedback" role="status" aria-live="polite">✓ Added</span>
+                                ` : ''}
                                 <div class="qty">
 
                                     <button
                                         onclick="chg(${product.id},-1)"
+                                        aria-label="Remove one ${esc(product.name)}"
                                     >
                                         −
                                     </button>
@@ -333,6 +348,7 @@ function render(anim = false) {
 
                                     <button
                                         onclick="chg(${product.id},1)"
+                                        aria-label="Add one more ${esc(product.name)}"
                                     >
                                         +
                                     </button>
@@ -342,8 +358,9 @@ function render(anim = false) {
 
                             : `
                                 <button
-                                    class="primary"
+                                    class="primary add-to-cart-btn"
                                     onclick="chg(${product.id},1)"
+                                    aria-label="Add ${esc(product.name)} to cart"
                                 >
                                     Add
                                 </button>
@@ -376,6 +393,21 @@ function chg(id, change) {
 
     if (quantity > product.stock) {
         quantity = product.stock;
+    }
+
+    // Show a short confirmation only when an add actually changes quantity.
+    if (change > 0 && quantity > (CART[id] || 0)) {
+        const key = String(id);
+        CART_ADD_FEEDBACK.add(key);
+        if (CART_ADD_FEEDBACK_TIMERS.has(key)) {
+            clearTimeout(CART_ADD_FEEDBACK_TIMERS.get(key));
+        }
+        const timer = setTimeout(() => {
+            CART_ADD_FEEDBACK.delete(key);
+            CART_ADD_FEEDBACK_TIMERS.delete(key);
+            render(false);
+        }, 900);
+        CART_ADD_FEEDBACK_TIMERS.set(key, timer);
     }
 
     if (quantity <= 0) {
