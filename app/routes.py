@@ -1,4 +1,4 @@
-import csv, io, secrets, urllib.parse, math, re, os, base64, json, mimetypes, urllib.request, urllib.error, smtplib, tempfile, uuid
+import csv, io, secrets, urllib.parse, math, re, os, base64, json, mimetypes, urllib.request, urllib.error, smtplib, tempfile, uuid, threading
 from pathlib import Path
 
 import segno
@@ -18,7 +18,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 from . import db
 
-from .models import User, Product, Category, Order, OrderItem, Enquiry, Payment, OtpChallenge, SiteSetting, Coupon, LedgerEntry, OrderArchive, ArchivedOrder, TelegramLink, TelegramToken
+from .models import User, Product, Category, Order, OrderItem, Enquiry, Payment, OtpChallenge, SiteSetting, Coupon, LedgerEntry, OrderArchive, ArchivedOrder, TelegramLink, TelegramToken, StaffTelegramLink
 
 
 main = Blueprint("main", __name__)
@@ -48,7 +48,6 @@ DEFAULT_SETTINGS = {
     "show_prices_brochure": "1",
     "ordering_enabled": "1",
     "customer_login_enabled": "1",
-    "otp_provider": "demo",
     "brochure_url": "",
     "brochure_eyebrow": "CHAND ENTERPRISES · DARBHANGA, BIHAR",
     "brochure_title": "Premium Product Brochure",
@@ -63,6 +62,14 @@ DEFAULT_SETTINGS = {
     "archive_method": "email",
     "archive_email": "",
     "archive_whatsapp": "",
+    "otp_provider": "demo",
+    "telegram_bot_username": "",
+    "notify_customer_status": "1",
+    "notify_admin_orders": "1",
+    "notify_admin_low_stock": "1",
+    "notify_delivery_assign": "1",
+    "notify_daily_summary": "1",
+    "last_summary_date": "",
 }
 
 # Maximum length of the brochure heading texts the developer can edit
@@ -269,7 +276,7 @@ def calculate_coupon(code, subtotal):
 def developer_settings():
     raw = setting_value("offers")
     offers = [x.strip() for x in raw.splitlines() if x.strip()] if raw else DEFAULT_OFFERS[:]
-    return {"business_name": setting_value("business_name"), "business_mobile": setting_value("business_mobile"), "whatsapp": setting_value("whatsapp"), "business_location": setting_value("business_location"), "upi": setting_value("upi"), "payment_name": setting_value("payment_name"), "business_lat": setting_value("business_lat"), "business_lng": setting_value("business_lng"), "delivery_base": setting_value("delivery_base"), "delivery_per_km": setting_value("delivery_per_km"), "delivery_free_above": setting_value("delivery_free_above"), "instagram_url": setting_value("instagram_url"), "facebook_url": setting_value("facebook_url"), "social_links": social_links(), "about_title": setting_value("about_title"), "about_text": setting_value("about_text"), "footer_tagline": setting_value("footer_tagline"), "show_prices_home": prices_home(), "show_prices_brochure": prices_brochure(), "ordering_enabled": ordering_enabled(), "customer_login_enabled": customer_login_enabled(), "otp_provider": setting_value("otp_provider") or "demo", "brochure_url": setting_value("brochure_url"), "brochure_eyebrow": setting_value("brochure_eyebrow"), "brochure_title": setting_value("brochure_title"), "brochure_subtitle": setting_value("brochure_subtitle"), "archive_days": setting_value("archive_days") or "7", "archive_method": setting_value("archive_method") or "email", "archive_email": setting_value("archive_email"), "archive_whatsapp": setting_value("archive_whatsapp"), "offers": offers}
+    return {"business_name": setting_value("business_name"), "business_mobile": setting_value("business_mobile"), "whatsapp": setting_value("whatsapp"), "business_location": setting_value("business_location"), "upi": setting_value("upi"), "payment_name": setting_value("payment_name"), "business_lat": setting_value("business_lat"), "business_lng": setting_value("business_lng"), "delivery_base": setting_value("delivery_base"), "delivery_per_km": setting_value("delivery_per_km"), "delivery_free_above": setting_value("delivery_free_above"), "instagram_url": setting_value("instagram_url"), "facebook_url": setting_value("facebook_url"), "social_links": social_links(), "about_title": setting_value("about_title"), "about_text": setting_value("about_text"), "footer_tagline": setting_value("footer_tagline"), "show_prices_home": prices_home(), "show_prices_brochure": prices_brochure(), "ordering_enabled": ordering_enabled(), "customer_login_enabled": customer_login_enabled(), "brochure_url": setting_value("brochure_url"), "brochure_eyebrow": setting_value("brochure_eyebrow"), "brochure_title": setting_value("brochure_title"), "brochure_subtitle": setting_value("brochure_subtitle"), "archive_days": setting_value("archive_days") or "7", "archive_method": setting_value("archive_method") or "email", "archive_email": setting_value("archive_email"), "archive_whatsapp": setting_value("archive_whatsapp"), "offers": offers, "otp_provider": setting_value("otp_provider") or "demo", "telegram_bot_username": setting_value("telegram_bot_username"), "notify_customer_status": _flag("notify_customer_status"), "notify_admin_orders": _flag("notify_admin_orders"), "notify_admin_low_stock": _flag("notify_admin_low_stock"), "notify_delivery_assign": _flag("notify_delivery_assign"), "notify_daily_summary": _flag("notify_daily_summary")}
 
 
 def display_datetime(dt):
@@ -440,262 +447,119 @@ def set_status(o, status):
     o.status = status
 
 
-def _telegram_config():
-    return {
-        "token": (current_app.config.get("TELEGRAM_BOT_TOKEN") or os.getenv("TELEGRAM_BOT_TOKEN") or "").strip(),
-        "secret": (current_app.config.get("TELEGRAM_WEBHOOK_SECRET") or os.getenv("TELEGRAM_WEBHOOK_SECRET") or "").strip(),
-        "base_url": (current_app.config.get("PUBLIC_BASE_URL") or os.getenv("PUBLIC_BASE_URL") or "").strip().rstrip("/"),
-    }
+# ---------- login code (OTP) delivery ----------
+
+# Where the customer's login code is sent. The developer picks one in
+# Developer > Login and OTP Settings.
+#   demo     = old behaviour (code shown on screen when env DEV_OTP=1)
+#   telegram = free Telegram bot
+# Add "whatsapp" / "sms" here later (see the commented lines in deliver_otp).
+OTP_PROVIDERS = {"demo", "telegram"}
 
 
-def _telegram_api(method, payload=None, timeout=15):
-    cfg = _telegram_config()
-    if not cfg["token"]:
-        raise RuntimeError("TELEGRAM_BOT_TOKEN is not configured")
-    url = f"https://api.telegram.org/bot{cfg['token']}/{method}"
-    body = json.dumps(payload or {}).encode("utf-8") if payload is not None else None
+def telegram_ready():
+    return bool(os.getenv("TELEGRAM_BOT_TOKEN") and os.getenv("TELEGRAM_WEBHOOK_SECRET")
+                and setting_value("telegram_bot_username"))
+
+
+def tg_call(method, payload=None):
+    """Call the Telegram Bot API. Returns the parsed JSON, or None if the token is missing / network fails."""
+    token = (os.getenv("TELEGRAM_BOT_TOKEN") or "").strip()
+    if not token:
+        return None
     req = urllib.request.Request(
-        url, data=body, method="POST" if body is not None else "GET",
-        headers={"Content-Type": "application/json", "User-Agent": "Chand-Enterprises/1.0"}
-    )
+        f"https://api.telegram.org/bot{token}/{method}",
+        data=json.dumps(payload or {}).encode("utf-8"),
+        headers={"Content-Type": "application/json"})
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as response:
-            result = json.loads(response.read().decode("utf-8"))
+        with urllib.request.urlopen(req, timeout=8) as response:
+            return json.loads(response.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
         try:
-            detail = json.loads(exc.read().decode("utf-8")).get("description", f"Telegram API HTTP {exc.code}")
+            return json.loads(exc.read().decode("utf-8"))      # Telegram explains 4xx errors in JSON
         except Exception:
-            detail = f"Telegram API HTTP {exc.code}"
-        raise RuntimeError(detail)
-    except (urllib.error.URLError, TimeoutError) as exc:
-        raise RuntimeError(f"Could not reach Telegram: {getattr(exc, 'reason', str(exc))}")
-    if not result.get("ok"):
-        raise RuntimeError(result.get("description") or f"Telegram API {method} failed")
-    return result.get("result")
+            return {"ok": False, "error_code": exc.code}
+    except Exception:
+        current_app.logger.warning("Telegram call %s failed", method)   # never log the URL: it contains the token
+        return None
 
 
-def _telegram_send(chat_id, text, reply_markup=None):
-    payload = {"chat_id": chat_id, "text": text}
-    if reply_markup is not None:
-        payload["reply_markup"] = reply_markup
-    return _telegram_api("sendMessage", payload)
+def telegram_send_otp(mobile, otp):
+    if not telegram_ready():
+        return {"ok": False, "error": "Telegram login is not set up yet. Please order on WhatsApp."}
+    now = datetime.utcnow()
+
+    link = TelegramLink.query.filter_by(mobile=mobile).first()
+    if link:
+        business = setting_value("business_name") or "Chand Enterprises"
+        r = tg_call("sendMessage", {
+            "chat_id": link.chat_id,
+            "text": f"🔐 Your {business} login code: {otp}\nValid for 5 minutes. Do not share it with anyone."})
+        if r and r.get("ok"):
+            return {"ok": True, "channel": "telegram"}
+        if r is None:
+            return {"ok": False, "error": "Could not reach Telegram. Please try again."}
+        if r.get("error_code") in (400, 403):          # user blocked the bot / chat no longer exists -> relink
+            db.session.delete(link)
+            db.session.commit()
+        else:
+            return {"ok": False, "error": "Could not send the code on Telegram. Please try again."}
+
+    # Not linked yet: give the website a one-time "Open Telegram" link.
+    TelegramToken.query.filter(TelegramToken.expires_at < now - timedelta(days=1)).delete(synchronize_session=False)
+    pending = TelegramToken.query.filter(TelegramToken.mobile == mobile, TelegramToken.used == False,
+                                         TelegramToken.expires_at > now).count()
+    if pending >= 5:
+        db.session.commit()
+        return {"ok": False, "error": "Too many attempts. Please wait a few minutes and try again."}
+    token = secrets.token_urlsafe(12)
+    db.session.add(TelegramToken(token=token, mobile=mobile, expires_at=now + timedelta(minutes=10)))
+    db.session.commit()
+    return {"ok": True, "needs_link": True, "token": token,
+            "link": f"https://t.me/{setting_value('telegram_bot_username')}?start={token}"}
 
 
-def _telegram_bot_username():
-    try:
-        return (_telegram_api("getMe") or {}).get("username") or ""
-    except RuntimeError:
-        return ""
+def deliver_otp(mobile, otp):
+    """Send the code through whichever provider the developer selected."""
+    provider = (setting_value("otp_provider") or "demo").strip().lower()
+    if provider == "telegram":
+        return telegram_send_otp(mobile, otp)
+    # --- later, add more providers here and in OTP_PROVIDERS: ---
+    # if provider == "whatsapp": return whatsapp_send_otp(mobile, otp)
+    # if provider == "sms":      return sms_send_otp(mobile, otp)
+    out = {"ok": True, "channel": "demo"}
+    if current_app.config["DEV_OTP"]:               # demo only: code is shown on screen
+        out["dev_otp"] = otp
+    return out
 
 
 def new_otp(mobile):
     now = datetime.utcnow()
-    provider = (setting_value("otp_provider") or "demo").strip().lower()
-    session["otp_mobile"] = mobile
-
-    if provider == "telegram":
-        cfg = _telegram_config()
-        if not cfg["token"] or not cfg["secret"]:
-            return jsonify(ok=False, error="Telegram bot is not configured. Add TELEGRAM_BOT_TOKEN and TELEGRAM_WEBHOOK_SECRET in Render."), 503
-
-        link = TelegramLink.query.filter_by(mobile=mobile).first()
-        if not link:
-            token = secrets.token_urlsafe(18)[:40]
-            username = _telegram_bot_username()
-            if not username:
-                return jsonify(ok=False, error="Telegram bot could not be reached. Check TELEGRAM_BOT_TOKEN and try Connect again."), 503
-            db.session.add(TelegramToken(token=token, mobile=mobile, expires_at=now + timedelta(minutes=10)))
-            db.session.commit()
-            return jsonify(ok=True, needs_link=True, token=token,
-                           link=f"https://t.me/{username}?start={urllib.parse.quote(token)}",
-                           expires_in=600)
-
     last = OtpChallenge.query.filter_by(mobile=mobile, verified=False).order_by(OtpChallenge.id.desc()).first()
     if last and (now - last.last_sent_at).total_seconds() < 30:
         wait = 30 - int((now - last.last_sent_at).total_seconds())
         return jsonify(ok=False, error=f"Please wait {wait} seconds before requesting another OTP"), 429
-
     otp = f"{secrets.randbelow(10000):04d}"
-    challenge = OtpChallenge(
-        mobile=mobile,
-        otp_hash=generate_password_hash(otp, method=OTP_HASH_METHOD),
-        expires_at=now + timedelta(minutes=5),
-        last_sent_at=now,
-    )
+    challenge = OtpChallenge(mobile=mobile, otp_hash=generate_password_hash(otp, method=OTP_HASH_METHOD),
+                             expires_at=now + timedelta(minutes=5), last_sent_at=now)
     db.session.add(challenge)
     db.session.commit()
+    session["otp_mobile"] = mobile
 
-    out = dict(ok=True, otp_sent=True, expires_in=300)
-    if provider == "telegram":
-        link = TelegramLink.query.filter_by(mobile=mobile).first()
-        if not link:
-            db.session.delete(challenge)
-            db.session.commit()
-            return jsonify(ok=False, error="Telegram account is not linked. Please start the linking process again."), 400
-        try:
-            _telegram_send(link.chat_id, f"Your Chand Enterprises login code is: {otp}\nThis code expires in 5 minutes. Do not share it.")
-        except RuntimeError as exc:
-            db.session.delete(challenge)
-            db.session.commit()
-            current_app.logger.warning("Telegram OTP delivery failed: %s", exc)
-            return jsonify(ok=False, error="Telegram could not deliver the login code. Please try again."), 502
-        # Never expose Telegram OTPs in the browser, even when DEV_OTP is enabled.
-        return jsonify(out)
+    sent = deliver_otp(mobile, otp)
+    if not sent.get("ok") or sent.get("needs_link"):
+        # nothing was delivered yet, so don't make the customer wait 30 s (resend right after linking)
+        challenge.last_sent_at = now - timedelta(seconds=31)
+        db.session.commit()
+    if not sent.get("ok"):
+        return jsonify(ok=False, error=sent.get("error") or "Could not send the login code"), 502
 
-    if current_app.config.get("DEV_OTP"):
-        out["dev_otp"] = otp
+    out = dict(ok=True, otp_sent=not sent.get("needs_link"), expires_in=300, channel=sent.get("channel", ""))
+    if sent.get("needs_link"):
+        out.update(needs_link=True, channel="telegram", link=sent["link"], token=sent["token"])
+    if sent.get("dev_otp"):
+        out["dev_otp"] = sent["dev_otp"]
     return jsonify(out)
-
-
-@main.get("/api/developer/telegram/status")
-def developer_telegram_status():
-    if not role_ok("developer"):
-        return jsonify(error="Forbidden"), 403
-    cfg = _telegram_config()
-    result = {
-        "ok": True,
-        "token_set": bool(cfg["token"]),
-        "secret_set": bool(cfg["secret"]),
-        "bot_username": "",
-        "webhook_url": "",
-        "last_error": "",
-        "linked_count": TelegramLink.query.count(),
-    }
-    if cfg["token"]:
-        try:
-            me = _telegram_api("getMe") or {}
-            result["bot_username"] = me.get("username") or ""
-            info = _telegram_api("getWebhookInfo") or {}
-            result["webhook_url"] = info.get("url") or ""
-            result["last_error"] = info.get("last_error_message") or ""
-        except RuntimeError as exc:
-            result["last_error"] = str(exc)
-    return jsonify(result)
-
-
-@main.post("/api/developer/telegram/setup")
-def developer_telegram_setup():
-    if not role_ok("developer"):
-        return jsonify(error="Forbidden"), 403
-    cfg = _telegram_config()
-    if not cfg["token"]:
-        return jsonify(error="Add TELEGRAM_BOT_TOKEN in Render Environment first."), 400
-    if not cfg["secret"] or len(cfg["secret"]) < 16 or not re.fullmatch(r"[A-Za-z0-9_-]+", cfg["secret"]):
-        return jsonify(error="TELEGRAM_WEBHOOK_SECRET must be at least 16 characters and contain only letters, numbers, underscores or hyphens."), 400
-
-    base_url = cfg["base_url"] or request.url_root.rstrip("/")
-    if not base_url.startswith("https://"):
-        return jsonify(error="Telegram webhooks require a public HTTPS URL. Deploy on Render or set PUBLIC_BASE_URL to your HTTPS app URL."), 400
-
-    try:
-        me = _telegram_api("getMe") or {}
-        webhook_url = base_url + "/api/telegram/webhook"
-        _telegram_api("setWebhook", {
-            "url": webhook_url,
-            "secret_token": cfg["secret"],
-            "allowed_updates": ["message"],
-            "drop_pending_updates": False,
-        })
-        return jsonify(ok=True, bot_username=me.get("username") or "", webhook_url=webhook_url)
-    except RuntimeError as exc:
-        current_app.logger.warning("Telegram webhook setup failed: %s", exc)
-        return jsonify(error=str(exc)), 502
-
-
-@main.post("/api/telegram/webhook")
-def telegram_webhook():
-    cfg = _telegram_config()
-    if not cfg["token"] or not cfg["secret"]:
-        return jsonify(ok=False), 503
-    if request.headers.get("X-Telegram-Bot-Api-Secret-Token", "") != cfg["secret"]:
-        return jsonify(error="Forbidden"), 403
-
-    update = request.get_json(silent=True) or {}
-    message = update.get("message") or {}
-    chat = message.get("chat") or {}
-    sender = message.get("from") or {}
-    chat_id = chat.get("id")
-    sender_id = sender.get("id")
-    if not chat_id or not sender_id:
-        return jsonify(ok=True)
-
-    text = str(message.get("text") or "").strip()
-    if text.startswith("/start"):
-        parts = text.split(maxsplit=1)
-        token_value = parts[1].strip() if len(parts) > 1 else ""
-        token_row = TelegramToken.query.filter_by(token=token_value, used=False).first() if token_value else None
-        now = datetime.utcnow()
-        if not token_row or token_row.expires_at < now:
-            try:
-                _telegram_send(chat_id, "To connect your account, open Telegram from the Chand Enterprises login page and press Start.")
-            except RuntimeError:
-                current_app.logger.warning("Telegram welcome message failed")
-            return jsonify(ok=True)
-
-        token_row.chat_id = int(chat_id)
-        db.session.commit()
-        keyboard = {
-            "keyboard": [[{"text": "Share my number", "request_contact": True}]],
-            "resize_keyboard": True,
-            "one_time_keyboard": True,
-        }
-        try:
-            _telegram_send(chat_id, "Please share your own phone number to link it with Chand Enterprises.", keyboard)
-        except RuntimeError as exc:
-            current_app.logger.warning("Telegram contact prompt failed: %s", exc)
-        return jsonify(ok=True)
-
-    contact = message.get("contact")
-    if contact:
-        # Only accept a contact card belonging to the sender, not a manually typed contact.
-        if contact.get("user_id") is None or str(contact.get("user_id")) != str(sender_id):
-            try:
-                _telegram_send(chat_id, "Please use the Share my number button to share your own Telegram phone number.")
-            except RuntimeError:
-                pass
-            return jsonify(ok=True)
-
-        digits = "".join(ch for ch in str(contact.get("phone_number") or "") if ch.isdigit())
-        phone = digits[-10:] if len(digits) >= 10 else digits
-        token_row = TelegramToken.query.filter_by(chat_id=int(chat_id), used=False).filter(
-            TelegramToken.expires_at >= datetime.utcnow()
-        ).order_by(TelegramToken.id.desc()).first()
-        if not token_row or phone != token_row.mobile[-10:]:
-            try:
-                _telegram_send(chat_id, "The number does not match the mobile number entered on the website. Return to the website and try again.")
-            except RuntimeError:
-                pass
-            return jsonify(ok=True)
-
-        linked = TelegramLink.query.filter_by(mobile=token_row.mobile).first()
-        if linked:
-            linked.chat_id = int(chat_id)
-            linked.linked_at = datetime.utcnow()
-        else:
-            linked = TelegramLink(mobile=token_row.mobile, chat_id=int(chat_id))
-            db.session.add(linked)
-        token_row.used = True
-        db.session.commit()
-        try:
-            _telegram_send(chat_id, "✅ Your Chand Enterprises account is linked. Return to the website; your login code will arrive here.", {"remove_keyboard": True})
-        except RuntimeError:
-            pass
-    return jsonify(ok=True)
-
-
-@main.get("/api/telegram/link-status")
-def telegram_link_status():
-    token_value = str(request.args.get("token") or "").strip()
-    if not token_value:
-        return jsonify(error="Token is required"), 400
-    token_row = TelegramToken.query.filter_by(token=token_value).first()
-    if not token_row or token_row.expires_at < datetime.utcnow():
-        return jsonify(ok=False, linked=False, error="Link expired. Request a new login."), 410
-    linked = False
-    if token_row.used and token_row.chat_id:
-        linked_row = TelegramLink.query.filter_by(mobile=token_row.mobile, chat_id=token_row.chat_id).first()
-        linked = linked_row is not None
-    return jsonify(ok=True, linked=linked)
 
 
 # ---------- pages ----------
@@ -1125,9 +989,7 @@ def verify_otp():
 
     # Master OTP for testing
     master_otp = current_app.config.get("MASTER_OTP", "")
-    provider = (setting_value("otp_provider") or "demo").strip().lower()
-    master_ok = provider != "telegram" and bool(master_otp) and entered_otp == master_otp
-    if not master_ok and not check_password_hash(ch.otp_hash, entered_otp):
+    if (not master_otp or entered_otp != master_otp) and not check_password_hash(ch.otp_hash, entered_otp):
         db.session.commit()
         return jsonify(
             ok=False,
@@ -1175,6 +1037,201 @@ def update_profile():
     session["name"] = u.name
     db.session.commit()
     return jsonify(ok=True)
+
+
+# ---------- Telegram alerts (orders, admin, delivery, daily summary) ----------
+# All alerts are sent from a background thread so a slow Telegram never slows down an order,
+# and a Telegram problem can never make an order, status change or assignment fail.
+
+def telegram_bot_ready():
+    """Bot token is set and the bot has been connected from the Developer panel."""
+    return bool(os.getenv("TELEGRAM_BOT_TOKEN") and setting_value("telegram_bot_username"))
+
+
+def tg_send_async(chat_ids, text):
+    chat_ids = [c for c in dict.fromkeys(chat_ids or []) if c]
+    if not chat_ids or not text or not telegram_bot_ready():
+        return
+    app = current_app._get_current_object()
+
+    def run():
+        with app.app_context():
+            for chat_id in chat_ids:
+                try:
+                    tg_call("sendMessage", {"chat_id": chat_id, "text": text[:4000],
+                                            "disable_web_page_preview": True})
+                except Exception:
+                    pass
+
+    threading.Thread(target=run, daemon=True).start()
+
+
+def safe_notify(fn, *args):
+    try:
+        fn(*args)
+    except Exception:
+        db.session.rollback()
+        current_app.logger.exception("Telegram alert failed (%s)", getattr(fn, "__name__", "?"))
+
+
+def admin_chat_ids():
+    rows = (db.session.query(StaffTelegramLink.chat_id)
+            .join(User, User.id == StaffTelegramLink.user_id)
+            .filter(User.role == "admin", User.active == True).all())
+    return [r[0] for r in rows]
+
+
+def staff_chat_id(user_id):
+    row = StaffTelegramLink.query.filter_by(user_id=user_id).first() if user_id else None
+    return row.chat_id if row else None
+
+
+def customer_chat_id(mobile):
+    row = TelegramLink.query.filter_by(mobile=mobile).first() if mobile else None
+    return row.chat_id if row else None
+
+
+def _business_name():
+    return setting_value("business_name") or "Chand Enterprises"
+
+
+def _order_lines_text(o):
+    return "\n".join(
+        f"• {i.product_name}" + (f" ({i.product_size})" if i.product_size else "") + f" x {i.quantity} = ₹{i.line_total:.0f}"
+        for i in o.items)
+
+
+def notify_customer_order(o, kind):
+    """kind: 'placed' | an order status | 'paid'. Only customers who linked Telegram get it."""
+    if not _flag("notify_customer_status"):
+        return
+    chat_id = customer_chat_id(o.mobile)
+    if not chat_id:
+        return
+    biz = _business_name()
+    if kind == "placed":
+        text = (f"✅ {biz}: order received\nOrder: {o.code}\n\n{_order_lines_text(o)}\n\n"
+                f"Subtotal: ₹{o.subtotal:.0f}\nDiscount: ₹{o.discount:.0f}\nDelivery: ₹{o.delivery_charge:.0f}\n"
+                f"Total: ₹{o.total:.0f}\nPayment: {o.payment_method} ({o.payment_status})\n\n"
+                "We will update you here as your order moves.")
+    elif kind == "Confirmed":
+        text = f"✅ Your order {o.code} is confirmed."
+    elif kind == "Preparing":
+        text = f"👨‍🍳 Your order {o.code} is being prepared."
+    elif kind == "Out for Delivery":
+        who = o.delivery_person.name if o.delivery_person else ""
+        text = f"🚚 Your order {o.code} is out for delivery." + (f"\nDelivery partner: {who}" if who else "")
+    elif kind == "Delivered":
+        text = f"📦 Your order {o.code} has been delivered. Total ₹{o.total:.0f}. Thank you for choosing {biz}!"
+    elif kind == "Cancelled":
+        text = f"❌ Your order {o.code} has been cancelled."
+    elif kind == "paid":
+        text = f"💰 Payment of ₹{o.total:.0f} received for order {o.code}. Thank you!"
+    else:
+        return
+    tg_send_async([chat_id], text)
+
+
+def _admin_order_text(o, title):
+    loc = f"\n📍 {o.map_url}" if o.map_url else ""
+    return (f"{title}\nOrder: {o.code}\n{o.customer_name} · {o.mobile}\n{o.address}{loc}\n\n"
+            f"{_order_lines_text(o)}\n\nTotal: ₹{o.total:.0f} · {o.payment_method} ({o.payment_status})")
+
+
+def notify_admins_order(o, title, extra=""):
+    if not _flag("notify_admin_orders"):
+        return
+    tg_send_async(admin_chat_ids(), _admin_order_text(o, title) + (("\n" + extra) if extra else ""))
+
+
+def notify_low_stock(products):
+    if not _flag("notify_admin_low_stock"):
+        return
+    low = [p for p in products if p.stock <= (p.low_stock_threshold or 10)]
+    if not low:
+        return
+    lines = [f"• {p.name}" + (f" ({p.size})" if p.size else "") + f": {p.stock} left (alert at {p.low_stock_threshold or 10})"
+             for p in low]
+    tg_send_async(admin_chat_ids(), "⚠️ Low stock\n" + "\n".join(lines))
+
+
+def notify_delivery_assigned(o):
+    if not _flag("notify_delivery_assign"):
+        return
+    chat_id = staff_chat_id(o.delivery_person_id)
+    if not chat_id:
+        return
+    loc = f"\n📍 {o.map_url}" if o.map_url else ""
+    cash = ""
+    if o.payment_method == "COD" and o.payment_status != "Paid":
+        cash = f"\n💵 Collect cash: ₹{max(0, o.total - (o.cash_collected or 0)):.0f}"
+    text = (f"📦 New delivery assigned\nOrder: {o.code}\n{o.customer_name} · {o.mobile}\n{o.address}{loc}\n\n"
+            f"{_order_lines_text(o)}\n\nTotal: ₹{o.total:.0f} · {o.payment_method} ({o.payment_status}){cash}")
+    tg_send_async([chat_id], text)
+
+
+def build_daily_summary():
+    """Summary of today (India time) for the admin chats."""
+    ist_now = datetime.utcnow() + timedelta(hours=5, minutes=30)
+    day_ist = ist_now.replace(hour=0, minute=0, second=0, microsecond=0)
+    start = day_ist - timedelta(hours=5, minutes=30)          # back to UTC for the database
+    end = start + timedelta(days=1)
+    orders = Order.query.filter(Order.created_at >= start, Order.created_at < end).all()
+    live = [o for o in orders if o.status != "Cancelled"]
+    revenue = sum(o.total for o in live if o.payment_status == "Paid")
+    unpaid = sum(o.total for o in live if o.payment_status != "Paid")
+    cash = sum((o.cash_collected or 0) for o in live if o.payment_method == "COD")
+    delivered = sum(1 for o in live if o.status == "Delivered")
+    qty_sum = db.func.sum(OrderItem.quantity)
+    top = (db.session.query(OrderItem.product_name, qty_sum)
+           .join(Order, Order.id == OrderItem.order_id)
+           .filter(Order.created_at >= start, Order.created_at < end, Order.status != "Cancelled")
+           .group_by(OrderItem.product_name).order_by(qty_sum.desc()).limit(3).all())
+    low = Product.query.filter(Product.active == True, Product.stock <= Product.low_stock_threshold).count()
+    lines = [f"📊 {_business_name()} · {day_ist.strftime('%d %b %Y')}",
+             f"Orders: {len(live)} (cancelled {len(orders) - len(live)})",
+             f"Delivered: {delivered}",
+             f"Paid revenue: ₹{revenue:.0f}",
+             f"Not paid yet: ₹{unpaid:.0f}",
+             f"COD cash collected: ₹{cash:.0f}"]
+    if top:
+        lines.append("Top products: " + ", ".join(f"{n} x{int(q)}" for n, q in top))
+    if low:
+        lines.append(f"⚠️ {low} product(s) at or below the low-stock alert")
+    return day_ist.strftime("%Y-%m-%d"), "\n".join(lines)
+
+
+def send_daily_summary(force=False):
+    if not telegram_bot_ready():
+        return {"ok": False, "error": "Telegram bot is not connected yet"}
+    day, text = build_daily_summary()
+    if not force and setting_value("last_summary_date") == day:
+        return {"ok": True, "skipped": "already sent today"}
+    chats = admin_chat_ids()
+    if not chats:
+        return {"ok": False, "error": "No admin has linked Telegram yet"}
+    tg_send_async(chats, text)
+    set_setting("last_summary_date", day)
+    db.session.commit()
+    return {"ok": True, "sent_to": len(chats)}
+
+
+def _staff_link_payload(u):
+    """One-time t.me link that connects THIS staff account's Telegram (no contact sharing needed)."""
+    if not telegram_bot_ready():
+        return None, "Connect the Telegram bot first (Settings > Login and OTP)"
+    now = datetime.utcnow()
+    TelegramToken.query.filter(TelegramToken.mobile == f"staff:{u.id}").delete(synchronize_session=False)
+    token = secrets.token_urlsafe(12)
+    db.session.add(TelegramToken(token=token, mobile=f"staff:{u.id}", expires_at=now + timedelta(minutes=10)))
+    db.session.commit()
+    link = f"https://t.me/{setting_value('telegram_bot_username')}?start={token}"
+    digits = "".join(c for c in (u.mobile or "") if c.isdigit())
+    wa = ""
+    if len(digits) >= 10:
+        wa = "https://wa.me/91" + digits[-10:] + "?text=" + urllib.parse.quote(
+            f"Open this link on your phone to get {_business_name()} alerts on Telegram (valid 10 minutes): {link}")
+    return {"link": link, "whatsapp_url": wa, "expires_in": 600}, None
 
 
 # ---------- shop ----------
@@ -1308,6 +1365,11 @@ def create_order():
 
     db.session.commit()
 
+    # Telegram alerts (never block or fail the order)
+    safe_notify(notify_customer_order, o, "placed")
+    safe_notify(notify_admins_order, o, "🛒 New order")
+    safe_notify(notify_low_stock, [p for p, _ in lines])
+
     return jsonify(ok=True, order_id=code, total=total, subtotal=subtotal, discount=discount,
                    delivery_charge=delivery, cash_collected=0, payment_method=method, upi=current_app.config["UPI_ID"],
                    upi_url=upi_uri(o))
@@ -1366,6 +1428,7 @@ def mark_paid(code):
         pay.transaction_id = utr
     o.payment_status = pay.status = "Verifying"
     db.session.commit()
+    safe_notify(notify_admins_order, o, "💳 Payment to verify (UPI)", f"UTR: {pay.transaction_id or 'not given'}")
     return jsonify(ok=True, status="Verifying")
 
 
@@ -1378,6 +1441,7 @@ def cancel_order(code):
         return jsonify(error="Order can no longer be cancelled"), 400
     set_status(o, "Cancelled")
     db.session.commit()
+    safe_notify(notify_admins_order, o, "❌ Customer cancelled an order")
     return jsonify(ok=True)
 
 
@@ -1475,6 +1539,8 @@ def update_order(oid):
     if not o:
         return jsonify(error="Order not found"), 404
 
+    old_status, old_pay = o.status, o.payment_status
+
     if d.get("status"):
         if d["status"] not in ORDER_STATUSES:
             return jsonify(error="Invalid status"), 400
@@ -1489,6 +1555,11 @@ def update_order(oid):
             pay.status = d["payment_status"]
 
     db.session.commit()
+
+    if o.status != old_status:
+        safe_notify(notify_customer_order, o, o.status)
+    if o.payment_status == "Paid" and old_pay != "Paid":
+        safe_notify(notify_customer_order, o, "paid")
     return jsonify(ok=True)
 
 
@@ -1499,9 +1570,12 @@ def assign_delivery(oid):
     o = db.session.get(Order, oid)
     if not o:
         return jsonify(error="Order not found"), 404
+    old_person = o.delivery_person_id
     val = (request.json or {}).get("delivery_person_id")
     o.delivery_person_id = int(val) if val else None
     db.session.commit()
+    if o.delivery_person_id and o.delivery_person_id != old_person:
+        safe_notify(notify_delivery_assigned, o)
     return jsonify(ok=True)
 
 
@@ -1774,6 +1848,7 @@ def delivery_status(oid):
     if o.status == "Cancelled":
         return jsonify(error="Order is cancelled"), 400
 
+    old_status, old_pay = o.status, o.payment_status
     o.status = s
 
     if s == "Delivered" and o.payment_method == "COD":
@@ -1784,6 +1859,15 @@ def delivery_status(oid):
                 pay.status = "Paid"
 
     db.session.commit()
+
+    if o.status != old_status:
+        safe_notify(notify_customer_order, o, o.status)
+        if s == "Delivered":
+            who = session.get("name") or "Delivery partner"
+            extra = f"Delivered by: {who}" + (f"\nCash collected: ₹{(o.cash_collected or 0):.0f}" if o.payment_method == "COD" else "")
+            safe_notify(notify_admins_order, o, "✅ Order delivered", extra)
+    if o.payment_status == "Paid" and old_pay != "Paid":
+        safe_notify(notify_customer_order, o, "paid")
     return jsonify(ok=True)
 
 
@@ -2155,6 +2239,7 @@ def delivery_cash(oid):
         return jsonify(error="Invalid cash amount"), 400
     if amount < 0 or amount > o.total:
         return jsonify(error="Cash amount cannot exceed order total"), 400
+    old_pay = o.payment_status
     o.cash_collected = amount
     if amount >= o.total:
         o.payment_status = "Paid"
@@ -2162,6 +2247,8 @@ def delivery_cash(oid):
         if pay:
             pay.status = "Paid"
     db.session.commit()
+    if o.payment_status == "Paid" and old_pay != "Paid":
+        safe_notify(notify_customer_order, o, "paid")
     return jsonify(ok=True, cash_collected=o.cash_collected, payment_status=o.payment_status)
 
 
@@ -2443,6 +2530,10 @@ def developer_get_settings():
     return jsonify(ok=True, settings=developer_settings())
 
 
+NOTIFY_FLAGS = {"notify_customer_status", "notify_admin_orders", "notify_admin_low_stock",
+                "notify_delivery_assign", "notify_daily_summary"}
+
+
 @main.put("/api/developer/settings")
 def developer_save_settings():
     if not role_ok("developer"):
@@ -2477,9 +2568,9 @@ def developer_save_settings():
             if len(value) > limit:
                 return jsonify(error=f"{key.replace('_', ' ').title()} must be {limit} characters or fewer"), 400
             set_setting(key, value)
-    for key in ["business_name", "business_mobile", "whatsapp", "business_location", "upi", "payment_name", "business_lat", "business_lng", "delivery_base", "delivery_per_km", "delivery_free_above", "show_prices_home", "show_prices_brochure", "ordering_enabled", "customer_login_enabled", "otp_provider", "brochure_url", "brochure_eyebrow", "brochure_title", "brochure_subtitle", "archive_days", "archive_method", "archive_email", "archive_whatsapp"]:
+    for key in ["business_name", "business_mobile", "whatsapp", "business_location", "upi", "payment_name", "business_lat", "business_lng", "delivery_base", "delivery_per_km", "delivery_free_above", "show_prices_home", "show_prices_brochure", "ordering_enabled", "customer_login_enabled", "brochure_url", "brochure_eyebrow", "brochure_title", "brochure_subtitle", "archive_days", "archive_method", "archive_email", "archive_whatsapp"] + sorted(NOTIFY_FLAGS):
         if key in d:
-            if key in {"show_prices_home", "show_prices_brochure", "ordering_enabled", "customer_login_enabled"}:
+            if key in {"show_prices_home", "show_prices_brochure", "ordering_enabled", "customer_login_enabled"} | NOTIFY_FLAGS:
                 set_setting(key, "0" if str(d.get(key)).strip().lower() in {"0", "false", "no", "off", ""} else "1")
                 continue
             value = str(d.get(key) or "").strip()
@@ -2489,18 +2580,6 @@ def developer_save_settings():
                 return jsonify(error=f"{key.replace('_', ' ').title()} must be a valid http(s) URL"), 400
             if key in BROCHURE_TEXT_LIMITS and len(value) > BROCHURE_TEXT_LIMITS[key]:
                 return jsonify(error=f"{key.replace('_', ' ').title()} must be {BROCHURE_TEXT_LIMITS[key]} characters or fewer"), 400
-            if key == "otp_provider":
-                value = value.lower()
-                if value not in {"demo", "telegram"}:
-                    return jsonify(error="OTP provider must be demo or telegram"), 400
-                if value == "telegram":
-                    cfg = _telegram_config()
-                    if not cfg["token"] or not cfg["secret"]:
-                        return jsonify(error="Configure TELEGRAM_BOT_TOKEN and TELEGRAM_WEBHOOK_SECRET in Render first"), 400
-                    try:
-                        _telegram_api("getMe")
-                    except RuntimeError as exc:
-                        return jsonify(error=f"Telegram bot is not reachable: {exc}"), 400
             if key == "archive_days":
                 try:
                     value = str(max(1, int(value or 7)))
@@ -2509,6 +2588,13 @@ def developer_save_settings():
             if key == "archive_method" and value not in {"email", "whatsapp"}:
                 return jsonify(error="Archive method must be email or whatsapp"), 400
             set_setting(key, value)
+    if "otp_provider" in d:
+        provider = str(d.get("otp_provider") or "").strip().lower()
+        if provider not in OTP_PROVIDERS:
+            return jsonify(error="Unknown login code provider"), 400
+        if provider == "telegram" and not telegram_ready():
+            return jsonify(error="Telegram is not connected yet. Add the bot token and webhook secret in Render, then press “Connect Telegram bot” first."), 400
+        set_setting("otp_provider", provider)
     db.session.commit()
     return jsonify(ok=True, settings=developer_settings())
 
@@ -2646,3 +2732,227 @@ def developer_delete_product(pid):
     p.active = False
     db.session.commit()
     return jsonify(ok=True)
+
+
+# ---------- Telegram bot: webhook, linking, developer tools ----------
+
+def _telegram_handle(update):
+    msg = update.get("message") or {}
+    chat = msg.get("chat") or {}
+    chat_id = chat.get("id")
+    if not chat_id or chat.get("type") != "private":
+        return
+    now = datetime.utcnow()
+    business = _business_name()
+
+    def say(text, keyboard=None):
+        payload = {"chat_id": chat_id, "text": text}
+        if keyboard:
+            payload["reply_markup"] = keyboard
+        tg_call("sendMessage", payload)
+
+    text = (msg.get("text") or "").strip()
+    contact = msg.get("contact")
+
+    if text.startswith("/stop"):
+        TelegramLink.query.filter_by(chat_id=chat_id).delete()
+        StaffTelegramLink.query.filter_by(chat_id=chat_id).delete()
+        db.session.commit()
+        return say("Done. This chat will no longer receive alerts or login codes. Send /start from the website link to connect again.")
+
+    if text.startswith("/start"):
+        parts = text.split(None, 1)
+        token = parts[1].strip() if len(parts) > 1 else ""
+        row = TelegramToken.query.filter_by(token=token, used=False).first() if token else None
+        if row and row.expires_at > now:
+            if row.mobile.startswith("staff:"):
+                # Staff alert link created by the developer: the staff account is already known.
+                try:
+                    uid = int(row.mobile.split(":", 1)[1])
+                except ValueError:
+                    return say("This link is not valid. Please ask for a new one.")
+                u = db.session.get(User, uid)
+                if not u or not u.active or u.role not in ("admin", "delivery", "developer"):
+                    return say("This staff account is not active. Please ask for a new link.")
+                StaffTelegramLink.query.filter_by(user_id=uid).delete()
+                db.session.add(StaffTelegramLink(user_id=uid, chat_id=chat_id))
+                row.used = True
+                db.session.commit()
+                return say(f"Connected ✅ {u.name}, you will get {business} alerts here.\nSend /stop to turn them off.")
+            row.chat_id = chat_id
+            db.session.commit()
+            return say(f"Welcome to {business}! 👋\nTap the button below to verify your mobile number.",
+                       {"keyboard": [[{"text": "📱 Share my number", "request_contact": True}]],
+                        "resize_keyboard": True, "one_time_keyboard": True})
+        if TelegramLink.query.filter_by(chat_id=chat_id).first() or StaffTelegramLink.query.filter_by(chat_id=chat_id).first():
+            return say("You're already connected ✅\nSend /stop to turn alerts off.")
+        return say("Please open the website, enter your mobile number and tap “Open Telegram” to connect.")
+
+    if contact:
+        # must be the sender's OWN contact, not a forwarded contact card
+        if contact.get("user_id") != (msg.get("from") or {}).get("id"):
+            return say("Please share your own number using the button.")
+        phone = "".join(c for c in str(contact.get("phone_number") or "") if c.isdigit())[-10:]
+        row = (TelegramToken.query.filter_by(chat_id=chat_id, used=False)
+               .order_by(TelegramToken.id.desc()).first())
+        if not row or row.expires_at <= now or row.mobile.startswith("staff:"):
+            return say("This link has expired. Please go back to the website and try again.",
+                       {"remove_keyboard": True})
+        if row.mobile[-10:] != phone:
+            return say("This Telegram number does not match the mobile number you entered on the website.",
+                       {"remove_keyboard": True})
+        TelegramLink.query.filter_by(mobile=row.mobile).delete()
+        db.session.add(TelegramLink(mobile=row.mobile, chat_id=chat_id))
+        row.used = True
+        db.session.commit()
+        say("Connected ✅\nGo back to the website. Your login code is on its way, and you will get order updates here too.\nSend /stop to turn this off.",
+            {"remove_keyboard": True})
+
+
+@main.post("/telegram/webhook")
+def telegram_webhook():
+    secret = os.getenv("TELEGRAM_WEBHOOK_SECRET", "")
+    got = request.headers.get("X-Telegram-Bot-Api-Secret-Token", "")
+    if not secret or not secrets.compare_digest(got.encode("utf-8"), secret.encode("utf-8")):
+        return "", 403
+    try:
+        _telegram_handle(request.get_json(silent=True) or {})
+    except Exception:
+        db.session.rollback()
+        current_app.logger.exception("Telegram webhook error")
+    return "ok"            # always 200 so Telegram does not keep retrying
+
+
+@main.get("/api/telegram/link-status")
+def telegram_link_status():
+    """The login popup polls this until the customer has pressed Start + Share number in Telegram."""
+    token = str(request.args.get("token") or "")
+    row = TelegramToken.query.filter_by(token=token).first() if token else None
+    mobile = session.get("otp_mobile")                       # token only works for the browser that asked for it
+    return jsonify(ok=True, linked=bool(row and mobile and row.mobile == mobile and row.used))
+
+
+@main.get("/api/developer/telegram/status")
+def developer_telegram_status():
+    if not role_ok("developer"):
+        return jsonify(error="Forbidden"), 403
+    token_set = bool(os.getenv("TELEGRAM_BOT_TOKEN"))
+    info = tg_call("getWebhookInfo") if token_set else None
+    result = (info or {}).get("result") or {}
+    return jsonify(ok=True, token_set=token_set, secret_set=bool(os.getenv("TELEGRAM_WEBHOOK_SECRET")),
+                   bot_username=setting_value("telegram_bot_username"),
+                   webhook_url=result.get("url") or "", last_error=result.get("last_error_message") or "",
+                   linked_count=TelegramLink.query.count(),
+                   staff_linked_count=StaffTelegramLink.query.count(),
+                   cron_secret_set=bool(os.getenv("CRON_SECRET")),
+                   provider=setting_value("otp_provider") or "demo")
+
+
+@main.post("/api/developer/telegram/setup")
+def developer_telegram_setup():
+    if not role_ok("developer"):
+        return jsonify(error="Forbidden"), 403
+    if not os.getenv("TELEGRAM_BOT_TOKEN"):
+        return jsonify(error="TELEGRAM_BOT_TOKEN is not set in the Render environment"), 400
+    secret = (os.getenv("TELEGRAM_WEBHOOK_SECRET") or "").strip()
+    if not re.fullmatch(r"[A-Za-z0-9_-]{16,256}", secret):
+        return jsonify(error="TELEGRAM_WEBHOOK_SECRET must be 16+ characters: letters, numbers, _ and - only"), 400
+    me_info = tg_call("getMe")
+    if not me_info or not me_info.get("ok"):
+        return jsonify(error="Telegram rejected the bot token. Check TELEGRAM_BOT_TOKEN."), 400
+    base = (os.getenv("PUBLIC_BASE_URL") or request.url_root).rstrip("/")
+    if base.startswith("http://") and "localhost" not in base and "127.0.0.1" not in base:
+        base = "https://" + base[len("http://"):]            # Render terminates TLS; Telegram needs https
+    r = tg_call("setWebhook", {"url": base + url_for("main.telegram_webhook"), "secret_token": secret,
+                               "allowed_updates": ["message"], "drop_pending_updates": True})
+    if not r or not r.get("ok"):
+        return jsonify(error=(r or {}).get("description") or "Telegram could not set the webhook"), 400
+    set_setting("telegram_bot_username", me_info["result"].get("username") or "")
+    db.session.commit()
+    return jsonify(ok=True, bot=me_info["result"].get("username"))
+
+
+@main.get("/api/developer/telegram/staff")
+def developer_telegram_staff():
+    if not role_ok("developer"):
+        return jsonify(error="Forbidden"), 403
+    linked = {r.user_id for r in StaffTelegramLink.query.all()}
+    users = User.query.filter(User.role.in_(["admin", "delivery"])).order_by(User.role, User.id).all()
+    return jsonify(ok=True, bot_ready=telegram_bot_ready(),
+                   users=[dict(id=u.id, name=u.name, username=u.username or "", role=u.role,
+                               active=bool(u.active), mobile=u.mobile or "", linked=u.id in linked) for u in users])
+
+
+@main.post("/api/developer/telegram/staff/<int:uid>/link")
+def developer_telegram_staff_link(uid):
+    if not role_ok("developer"):
+        return jsonify(error="Forbidden"), 403
+    u = db.session.get(User, uid)
+    if not u or u.role not in ("admin", "delivery") or not u.active:
+        return jsonify(error="Staff account not found"), 404
+    payload, error = _staff_link_payload(u)
+    if error:
+        return jsonify(error=error), 400
+    return jsonify(ok=True, **payload)
+
+
+@main.delete("/api/developer/telegram/staff/<int:uid>")
+def developer_telegram_staff_unlink(uid):
+    if not role_ok("developer"):
+        return jsonify(error="Forbidden"), 403
+    StaffTelegramLink.query.filter_by(user_id=uid).delete()
+    db.session.commit()
+    return jsonify(ok=True)
+
+
+@main.route("/api/staff/telegram", methods=["GET", "POST", "DELETE"])
+def staff_telegram_self():
+    """For a logged-in admin / delivery person to connect their own Telegram (a button can call this later)."""
+    u = current_user()
+    if not u or u.role not in ("admin", "delivery", "developer"):
+        return jsonify(error="Forbidden"), 403
+    if request.method == "DELETE":
+        StaffTelegramLink.query.filter_by(user_id=u.id).delete()
+        db.session.commit()
+        return jsonify(ok=True)
+    if request.method == "POST":
+        payload, error = _staff_link_payload(u)
+        if error:
+            return jsonify(error=error), 400
+        return jsonify(ok=True, **payload)
+    return jsonify(ok=True, bot_ready=telegram_bot_ready(),
+                   linked=bool(StaffTelegramLink.query.filter_by(user_id=u.id).first()))
+
+
+@main.post("/api/developer/telegram/test")
+def developer_telegram_test():
+    if not role_ok("developer"):
+        return jsonify(error="Forbidden"), 403
+    if not telegram_bot_ready():
+        return jsonify(error="Telegram bot is not connected yet"), 400
+    chats = admin_chat_ids()
+    if not chats:
+        return jsonify(error="No admin has linked Telegram yet"), 400
+    tg_send_async(chats, f"✅ Test alert from {_business_name()}. Telegram alerts are working.")
+    return jsonify(ok=True, sent_to=len(chats))
+
+
+@main.post("/api/developer/telegram/summary-now")
+def developer_telegram_summary_now():
+    if not role_ok("developer"):
+        return jsonify(error="Forbidden"), 403
+    result = send_daily_summary(force=True)
+    return jsonify(result), (200 if result.get("ok") else 400)
+
+
+@main.route("/api/cron/daily-summary", methods=["GET", "POST"])
+def cron_daily_summary():
+    """Call once a day from a free scheduler (e.g. cron-job.org) at about 9:30 PM India time.
+    Needs env CRON_SECRET, sent as header X-Cron-Key (or ?key=)."""
+    secret = os.getenv("CRON_SECRET", "")
+    got = request.headers.get("X-Cron-Key") or request.args.get("key") or ""
+    if not secret or not secrets.compare_digest(got.encode("utf-8"), secret.encode("utf-8")):
+        return "", 403
+    if not _flag("notify_daily_summary"):
+        return jsonify(ok=True, skipped="daily summary is switched off")
+    return jsonify(send_daily_summary())
