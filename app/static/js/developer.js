@@ -416,7 +416,22 @@ function settingsAlertsHtml(st) {
 
         ${settingToggle('ds_n_summary', st.notify_daily_summary !== false,
             'Admin: daily sales summary',
-            'Needs a free daily scheduler calling /api/cron/daily-summary (see the note below).')}
+            'Sent once a day at the time below, after the scheduler (see Scheduler) checks in.')}
+
+        <label>Daily summary time (India time)
+            <input id="ds_summary_time" type="time" value="${esc(st.summary_time || '21:30')}">
+        </label>
+
+        <h3 style="margin:16px 0 6px">Scheduler</h3>
+        <div id="sched_status" class="muted" style="line-height:1.7">Checking scheduler…</div>
+        <button type="button" onclick="runSchedulerNow()" style="margin-top:8px">▶️ Run scheduler check now</button>
+        <p id="sched_msg" class="muted" style="margin-top:6px"></p>
+        <p class="muted" style="font-size:12px;margin-top:8px">
+            A free job must call this address every 10 minutes (it also keeps the free Render site awake):<br>
+            <input readonly value="${esc(location.origin)}/api/cron/tick" onclick="this.select()" style="width:100%;box-sizing:border-box;margin:4px 0">
+            Header <b>X-Cron-Key</b> = your <b>CRON_SECRET</b> from Render. The time above and the on/off switch are
+            controlled here, so you never need to change the job when you change the time.
+        </p>
 
         <h3 style="margin:16px 0 6px">Staff Telegram</h3>
         <p class="muted" style="margin:0 0 8px;font-size:12px">
@@ -431,12 +446,49 @@ function settingsAlertsHtml(st) {
         </div>
         <p id="tg_alert_msg" class="muted" style="margin-top:8px"></p>
 
-        <p class="muted" style="font-size:12px;margin-top:10px">
-            Daily summary: in Render add <b>CRON_SECRET</b> (any long random text), then in a free scheduler such as
-            cron-job.org call <b>https://YOUR-SITE/api/cron/daily-summary</b> once a day at 9:30 PM with the header
-            <b>X-Cron-Key: your secret</b>. It sends at most one summary per day.
-        </p>
     `;
+}
+
+async function loadSchedulerStatus() {
+    const box = $('#sched_status');
+    if (!box) return;
+
+    const r = await api('/api/developer/scheduler/status');
+    if (!r._ok) {
+        box.textContent = r.error || 'Could not check the scheduler';
+        return;
+    }
+
+    let last;
+    if (r.last_tick_seconds_ago === null) {
+        last = '❌ The scheduler job has never called the site yet';
+    } else {
+        const m = Math.round(r.last_tick_seconds_ago / 60);
+        const when = m < 1 ? 'less than a minute ago' : `${m} min ago`;
+        last = r.last_tick_seconds_ago <= 1800
+            ? `✅ Scheduler last checked in ${when}`
+            : `⚠️ Scheduler last checked in ${when} (the job may be stopped)`;
+    }
+
+    const lines = [
+        r.cron_secret_set ? '✅ CRON_SECRET is set' : '❌ CRON_SECRET is missing in Render',
+        last,
+        r.summary_enabled
+            ? `✅ Daily summary ON at ${esc(r.summary_time)} India time`
+            : '⏸️ Daily summary is switched off',
+        r.last_summary_date ? `Last summary sent for: ${esc(r.last_summary_date)}` : 'No summary sent yet',
+        r.admins_linked ? `👥 Admins connected: ${r.admins_linked}` : '❌ No admin has connected Telegram yet',
+        `🕒 India time now: ${esc(r.ist_now)}`
+    ];
+    box.innerHTML = lines.join('<br>');
+}
+
+async function runSchedulerNow() {
+    const msg = $('#sched_msg');
+    if (msg) msg.textContent = 'Running…';
+    const r = await api('/api/developer/scheduler/run', 'POST');
+    if (msg) msg.textContent = r._ok ? `✅ Check done. Summary: ${r.summary}` : '❌ ' + (r.error || 'Could not run');
+    loadSchedulerStatus();
 }
 
 async function loadTelegramStaff() {
@@ -558,7 +610,7 @@ async function developerSettings(section) {
     `);
 
     if (section === 'login') loadTelegramStatus();
-    if (section === 'alerts') loadTelegramStaff();
+    if (section === 'alerts') { loadTelegramStaff(); loadSchedulerStatus(); }
 }
 
 
@@ -652,7 +704,8 @@ async function saveDeveloperSettings(section) {
         notify_admin_orders: check('#ds_n_orders'),
         notify_admin_low_stock: check('#ds_n_lowstock'),
         notify_delivery_assign: check('#ds_n_delivery'),
-        notify_daily_summary: check('#ds_n_summary')
+        notify_daily_summary: check('#ds_n_summary'),
+        summary_time: text('#ds_summary_time')
     });
 
     if (!result._ok) {
@@ -1617,6 +1670,8 @@ window.logout =
 window.loadTelegramStatus = loadTelegramStatus;
 window.connectTelegramBot = connectTelegramBot;
 window.loadTelegramStaff = loadTelegramStaff;
+window.loadSchedulerStatus = loadSchedulerStatus;
+window.runSchedulerNow = runSchedulerNow;
 window.tgStaffLink = tgStaffLink;
 window.tgStaffUnlink = tgStaffUnlink;
 window.tgSendTest = tgSendTest;
