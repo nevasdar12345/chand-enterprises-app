@@ -203,6 +203,7 @@ function persistCart() {
     }
 
     count.textContent = total;
+    count.dataset.zero = total ? "" : "1";
   }
 }
 
