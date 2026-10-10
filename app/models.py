@@ -286,7 +286,7 @@ class Order(db.Model):
 
     @property
     def map_url(self):
-        if self.latitude is None or self.longitude is None:
+        if self.latitude is None or self.longitude is None or (self.latitude == 0 and self.longitude == 0):
             return ""
 
         return (
@@ -295,11 +295,32 @@ class Order(db.Model):
         )
 
     @property
+    def directions_url(self):
+        if self.latitude is None or self.longitude is None or (self.latitude == 0 and self.longitude == 0):
+            return ""
+        return f"https://www.google.com/maps/dir/?api=1&destination={self.latitude:.6f}%2C{self.longitude:.6f}"
+
+    @property
     def subtotal(self):
         return sum(
             item.line_total
             for item in self.items
         )
+
+
+class OrderTrackingEvent(db.Model):
+    """Append-only timeline events for order status and delivery changes."""
+    id = db.Column(db.Integer, primary_key=True)
+    order_id = db.Column(db.Integer, db.ForeignKey("order.id", ondelete="CASCADE"), nullable=False, index=True)
+    event_type = db.Column(db.String(40), nullable=False, default="status")
+    status = db.Column(db.String(40), nullable=True)
+    title = db.Column(db.String(120), nullable=False)
+    note = db.Column(db.String(500), default="")
+    actor_user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
+
+    order = db.relationship("Order", backref=db.backref("tracking_events", lazy="dynamic", cascade="all, delete-orphan"))
+    actor = db.relationship("User", foreign_keys=[actor_user_id])
 
 
 # ============================================================
