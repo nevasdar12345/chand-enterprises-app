@@ -213,6 +213,66 @@ function updateDeliveryMetrics() {
 }
 
 
+let ceDeliveryLeafletPromise = null;
+let ceDeliveryMap = null;
+let ceDeliveryMarkers = null;
+
+function loadLeafletForDeliveryMap() {
+    if (window.L) return Promise.resolve();
+    if (ceDeliveryLeafletPromise) return ceDeliveryLeafletPromise;
+    ceDeliveryLeafletPromise = new Promise((resolve, reject) => {
+        if (!document.getElementById('ce-delivery-leaflet-css')) {
+            const css = document.createElement('link');
+            css.id = 'ce-delivery-leaflet-css'; css.rel = 'stylesheet';
+            css.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+            document.head.appendChild(css);
+        }
+        const script = document.createElement('script');
+        script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+        script.onload = resolve;
+        script.onerror = () => reject(new Error('Map library could not load'));
+        document.head.appendChild(script);
+    });
+    return ceDeliveryLeafletPromise;
+}
+
+async function loadDeliveryMap() {
+    const panel = document.getElementById('ceDeliveryMapPanel');
+    const mapBox = document.getElementById('ceDeliveryMap');
+    const note = document.getElementById('ceDeliveryMapNote');
+    if (!panel || !mapBox || !note) return;
+    const config = await api('/api/config');
+    if (config && config.maps_enabled === false) { panel.style.display = 'none'; return; }
+    panel.style.display = '';
+    const orders = DELIVERY_ORDERS.filter(order => order.latitude != null && order.longitude != null && !(Number(order.latitude) === 0 && Number(order.longitude) === 0) && order.status !== 'Cancelled');
+    try {
+        await loadLeafletForDeliveryMap();
+        if (!ceDeliveryMap) {
+            ceDeliveryMap = L.map(mapBox).setView([26.15, 85.90], 12);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            }).addTo(ceDeliveryMap);
+            ceDeliveryMarkers = L.layerGroup().addTo(ceDeliveryMap);
+        }
+        ceDeliveryMarkers.clearLayers();
+        const bounds = [];
+        orders.forEach(order => {
+            const lat = Number(order.latitude), lng = Number(order.longitude);
+            if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+            L.marker([lat, lng]).bindPopup(`<b>${esc(order.code)}</b><br>${esc(order.customer || '')}<br>${esc(order.status || '')}<br>${esc(order.address || '')}<br><a target="_blank" rel="noopener" href="${esc(order.directions_url || order.map_url || '')}">Open directions</a>`).addTo(ceDeliveryMarkers);
+            bounds.push([lat, lng]);
+        });
+        if (bounds.length) ceDeliveryMap.fitBounds(bounds, {padding:[24,24], maxZoom:14});
+        setTimeout(() => ceDeliveryMap.invalidateSize(), 100);
+        note.textContent = orders.length ? `${orders.length} assigned order(s) have map coordinates.` : 'No assigned orders have saved coordinates yet. You can still use address details and call the customer.';
+    } catch (error) {
+        console.error('Delivery map error:', error);
+        note.textContent = 'Map could not load. Use the Navigate link on each order instead.';
+    }
+}
+window.loadDeliveryMap = loadDeliveryMap;
+
 /* =========================
    LOAD DELIVERY ORDERS
    ========================= */
@@ -268,8 +328,8 @@ async function loadDelivery() {
 
     updateDeliveryMetrics();
 
-
     renderDeliveryOrders();
+    loadDeliveryMap();
 }
 
 
@@ -331,7 +391,7 @@ function deliveryCard(order) {
             <div class="dlv-block">
                 <span class="dlv-label">Address</span>
                 <div>${esc(order.address || '')}</div>
-                ${order.map_url ? `<a class="loc-map-link" target="_blank" rel="noopener" href="${esc(order.map_url)}">📍 Navigate</a>` : ''}
+                ${order.map_url && order.map_features?.delivery_navigation ? `<a class="loc-map-link" target="_blank" rel="noopener" href="${esc(order.directions_url || order.map_url)}">📍 Navigate</a>` : (order.map_url ? '<small class="dlv-note">Map navigation disabled by developer</small>' : '<small class="dlv-note">No map pin saved</small>')}
             </div>
 
             <div class="dlv-block">
