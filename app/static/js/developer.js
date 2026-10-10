@@ -200,7 +200,8 @@ const SETTINGS_SECTIONS = {
     brochure: { icon: '📖', title: 'Brochure Settings',   note: 'Brochure link, headings and prices.' },
     business: { icon: '🏢', title: 'Business Settings',   note: 'Name, mobile, WhatsApp, UPI, location and delivery.' },
     login:    { icon: '🔐', title: 'Login and OTP Settings', note: 'How customers receive their login code (Telegram now, WhatsApp / SMS later).' },
-    alerts:   { icon: '🔔', title: 'Telegram Alerts', note: 'Order updates, admin alerts, delivery assignments and the daily summary.' }
+    alerts:   { icon: '🔔', title: 'Telegram Alerts', note: 'Order updates, admin alerts, delivery assignments and the daily summary.' },
+    maps:     { icon: '🗺️', title: 'Delivery & Maps Settings', note: 'Control customer tracking, delivery navigation, admin maps and optional GPS.' }
 };
 
 function settingToggle(id, checked, label, hint) {
@@ -577,6 +578,16 @@ async function tgSummaryNow() {
     if (msg) msg.textContent = r._ok ? `✅ Summary sent to ${r.sent_to} admin(s).` : '❌ ' + (r.error || 'Could not send');
 }
 
+function settingsMapsHtml(st) {
+    return `
+        <p class="muted">These switches control map features across the customer, admin and delivery dashboards. Live GPS is off by default and should only be enabled with delivery staff consent.</p>
+        ${settingToggle('ds_maps_enabled', st.maps_enabled !== false, 'Enable maps globally', 'Master switch for map features.')}
+        ${settingToggle('ds_map_customer_tracking', st.map_customer_tracking !== false, 'Customer order timeline and maps', 'Let customers view their order timeline and saved delivery location.')}
+        ${settingToggle('ds_map_delivery_navigation', st.map_delivery_navigation !== false, 'Delivery navigation', 'Show one-tap navigation links for assigned orders.')}
+        ${settingToggle('ds_map_admin_view', st.map_admin_view !== false, 'Admin delivery map', 'Allow the admin dashboard to display orders with saved coordinates.')}
+        <p class="muted" style="font-size:12px">Note: public map tile and geocoding services have fair-use limits. Do not use them for unlimited high-volume requests.</p>`;
+}
+
 function settingsPicker() {
     modal(`
         <h2>Settings</h2>
@@ -616,7 +627,8 @@ async function developerSettings(section) {
         brochure: settingsBrochureHtml,
         business: settingsBusinessHtml,
         login: settingsLoginHtml,
-        alerts: settingsAlertsHtml
+        alerts: settingsAlertsHtml,
+        maps: settingsMapsHtml
     }[section](st);
 
     modal(`
@@ -745,7 +757,13 @@ async function saveDeveloperSettings(section) {
         notify_admin_low_stock: check('#ds_n_lowstock'),
         notify_delivery_assign: check('#ds_n_delivery'),
         notify_daily_summary: check('#ds_n_summary'),
-        summary_time: text('#ds_summary_time')
+        summary_time: text('#ds_summary_time'),
+
+        /* Delivery & maps */
+        maps_enabled: check('#ds_maps_enabled'),
+        map_customer_tracking: check('#ds_map_customer_tracking'),
+        map_delivery_navigation: check('#ds_map_delivery_navigation'),
+        map_admin_view: check('#ds_map_admin_view'),
     });
 
     if (!result._ok) {
