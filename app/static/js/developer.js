@@ -199,7 +199,8 @@ const SETTINGS_SECTIONS = {
     about:    { icon: 'ℹ️', title: 'About Page Settings', note: 'About text and social media links.' },
     brochure: { icon: '📖', title: 'Brochure Settings',   note: 'Brochure link, headings and prices.' },
     business: { icon: '🏢', title: 'Business Settings',   note: 'Name, mobile, WhatsApp, UPI, location and delivery.' },
-    login:    { icon: '🔐', title: 'Login and OTP Settings', note: 'How customers receive their login code (Telegram now, WhatsApp / SMS later).' }
+    login:    { icon: '🔐', title: 'Login and OTP Settings', note: 'How customers receive their login code (Telegram now, WhatsApp / SMS later).' },
+    alerts:   { icon: '🔔', title: 'Telegram Alerts', note: 'Order updates, admin alerts, delivery assignments and the daily summary.' }
 };
 
 function settingToggle(id, checked, label, hint) {
@@ -376,7 +377,7 @@ async function loadTelegramStatus() {
     ];
     if (r.webhook_url) lines.push('✅ Webhook active');
     if (r.last_error) lines.push('⚠️ Telegram reported: ' + esc(r.last_error));
-    lines.push('👥 Customers linked: ' + r.linked_count);
+    lines.push('👥 Customers linked: ' + r.linked_count + ' · Staff linked: ' + (r.staff_linked_count || 0));
 
     box.innerHTML = lines.join('<br>');
 }
@@ -391,6 +392,115 @@ async function connectTelegramBot() {
         return;
     }
     loadTelegramStatus();
+}
+
+function settingsAlertsHtml(st) {
+    return `
+        <p class="muted" style="margin:0 0 6px">Alerts are sent by your Telegram bot. Untick a switch to stop that kind of alert.</p>
+
+        ${settingToggle('ds_n_customer', st.notify_customer_status !== false,
+            'Customer order updates',
+            'Order received, preparing, out for delivery, delivered, cancelled and payment received. Only customers who connected Telegram when logging in get these.')}
+
+        ${settingToggle('ds_n_orders', st.notify_admin_orders !== false,
+            'Admin: order alerts',
+            'New orders, UPI payments to verify, cancellations and deliveries, sent to every connected admin.')}
+
+        ${settingToggle('ds_n_lowstock', st.notify_admin_low_stock !== false,
+            'Admin: low-stock alerts',
+            'Sent after an order when a product falls to its low-stock level.')}
+
+        ${settingToggle('ds_n_delivery', st.notify_delivery_assign !== false,
+            'Delivery: new assignment',
+            'The delivery person gets the order, address, map link and cash to collect.')}
+
+        ${settingToggle('ds_n_summary', st.notify_daily_summary !== false,
+            'Admin: daily sales summary',
+            'Needs a free daily scheduler calling /api/cron/daily-summary (see the note below).')}
+
+        <h3 style="margin:16px 0 6px">Staff Telegram</h3>
+        <p class="muted" style="margin:0 0 8px;font-size:12px">
+            Press <b>Get link</b> for a staff member, then open the link on <b>their</b> phone
+            (or send it on WhatsApp) and tap Start. The link works once and expires in 10 minutes.
+        </p>
+        <div id="tg_staff" class="muted">Loading staff…</div>
+
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+            <button type="button" onclick="tgSendTest()">🔔 Send test alert to admins</button>
+            <button type="button" onclick="tgSummaryNow()">📊 Send today's summary now</button>
+        </div>
+        <p id="tg_alert_msg" class="muted" style="margin-top:8px"></p>
+
+        <p class="muted" style="font-size:12px;margin-top:10px">
+            Daily summary: in Render add <b>CRON_SECRET</b> (any long random text), then in a free scheduler such as
+            cron-job.org call <b>https://YOUR-SITE/api/cron/daily-summary</b> once a day at 9:30 PM with the header
+            <b>X-Cron-Key: your secret</b>. It sends at most one summary per day.
+        </p>
+    `;
+}
+
+async function loadTelegramStaff() {
+    const box = $('#tg_staff');
+    if (!box) return;
+
+    const r = await api('/api/developer/telegram/staff');
+    if (!r._ok) {
+        box.textContent = r.error || 'Could not load staff';
+        return;
+    }
+    if (!r.bot_ready) {
+        box.textContent = 'Connect the Telegram bot first (Settings → Login and OTP Settings).';
+        return;
+    }
+
+    const rows = (r.users || []).filter(u => u.active).map(u => `
+        <div class="row" style="gap:8px;margin:6px 0;align-items:center;flex-wrap:wrap">
+            <span style="flex:1"><b>${esc(u.name)}</b> <small class="muted">${esc(u.role)}</small></span>
+            <span>${u.linked ? '✅ connected' : '❌ not connected'}</span>
+            <button type="button" onclick="tgStaffLink(${u.id})">${u.linked ? 'Re-link' : 'Get link'}</button>
+            ${u.linked ? `<button type="button" onclick="tgStaffUnlink(${u.id})">Disconnect</button>` : ''}
+        </div>`).join('');
+
+    box.innerHTML = (rows || '<p class="muted">No active admin or delivery accounts.</p>') + '<div id="tg_staff_link"></div>';
+}
+
+async function tgStaffLink(id) {
+    const out = $('#tg_staff_link');
+    if (out) out.textContent = 'Creating link…';
+
+    const r = await api(`/api/developer/telegram/staff/${id}/link`, 'POST');
+    if (!out) return;
+    if (!r._ok) {
+        out.textContent = '❌ ' + (r.error || 'Could not create the link');
+        return;
+    }
+
+    out.innerHTML = `
+        <div style="margin-top:10px;padding:10px;border:1px solid #dbe4ea;border-radius:10px">
+            <small class="muted">Open on the staff member's phone. Valid 10 minutes, works once.</small>
+            <input readonly value="${esc(r.link)}" onclick="this.select()" style="width:100%;box-sizing:border-box;margin:6px 0">
+            <a class="primary" target="_blank" rel="noopener" href="${esc(r.link)}">Open Telegram</a>
+            ${r.whatsapp_url ? `<a class="add" target="_blank" rel="noopener" href="${esc(r.whatsapp_url)}">Send on WhatsApp</a>` : '<small class="muted"> (add a mobile number to this account to send it on WhatsApp)</small>'}
+        </div>`;
+}
+
+async function tgStaffUnlink(id) {
+    if (!confirm('Stop Telegram alerts for this person?')) return;
+    const r = await api(`/api/developer/telegram/staff/${id}`, 'DELETE');
+    if (!r._ok) return alert(r.error || 'Could not disconnect');
+    loadTelegramStaff();
+}
+
+async function tgSendTest() {
+    const msg = $('#tg_alert_msg');
+    const r = await api('/api/developer/telegram/test', 'POST');
+    if (msg) msg.textContent = r._ok ? `✅ Test alert sent to ${r.sent_to} admin(s).` : '❌ ' + (r.error || 'Could not send');
+}
+
+async function tgSummaryNow() {
+    const msg = $('#tg_alert_msg');
+    const r = await api('/api/developer/telegram/summary-now', 'POST');
+    if (msg) msg.textContent = r._ok ? `✅ Summary sent to ${r.sent_to} admin(s).` : '❌ ' + (r.error || 'Could not send');
 }
 
 function settingsPicker() {
@@ -431,7 +541,8 @@ async function developerSettings(section) {
         about: settingsAboutHtml,
         brochure: settingsBrochureHtml,
         business: settingsBusinessHtml,
-        login: settingsLoginHtml
+        login: settingsLoginHtml,
+        alerts: settingsAlertsHtml
     }[section](st);
 
     modal(`
@@ -447,6 +558,7 @@ async function developerSettings(section) {
     `);
 
     if (section === 'login') loadTelegramStatus();
+    if (section === 'alerts') loadTelegramStaff();
 }
 
 
@@ -533,7 +645,14 @@ async function saveDeveloperSettings(section) {
         delivery_free_above: $('#ds_free')?.value,
 
         /* Login & OTP */
-        otp_provider: $('#ds_otp_provider')?.value
+        otp_provider: $('#ds_otp_provider')?.value,
+
+        /* Telegram alerts */
+        notify_customer_status: check('#ds_n_customer'),
+        notify_admin_orders: check('#ds_n_orders'),
+        notify_admin_low_stock: check('#ds_n_lowstock'),
+        notify_delivery_assign: check('#ds_n_delivery'),
+        notify_daily_summary: check('#ds_n_summary')
     });
 
     if (!result._ok) {
@@ -1497,6 +1616,11 @@ window.logout =
 
 window.loadTelegramStatus = loadTelegramStatus;
 window.connectTelegramBot = connectTelegramBot;
+window.loadTelegramStaff = loadTelegramStaff;
+window.tgStaffLink = tgStaffLink;
+window.tgStaffUnlink = tgStaffUnlink;
+window.tgSendTest = tgSendTest;
+window.tgSummaryNow = tgSummaryNow;
 
 
 /* =========================================================
