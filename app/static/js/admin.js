@@ -1797,6 +1797,38 @@ async function loadAdminDeliveryMap() {
 }
 window.loadAdminDeliveryMap = loadAdminDeliveryMap;
 
+async function loadDeliveryOperations() {
+    const panel = document.getElementById('ceDeliveryOpsPanel');
+    const summaryBox = document.getElementById('ceDeliveryOpsSummary');
+    const alertsBox = document.getElementById('ceDeliveryOpsAlerts');
+    const staffBox = document.getElementById('ceDeliveryOpsStaff');
+    if (!panel || !summaryBox || !alertsBox || !staffBox) return;
+    const result = await api('/api/admin/delivery-operations');
+    if (!result || result._ok === false || result.error) {
+        summaryBox.textContent = result?.error || 'Could not load delivery operations.';
+        return;
+    }
+    const m = result.summary || {};
+    const metrics = [
+        ['Active orders', m.active_orders ?? 0],
+        ['Unassigned', m.unassigned_orders ?? 0],
+        ['Missing locations', m.missing_locations ?? 0],
+        ['Delivered (30 days)', m.delivered_30d ?? 0],
+        ['Avg. delivery time', m.average_delivery_minutes == null ? 'Not enough data' : `${m.average_delivery_minutes} min`]
+    ];
+    summaryBox.innerHTML = metrics.map(([label,value]) => `<div class="ce-ops-metric"><small>${esc(label)}</small><strong>${esc(String(value))}</strong></div>`).join('');
+    const a = result.alerts || {};
+    const list = (title, rows, format) => `<div class="ce-ops-alert"><h3>${esc(title)} (${rows.length})</h3>${rows.length ? `<ul>${rows.slice(0,8).map(row=>`<li>${format(row)}</li>`).join('')}</ul>` : '<p class="muted">None right now.</p>'}</div>`;
+    alertsBox.innerHTML = [
+        list('Orders needing assignment', a.unassigned || [], x=>`<b>${esc(x.code)}</b> — ${esc(x.customer)} <small>${esc(x.status)}</small>`),
+        list('Missing delivery locations', a.missing_location || [], x=>`<b>${esc(x.code)}</b> — ${esc(x.customer)} <small>${esc(x.status)}</small>`),
+        list('Out for delivery over 60 minutes', a.delayed || [], x=>`<b>${esc(x.code)}</b> — ${esc(String(x.minutes))} min · ${esc(x.delivery_person)}`)
+    ].join('');
+    const staff = Array.isArray(result.delivery_staff) ? result.delivery_staff : [];
+    staffBox.innerHTML = `<h3>Delivery performance</h3>${staff.length ? `<div class="ce-ops-table-wrap"><table><thead><tr><th>Delivery person</th><th>Delivered</th><th>Paid order value</th></tr></thead><tbody>${staff.map(x=>`<tr><td>${esc(x.name)}</td><td>${esc(String(x.delivered_30d))}</td><td>₹${esc(Number(x.paid_total_30d || 0).toFixed(2))}</td></tr>`).join('')}</tbody></table></div>` : '<p class="muted">No delivered orders recorded in the last 30 days.</p>'}`;
+}
+window.loadDeliveryOperations = loadDeliveryOperations;
+
 async function adminStartup() {
     await loadAdminCategories();
 
@@ -1804,6 +1836,7 @@ async function adminStartup() {
 
         await loadAdminOrders();
         await loadAdminDeliveryMap();
+        await loadDeliveryOperations();
 
         await loadAdminProducts();
 
