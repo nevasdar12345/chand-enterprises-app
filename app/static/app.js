@@ -1501,8 +1501,30 @@ async function trackOrder(code) {
     ${order.estimated_delivery_window ? `<div class="ce-track-section"><small>Estimated delivery window</small><b>${esc(order.estimated_delivery_window)}</b><p class="muted">Estimate only; actual timing may vary.</p></div>` : ''}
     <div class="ce-track-section">${contact}</div>
     <div class="ce-track-section"><small>Payment status</small><b>${esc(order.payment_status || "Pending")}</b></div>
+    ${order.status === "Out for Delivery" && features.customer_tracking ? `<div class="ce-track-section"><h3>Live delivery location</h3><p id="ceLiveLocationState" class="muted">Checking for the latest delivery-person location…</p><div id="ceLiveLocationMap" class="ce-live-location-map"></div><a id="ceLiveLocationLink" target="_blank" rel="noopener" hidden>Open latest location in Maps ↗</a></div>` : ""}
     <button class="primary" onclick="closeModal()">Close tracking</button>
   </div>`);
+  if (order.status === "Out for Delivery" && features.customer_tracking) startLiveLocationPolling(code);
+}
+
+let LIVE_LOCATION_TIMER = null;
+function startLiveLocationPolling(code) {
+  if (LIVE_LOCATION_TIMER) clearInterval(LIVE_LOCATION_TIMER);
+  const refresh = async () => {
+    const state = document.getElementById('ceLiveLocationState');
+    if (!state) { clearInterval(LIVE_LOCATION_TIMER); LIVE_LOCATION_TIMER = null; return; }
+    const result = await api(`/api/orders/${encodeURIComponent(code)}/live-location`);
+    const link = document.getElementById('ceLiveLocationLink');
+    const map = document.getElementById('ceLiveLocationMap');
+    if (!result || result._ok === false || !result.ok) { state.textContent = result?.error || 'Live location is not available yet.'; return; }
+    if (!result.available) { state.textContent = 'The delivery person has not shared a location yet.'; return; }
+    const lat = Number(result.latitude), lng = Number(result.longitude);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) { state.textContent = 'Location data is invalid.'; return; }
+    state.textContent = `${result.stale ? 'Last known location (may be outdated)' : 'Latest location'} · Updated ${result.updated_at || 'recently'}${result.accuracy_m ? ` · accuracy ±${Math.round(result.accuracy_m)} m` : ''}`;
+    if (map) map.innerHTML = `<iframe title="Latest delivery location" loading="lazy" referrerpolicy="no-referrer-when-downgrade" src="https://www.openstreetmap.org/export/embed.html?bbox=${encodeURIComponent(lng-0.006)}%2C${encodeURIComponent(lat-0.006)}%2C${encodeURIComponent(lng+0.006)}%2C${encodeURIComponent(lat+0.006)}&layer=mapnik&marker=${encodeURIComponent(lat)}%2C${encodeURIComponent(lng)}"></iframe>`;
+    if (link) { link.hidden = false; link.href = `https://www.google.com/maps?q=${encodeURIComponent(lat)},${encodeURIComponent(lng)}`; }
+  };
+  refresh(); LIVE_LOCATION_TIMER = setInterval(refresh, 12000);
 }
 
 async function editOrderDeliveryLocation(code) {
