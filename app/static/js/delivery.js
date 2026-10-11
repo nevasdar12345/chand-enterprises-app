@@ -273,6 +273,97 @@ async function loadDeliveryMap() {
 }
 window.loadDeliveryMap = loadDeliveryMap;
 
+function ceDistanceKm(a, b) {
+    const rad = Math.PI / 180;
+    const dLat = (b.lat - a.lat) * rad;
+    const dLng = (b.lng - a.lng) * rad;
+    const v = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * rad) * Math.cos(b.lat * rad) * Math.sin(dLng / 2) ** 2;
+    return 6371 * 2 * Math.atan2(Math.sqrt(v), Math.sqrt(Math.max(0, 1 - v)));
+}
+
+function ceOrderPoint(order) {
+    const lat = Number(order.latitude), lng = Number(order.longitude);
+    return Number.isFinite(lat) && Number.isFinite(lng) && !(lat === 0 && lng === 0) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180
+        ? { lat, lng } : null;
+}
+
+async function suggestDeliveryRoute(useCurrentLocation = false) {
+    const resultBox = document.getElementById('ceDeliveryRouteResult');
+    if (!resultBox) return;
+    const config = await api('/api/config');
+    if (!config || config.maps_enabled === false || config.map_delivery_navigation === false) {
+        resultBox.textContent = 'Route suggestions are disabled in developer map settings.';
+        return;
+    }
+    const stops = DELIVERY_ORDERS
+        .filter(order => !['Delivered', 'Cancelled'].includes(order.status))
+        .map(order => ({ order, point: ceOrderPoint(order) }))
+        .filter(item => item.point);
+    if (!stops.length) {
+        resultBox.textContent = 'No active assigned orders have valid map coordinates. Ask the customer to update the delivery pin or use the address and phone details.';
+        return;
+    }
+    let origin = null;
+    const businessLat = Number(config.business_lat), businessLng = Number(config.business_lng);
+    if (Number.isFinite(businessLat) && Number.isFinite(businessLng) && !(businessLat === 0 && businessLng === 0) && businessLat >= -90 && businessLat <= 90 && businessLng >= -180 && businessLng <= 180) {
+        origin = { lat: businessLat, lng: businessLng, label: 'Business location' };
+    }
+    if (useCurrentLocation) origin = null;
+    if (useCurrentLocation && !navigator.geolocation) {
+        resultBox.textContent = 'This browser does not support location access. Use the normal route suggestion or configure business coordinates in Developer → Business Settings.';
+        return;
+    }
+    if (useCurrentLocation || !origin) {
+        if (navigator.geolocation) {
+            resultBox.textContent = 'Getting current location…';
+            try {
+                const position = await new Promise((resolve, reject) => navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }));
+                origin = { lat: position.coords.latitude, lng: position.coords.longitude, label: 'Current location' };
+            } catch (error) {
+                if (useCurrentLocation) {
+                    resultBox.textContent = 'Could not get your current location. Allow location access or use the normal route suggestion.';
+                    return;
+                }
+            }
+        }
+    }
+    const remaining = [...stops];
+    const ordered = [];
+    // Without a known origin, start at the first pending delivery and order the rest from there.
+    if (!origin) {
+        const first = remaining.shift();
+        ordered.push(first);
+        origin = { ...first.point, label: 'First suggested stop' };
+    }
+    let current = origin;
+    while (remaining.length) {
+        let bestIndex = 0, bestDistance = Infinity;
+        remaining.forEach((item, index) => {
+            const distance = ceDistanceKm(current, item.point);
+            if (distance < bestDistance) { bestDistance = distance; bestIndex = index; }
+        });
+        const [next] = remaining.splice(bestIndex, 1);
+        next.distanceFromPreviousKm = bestDistance;
+        ordered.push(next);
+        current = next.point;
+    }
+    // Keep the route link mobile-friendly: Google Maps URLs support only a limited
+    // number of waypoints across devices. Plan at most four delivery stops per run.
+    const routeStops = ordered.slice(0, 4);
+    const omittedStops = Math.max(0, ordered.length - routeStops.length);
+    const destination = routeStops[routeStops.length - 1];
+    const firstIsOrigin = origin.label === 'First suggested stop';
+    const waypointStops = routeStops.slice(0, -1);
+    const waypoints = waypointStops.map(x => `${x.point.lat},${x.point.lng}`).join('|');
+    const originParam = firstIsOrigin ? '' : `&origin=${encodeURIComponent(`${origin.lat},${origin.lng}`)}`;
+    const routeUrl = `https://www.google.com/maps/dir/?api=1${originParam}&destination=${encodeURIComponent(`${destination.point.lat},${destination.point.lng}`)}${waypoints ? `&waypoints=${encodeURIComponent(waypoints)}` : ''}&travelmode=driving`;
+    const list = routeStops.map((item, index) => `<li><b>${index + 1}. ${esc(item.order.code)}</b> — ${esc(item.order.customer || 'Customer')}<small>${esc(item.order.address || '')}</small><small>${esc(item.order.estimated_delivery_window || '')}</small></li>`).join('');
+    const originNote = firstIsOrigin ? 'No starting location was available; Google Maps will use your current location. Stop ordering starts with the first pending order.' : `Origin: ${esc(origin.label)}.`;
+    const omittedNote = omittedStops ? `<p class="muted">${omittedStops} additional stop(s) were left out to keep the Google Maps route link compatible with mobile devices. Complete this route and generate another.</p>` : '';
+    resultBox.innerHTML = `<div class="ce-route-result-head"><b>Suggested stop order</b><small>${originNote} Order is based on straight-line distance, not live traffic. Confirm the route before driving.</small></div><ol>${list}</ol>${omittedNote}<a class="primary" target="_blank" rel="noopener" href="${esc(routeUrl)}">Open suggested route in Google Maps ↗</a>`;
+}
+window.suggestDeliveryRoute = suggestDeliveryRoute;
+
 /* =========================
    LOAD DELIVERY ORDERS
    ========================= */
@@ -391,6 +482,8 @@ function deliveryCard(order) {
             <div class="dlv-block">
                 <span class="dlv-label">Address</span>
                 <div>${esc(order.address || '')}</div>
+                ${order.location_issue ? `<small class="ce-location-warning">⚠️ ${esc(order.location_issue)}</small>` : ''}
+                ${order.estimated_delivery_window && !['Delivered','Cancelled'].includes(status) ? `<small class="dlv-note">Estimated: ${esc(order.estimated_delivery_window)}</small>` : ''}
                 ${order.map_url && order.map_features?.delivery_navigation ? `<a class="loc-map-link" target="_blank" rel="noopener" href="${esc(order.directions_url || order.map_url)}">📍 Navigate</a>` : (order.map_url ? '<small class="dlv-note">Map navigation disabled by developer</small>' : '<small class="dlv-note">No map pin saved</small>')}
             </div>
 
