@@ -48,6 +48,12 @@ DEFAULT_SETTINGS = {
     "map_customer_tracking": "1",
     "map_delivery_navigation": "1",
     "map_admin_view": "1",
+    "eta_confirmed_min": "30",
+    "eta_confirmed_max": "60",
+    "eta_preparing_min": "20",
+    "eta_preparing_max": "45",
+    "eta_out_for_delivery_min": "10",
+    "eta_out_for_delivery_max": "25",
     "show_prices_home": "1",
     "show_prices_brochure": "1",
     "ordering_enabled": "1",
@@ -306,6 +312,12 @@ def developer_settings():
     return {"business_name": setting_value("business_name"), "business_mobile": setting_value("business_mobile"), "whatsapp": setting_value("whatsapp"), "business_location": setting_value("business_location"), "upi": setting_value("upi"), "payment_name": setting_value("payment_name"), "business_lat": setting_value("business_lat"), "business_lng": setting_value("business_lng"), "delivery_base": setting_value("delivery_base"), "delivery_per_km": setting_value("delivery_per_km"), "delivery_free_above": setting_value("delivery_free_above"), "instagram_url": setting_value("instagram_url"), "facebook_url": setting_value("facebook_url"), "social_links": social_links(), "about_title": setting_value("about_title"), "about_text": setting_value("about_text"), "footer_tagline": setting_value("footer_tagline"), "home_delivery_title": setting_value("home_delivery_title"), "home_delivery_text": setting_value("home_delivery_text"), "home_payment_title": setting_value("home_payment_title"), "home_payment_text": setting_value("home_payment_text"), "home_support_title": setting_value("home_support_title"), "home_support_text": setting_value("home_support_text"), "home_store_eyebrow": setting_value("home_store_eyebrow"), "home_products_title": setting_value("home_products_title"), "home_products_text": setting_value("home_products_text"), "home_bulk_badge": setting_value("home_bulk_badge"), "home_bulk_title": setting_value("home_bulk_title"), "home_bulk_text": setting_value("home_bulk_text"), "home_bulk_button": setting_value("home_bulk_button"), "home_event_button": setting_value("home_event_button"), "home_bulk_order_button": setting_value("home_bulk_order_button"), "footer_contact_title": setting_value("footer_contact_title"), "footer_whatsapp_label": setting_value("footer_whatsapp_label"), "footer_copyright_prefix": setting_value("footer_copyright_prefix"), "show_prices_home": prices_home(), "show_prices_brochure": prices_brochure(), "ordering_enabled": ordering_enabled(), "customer_login_enabled": customer_login_enabled(), "brochure_url": setting_value("brochure_url"), "brochure_eyebrow": setting_value("brochure_eyebrow"), "brochure_title": setting_value("brochure_title"), "brochure_subtitle": setting_value("brochure_subtitle"), "archive_days": setting_value("archive_days") or "7", "archive_method": setting_value("archive_method") or "email", "archive_email": setting_value("archive_email"), "archive_whatsapp": setting_value("archive_whatsapp"), "offers": offers, "otp_provider": setting_value("otp_provider") or "demo", "telegram_bot_username": setting_value("telegram_bot_username"), "notify_customer_status": _flag("notify_customer_status"), "notify_admin_orders": _flag("notify_admin_orders"), "notify_admin_low_stock": _flag("notify_admin_low_stock"), "notify_delivery_assign": _flag("notify_delivery_assign"), "notify_daily_summary": _flag("notify_daily_summary"), "summary_time": setting_value("summary_time") or "21:30",
             "maps_enabled": _flag("maps_enabled"), "map_customer_tracking": _flag("map_customer_tracking"),
             "map_delivery_navigation": _flag("map_delivery_navigation"), "map_admin_view": _flag("map_admin_view"),
+            "eta_confirmed_min": setting_value("eta_confirmed_min") or "30",
+            "eta_confirmed_max": setting_value("eta_confirmed_max") or "60",
+            "eta_preparing_min": setting_value("eta_preparing_min") or "20",
+            "eta_preparing_max": setting_value("eta_preparing_max") or "45",
+            "eta_out_for_delivery_min": setting_value("eta_out_for_delivery_min") or "10",
+            "eta_out_for_delivery_max": setting_value("eta_out_for_delivery_max") or "25",
             }
 
 
@@ -425,7 +437,37 @@ def parse_coord(value, low, high):
         number = float(value)
     except (TypeError, ValueError):
         return None
-    return number if low <= number <= high else None
+    return number if math.isfinite(number) and low <= number <= high else None
+
+
+def valid_order_coordinates(lat, lng):
+    """Reject absent, out-of-range and Null Island coordinates."""
+    return lat is not None and lng is not None and not (float(lat) == 0 and float(lng) == 0) and -90 <= float(lat) <= 90 and -180 <= float(lng) <= 180
+
+
+def location_issue(o):
+    if not (o.address or '').strip():
+        return 'Delivery address is missing'
+    if not valid_order_coordinates(o.latitude, o.longitude):
+        return 'Valid map location is missing'
+    return ''
+
+
+def estimated_delivery_window(status):
+    """A configurable operational estimate, not a traffic-aware/live ETA."""
+    status_key = {
+        'Confirmed': 'confirmed',
+        'Preparing': 'preparing',
+        'Out for Delivery': 'out_for_delivery',
+    }.get(status)
+    if not status_key:
+        return ''
+    try:
+        low = max(0, int(setting_value(f'eta_{status_key}_min') or 0))
+        high = max(low, int(setting_value(f'eta_{status_key}_max') or low))
+    except (TypeError, ValueError):
+        low, high = {'confirmed': (30, 60), 'preparing': (20, 45), 'out_for_delivery': (10, 25)}[status_key]
+    return f'{low}–{high} min estimated remaining'
 
 
 def order_dict(o):
@@ -435,6 +477,9 @@ def order_dict(o):
 
     return dict(id=o.id, code=o.code, customer=o.customer_name, mobile=o.mobile,
                 address=o.address, latitude=o.latitude, longitude=o.longitude,
+                location_valid=valid_order_coordinates(o.latitude, o.longitude),
+                location_issue=location_issue(o),
+                estimated_delivery_window=estimated_delivery_window(o.status),
                 map_url=o.map_url, directions_url=o.directions_url,
                 map_features={"enabled": _flag("maps_enabled"),
                               "customer_tracking": _flag("maps_enabled") and _flag("map_customer_tracking"),
@@ -1354,7 +1399,7 @@ def delivery_quote():
     code = str(d.get("coupon") or "").strip().upper()
     lat = parse_coord(d.get("latitude"), -90, 90)
     lng = parse_coord(d.get("longitude"), -180, 180)
-    if lat is None or lng is None:
+    if not valid_order_coordinates(lat, lng):
         lat = lng = None
     row, discount = calculate_coupon(code, subtotal)
     coupon_msg, coupon_ok = "", False
@@ -1375,7 +1420,7 @@ def delivery_quote():
 @main.get("/api/config")
 def config():
     cfg = developer_settings()
-    return jsonify(_ok=True, whatsapp=wa_number(), upi=cfg["upi"] or current_app.config["UPI_ID"], business_name=cfg["business_name"], business_mobile=cfg["business_mobile"], business_location=cfg["business_location"], payment_name=cfg["payment_name"], offers=cfg["offers"], show_prices_home=cfg["show_prices_home"], show_prices_brochure=cfg["show_prices_brochure"], ordering_enabled=cfg["ordering_enabled"], customer_login_enabled=cfg["customer_login_enabled"], maps_enabled=cfg["maps_enabled"], map_customer_tracking=cfg["map_customer_tracking"], map_delivery_navigation=cfg["map_delivery_navigation"], map_admin_view=cfg["map_admin_view"], free_delivery_above=float_setting("delivery_free_above", 500), instagram_url=cfg["instagram_url"], facebook_url=cfg["facebook_url"], social_links=cfg["social_links"], about_title=cfg["about_title"], about_text=cfg["about_text"], footer_tagline=cfg["footer_tagline"], brochure_url=cfg["brochure_url"], categories=[category_dict(c) for c in active_categories()], coupons=[coupon_dict(c) for c in Coupon.query.filter_by(active=True).order_by(Coupon.code).all()])
+    return jsonify(_ok=True, whatsapp=wa_number(), upi=cfg["upi"] or current_app.config["UPI_ID"], business_name=cfg["business_name"], business_mobile=cfg["business_mobile"], business_location=cfg["business_location"], payment_name=cfg["payment_name"], offers=cfg["offers"], show_prices_home=cfg["show_prices_home"], show_prices_brochure=cfg["show_prices_brochure"], ordering_enabled=cfg["ordering_enabled"], customer_login_enabled=cfg["customer_login_enabled"], maps_enabled=cfg["maps_enabled"], map_customer_tracking=cfg["map_customer_tracking"], map_delivery_navigation=cfg["map_delivery_navigation"], map_admin_view=cfg["map_admin_view"], business_lat=cfg["business_lat"], business_lng=cfg["business_lng"], eta_confirmed_min=cfg["eta_confirmed_min"], eta_confirmed_max=cfg["eta_confirmed_max"], eta_preparing_min=cfg["eta_preparing_min"], eta_preparing_max=cfg["eta_preparing_max"], eta_out_for_delivery_min=cfg["eta_out_for_delivery_min"], eta_out_for_delivery_max=cfg["eta_out_for_delivery_max"], free_delivery_above=float_setting("delivery_free_above", 500), instagram_url=cfg["instagram_url"], facebook_url=cfg["facebook_url"], social_links=cfg["social_links"], about_title=cfg["about_title"], about_text=cfg["about_text"], footer_tagline=cfg["footer_tagline"], brochure_url=cfg["brochure_url"], categories=[category_dict(c) for c in active_categories()], coupons=[coupon_dict(c) for c in Coupon.query.filter_by(active=True).order_by(Coupon.code).all()])
 
 
 @main.get("/api/categories")
@@ -1405,7 +1450,7 @@ def create_order():
     lat = parse_coord(d.get("latitude"), -90, 90)
     lng = parse_coord(d.get("longitude"), -180, 180)
 
-    if lat is None or lng is None:
+    if not valid_order_coordinates(lat, lng):
         lat = lng = None
 
     coupon = (d.get("coupon") or "").strip().upper()
@@ -1508,6 +1553,41 @@ def my_orders():
     return jsonify([order_dict(o) for o in rows])
 
 
+@main.post("/api/orders/<code>/delivery-location")
+def update_order_delivery_location(code):
+    """Customers may correct their own delivery details before dispatch."""
+    u = current_user()
+    if not u or u.role != "customer":
+        return jsonify(error="Please login as customer"), 401
+    o = Order.query.filter_by(code=code).first()
+    if not o:
+        return jsonify(error="Order not found"), 404
+    if o.mobile != u.mobile:
+        return jsonify(error="You can only update your own order"), 403
+    if o.status not in {"Confirmed", "Preparing"}:
+        return jsonify(error="Delivery details can only be changed before dispatch"), 400
+    d = request.json or {}
+    address = str(d.get("address") or "").strip()
+    if not address or len(address) > 1000:
+        return jsonify(error="Enter a delivery address (up to 1000 characters)"), 400
+    raw_lat, raw_lng = d.get("latitude"), d.get("longitude")
+    if (raw_lat in (None, "") and raw_lng in (None, "")):
+        lat = lng = None
+    else:
+        lat = parse_coord(raw_lat, -90, 90)
+        lng = parse_coord(raw_lng, -180, 180)
+        if lat is None or lng is None or (lat == 0 and lng == 0):
+            return jsonify(error="Enter valid latitude and longitude, or clear both coordinates"), 400
+    old_address, old_lat, old_lng = o.address, o.latitude, o.longitude
+    if address == old_address and lat == old_lat and lng == old_lng:
+        return jsonify(ok=True, message="No changes were needed", order=order_dict(o))
+    o.address, o.latitude, o.longitude = address, lat, lng
+    add_tracking_event(o, "Delivery details updated", event_type="location", status=o.status,
+                       note="Customer updated the delivery address or map pin before dispatch.", actor_user_id=u.id)
+    db.session.commit()
+    return jsonify(ok=True, message="Delivery details updated", order=order_dict(o))
+
+
 @main.get("/api/orders/<code>/tracking")
 def order_tracking(code):
     u = current_user()
@@ -1534,7 +1614,11 @@ def order_tracking(code):
                                   "address": o.address, "latitude": o.latitude, "longitude": o.longitude,
                                   "map_url": o.map_url, "directions_url": o.directions_url, "delivery_person": o.delivery_person.name if o.delivery_person else "",
                                   "delivery_mobile": o.delivery_person.mobile if o.delivery_person else "",
-                                  "payment_status": o.payment_status},
+                                  "payment_status": o.payment_status,
+                                  "location_valid": valid_order_coordinates(o.latitude, o.longitude),
+                                  "location_issue": location_issue(o),
+                                  "estimated_delivery_window": estimated_delivery_window(o.status),
+                                  "can_edit_location": u.role == "customer" and o.status in {"Confirmed", "Preparing"}},
                    events=[{"title": e.title, "type": e.event_type, "status": e.status,
                             "note": e.note or "", "at": display_datetime(e.created_at)} for e in events],
                    features=flags)
@@ -1641,16 +1725,20 @@ def admin_delivery_map():
     if not _flag("maps_enabled") or not _flag("map_admin_view"):
         return jsonify(ok=True, enabled=False, orders=[])
     rows = Order.query.options(joinedload(Order.delivery_person)).filter(
-        Order.latitude.isnot(None), Order.longitude.isnot(None),
-        db.or_(Order.latitude != 0, Order.longitude != 0),
         Order.status.notin_(["Delivered", "Cancelled"])
     ).order_by(Order.created_at.desc()).limit(250).all()
-    return jsonify(ok=True, enabled=True, orders=[{
-        "code": o.code, "customer": o.customer_name, "address": o.address,
-        "latitude": o.latitude, "longitude": o.longitude, "status": o.status,
-        "delivery_person": o.delivery_person.name if o.delivery_person else "Unassigned",
-        "map_url": o.map_url, "directions_url": o.directions_url
-    } for o in rows])
+    orders = []
+    for o in rows:
+        valid = valid_order_coordinates(o.latitude, o.longitude)
+        orders.append({
+            "code": o.code, "customer": o.customer_name, "address": o.address,
+            "latitude": o.latitude, "longitude": o.longitude, "location_valid": valid,
+            "location_issue": location_issue(o), "status": o.status,
+            "delivery_person": o.delivery_person.name if o.delivery_person else "Unassigned",
+            "map_url": o.map_url, "directions_url": o.directions_url,
+            "estimated_delivery_window": estimated_delivery_window(o.status),
+        })
+    return jsonify(ok=True, enabled=True, orders=orders)
 
 
 @main.get("/api/admin/orders")
@@ -2753,7 +2841,7 @@ def developer_save_settings():
             if len(value) > limit:
                 return jsonify(error=f"{key.replace('_', ' ').title()} must be {limit} characters or fewer"), 400
             set_setting(key, value)
-    for key in ["business_name", "business_mobile", "whatsapp", "business_location", "upi", "payment_name", "business_lat", "business_lng", "delivery_base", "delivery_per_km", "delivery_free_above", "show_prices_home", "show_prices_brochure", "ordering_enabled", "customer_login_enabled", "brochure_url", "brochure_eyebrow", "brochure_title", "brochure_subtitle", "archive_days", "archive_method", "archive_email", "archive_whatsapp", "summary_time"] + sorted(NOTIFY_FLAGS | MAP_FLAGS):
+    for key in ["business_name", "business_mobile", "whatsapp", "business_location", "upi", "payment_name", "business_lat", "business_lng", "delivery_base", "delivery_per_km", "delivery_free_above", "show_prices_home", "show_prices_brochure", "ordering_enabled", "customer_login_enabled", "brochure_url", "brochure_eyebrow", "brochure_title", "brochure_subtitle", "archive_days", "archive_method", "archive_email", "archive_whatsapp", "summary_time", "eta_confirmed_min", "eta_confirmed_max", "eta_preparing_min", "eta_preparing_max", "eta_out_for_delivery_min", "eta_out_for_delivery_max"] + sorted(NOTIFY_FLAGS | MAP_FLAGS):
         if key in d:
             if key in {"show_prices_home", "show_prices_brochure", "ordering_enabled", "customer_login_enabled"} | NOTIFY_FLAGS | MAP_FLAGS:
                 set_setting(key, "0" if str(d.get(key)).strip().lower() in {"0", "false", "no", "off", ""} else "1")
@@ -2774,7 +2862,25 @@ def developer_save_settings():
                 return jsonify(error="Archive method must be email or whatsapp"), 400
             if key == "summary_time" and not TIME_RE.match(value):
                 return jsonify(error="Summary time must look like 21:30 (24-hour, India time)"), 400
+            if key.startswith("eta_"):
+                try:
+                    minutes = int(value)
+                except (TypeError, ValueError):
+                    return jsonify(error="Delivery estimate values must be whole minutes"), 400
+                if minutes < 0 or minutes > 1440:
+                    return jsonify(error="Delivery estimate must be between 0 and 1440 minutes"), 400
+                value = str(minutes)
             set_setting(key, value)
+    for phase in ("confirmed", "preparing", "out_for_delivery"):
+        low_key, high_key = f"eta_{phase}_min", f"eta_{phase}_max"
+        if low_key in d or high_key in d:
+            try:
+                low = int(d.get(low_key, setting_value(low_key) or 0))
+                high = int(d.get(high_key, setting_value(high_key) or low))
+            except (TypeError, ValueError):
+                return jsonify(error="Delivery estimate values must be whole minutes"), 400
+            if high < low:
+                return jsonify(error=f"Maximum estimate must be at least the minimum for {phase.replace('_', ' ')}"), 400
     if "otp_provider" in d:
         provider = str(d.get("otp_provider") or "").strip().lower()
         if provider not in OTP_PROVIDERS:
