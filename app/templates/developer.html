@@ -130,6 +130,26 @@ Developer · Chand Enterprises
         <p class="muted" style="font-size:12px;margin-bottom:0">This is an on-demand diagnostic, not an external uptime monitor. For full incident diagnosis, also review Render logs and database-provider status.</p>
     </section>
 
+    <section class="panel" id="developerApiInspectorPanel">
+        <div class="row" style="align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+            <div>
+                <h2 style="margin:0">🧪 API Response Inspector</h2>
+                <p class="muted" style="margin:6px 0 0">Inspect real API responses as the app uses them, review status codes and timings, and filter failed requests. History is limited and held in this server worker's memory.</p>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <button class="primary" type="button" onclick="loadDeveloperApiInspector()">Refresh</button>
+                <button type="button" onclick="clearDeveloperApiHistory()">Clear history</button>
+            </div>
+        </div>
+        <div class="row" style="gap:8px;flex-wrap:wrap;margin:14px 0">
+            <input id="apiInspectorSearch" type="search" placeholder="Filter by path, method or status…" style="flex:1;min-width:220px" oninput="filterDeveloperApiLogs()">
+            <select id="apiInspectorStatus" onchange="loadDeveloperApiInspector()" style="min-width:160px"><option value="all">All responses</option><option value="success">Successful (2xx/3xx)</option><option value="errors">Errors (4xx/5xx)</option></select>
+        </div>
+        <div id="developerApiInspectorSummary" class="muted" style="margin:10px 0">Loading API history…</div>
+        <div id="developerApiInspectorLogs" class="table-wrap" aria-live="polite">Loading…</div>
+        <details style="margin-top:14px"><summary style="cursor:pointer;font-weight:700">Discovered API endpoints</summary><p class="muted">Endpoints are listed from Flask's registered routes. Read-only safe probes are not run automatically; open the related app feature to generate a real response.</p><div id="developerApiEndpointList" class="table-wrap">Loading…</div></details>
+        <p class="muted" style="font-size:12px;margin-bottom:0">Sensitive fields are redacted. Authentication response bodies are hidden. This does not log requests made directly from the browser to third-party services or requests that bypass this Flask worker.</p>
+    </section>
 
     <!-- =========================
          QUICK SETTINGS
