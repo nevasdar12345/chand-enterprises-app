@@ -1846,6 +1846,70 @@ def admin_delivery_map():
     return jsonify(ok=True, enabled=True, orders=orders)
 
 
+@main.get("/api/admin/delivery-operations")
+def admin_delivery_operations():
+    """Free operational overview derived from existing orders and tracking events."""
+    if not role_ok("admin"):
+        return jsonify(error="Forbidden"), 403
+
+    now = datetime.utcnow()
+    since = now - timedelta(days=30)
+    active_statuses = ["Confirmed", "Preparing", "Out for Delivery"]
+    active = (Order.query.options(joinedload(Order.delivery_person))
+              .filter(Order.status.in_(active_statuses))
+              .order_by(Order.created_at.asc()).limit(500).all())
+    delivered = Order.query.filter(Order.status == "Delivered", Order.created_at >= since).all()
+
+    # Build delivery duration from recorded status events; never infer a duration
+    # when either timestamp is missing.
+    delivered_ids = [o.id for o in delivered]
+    events_by_order = {}
+    if delivered_ids:
+        events = (OrderTrackingEvent.query.filter(OrderTrackingEvent.order_id.in_(delivered_ids),
+                    OrderTrackingEvent.created_at >= since - timedelta(days=7))
+                  .order_by(OrderTrackingEvent.created_at.asc()).all())
+        for event in events:
+            events_by_order.setdefault(event.order_id, []).append(event)
+    durations = []
+    for order in delivered:
+        events = events_by_order.get(order.id, [])
+        start = next((e.created_at for e in events if e.status == "Out for Delivery"), None)
+        end = next((e.created_at for e in events if e.status == "Delivered"), None)
+        if start and end and end >= start:
+            durations.append((end - start).total_seconds() / 60)
+
+    unassigned = [o for o in active if not o.delivery_person_id]
+    missing_location = [o for o in active if not valid_order_coordinates(o.latitude, o.longitude)]
+    delayed = []
+    for o in active:
+        if o.status != "Out for Delivery":
+            continue
+        started = next((e.created_at for e in sorted(o.tracking_events, key=lambda x: x.created_at)
+                        if e.status == "Out for Delivery"), None)
+        if started and (now - started).total_seconds() >= 60 * 60:
+            delayed.append({"code": o.code, "minutes": int((now - started).total_seconds() // 60),
+                            "delivery_person": o.delivery_person.name if o.delivery_person else "Unassigned"})
+
+    staff = {}
+    for o in delivered:
+        if not o.delivery_person_id:
+            continue
+        person = o.delivery_person.name if o.delivery_person else f"Delivery #{o.delivery_person_id}"
+        row = staff.setdefault(str(o.delivery_person_id), {"name": person, "delivered_30d": 0, "paid_total_30d": 0.0})
+        row["delivered_30d"] += 1
+        if o.payment_status == "Paid":
+            row["paid_total_30d"] += float(o.total or 0)
+
+    return jsonify(ok=True, period_days=30,
+        summary={"active_orders": len(active), "unassigned_orders": len(unassigned),
+                 "missing_locations": len(missing_location), "delivered_30d": len(delivered),
+                 "average_delivery_minutes": round(sum(durations) / len(durations)) if durations else None},
+        alerts={"unassigned": [{"code": o.code, "status": o.status, "customer": o.customer_name} for o in unassigned[:20]],
+                "missing_location": [{"code": o.code, "status": o.status, "customer": o.customer_name} for o in missing_location[:20]],
+                "delayed": delayed[:20]},
+        delivery_staff=sorted(staff.values(), key=lambda x: (-x["delivered_30d"], x["name"])))
+
+
 @main.get("/api/admin/orders")
 def admin_orders():
     if not role_ok("admin"):
