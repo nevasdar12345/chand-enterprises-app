@@ -1,5 +1,6 @@
-import csv, io, secrets, urllib.parse, math, re, os, base64, json, mimetypes, urllib.request, urllib.error, smtplib, tempfile, uuid, threading
+import csv, io, secrets, urllib.parse, math, re, os, base64, json, mimetypes, urllib.request, urllib.error, smtplib, tempfile, uuid, threading, time
 from pathlib import Path
+from collections import deque
 
 import segno
 from email.message import EmailMessage
@@ -368,6 +369,114 @@ def current_user():
 def role_ok(*roles):
     u = current_user()
     return bool(u) and (not roles or u.role in roles)
+
+
+# ---------- developer API inspector (bounded, process-local response history) ----------
+_API_HISTORY_LIMIT = 250
+_api_response_history = deque(maxlen=_API_HISTORY_LIMIT)
+_api_history_lock = threading.Lock()
+_API_SENSITIVE_KEYS = (
+    "password", "secret", "token", "authorization", "cookie", "otp", "signature",
+    "mobile", "phone", "email", "address", "landmark", "customer_name", "recipient", "name", "username",
+    "latitude", "longitude", "lat", "lng", "upi", "transaction_id", "gateway_order_id",
+)
+_API_PRIVATE_ENDPOINTS = ("/api/login", "/api/verify-otp", "/api/otp/resend", "/api/staff/telegram")
+
+def _api_redact(value, key=""):
+    """Keep useful response structure while masking secrets and customer-identifying fields."""
+    key_lower = str(key or "").lower()
+    if key_lower in {"lat", "lng"} or any(part in key_lower for part in _API_SENSITIVE_KEYS if part not in {"lat", "lng"}):
+        return "[REDACTED]"
+    if isinstance(value, dict):
+        return {str(k): _api_redact(v, str(k)) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_api_redact(v) for v in value[:100]]
+    if isinstance(value, str):
+        return value[:2000]
+    if value is None or isinstance(value, (int, float, bool)):
+        return value
+    return str(value)[:500]
+
+@main.before_app_request
+def _api_inspector_start_timer():
+    if request.path.startswith("/api/"):
+        g._api_inspector_started = time.perf_counter()
+
+@main.after_app_request
+def _api_inspector_capture_response(response):
+    path = request.path
+    if not path.startswith("/api/") or path == "/api/developer/api-inspector" or path.startswith("/api/developer/api-inspector/"):
+        return response
+    # Do not store auth challenge bodies or request bodies; only bounded response metadata/body.
+    elapsed_ms = round((time.perf_counter() - getattr(g, "_api_inspector_started", time.perf_counter())) * 1000, 1)
+    entry = {
+        "id": uuid.uuid4().hex[:10],
+        "time": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC"),
+        "method": request.method, "path": path, "status": int(response.status_code),
+        "duration_ms": elapsed_ms, "content_type": response.mimetype or "unknown",
+        "body": None,
+    }
+    if any(path.startswith(prefix) for prefix in _API_PRIVATE_ENDPOINTS):
+        entry["body"] = {"notice": "Response body intentionally hidden for authentication/privacy safety."}
+    elif response.mimetype == "application/json":
+        try:
+            body = response.get_json(silent=True)
+            entry["body"] = _api_redact(body)
+        except Exception:
+            entry["body"] = {"notice": "JSON response could not be decoded for inspection."}
+    elif response.mimetype and (response.mimetype.startswith("text/") or response.mimetype in ("application/xml", "image/svg+xml")):
+        try:
+            entry["body"] = response.get_data(as_text=True)[:4000]
+        except Exception:
+            entry["body"] = "[Response body unavailable]"
+    else:
+        entry["body"] = {"notice": "Binary or non-text response body omitted.", "bytes": response.calculate_content_length()}
+    try:
+        encoded_body = json.dumps(entry["body"], ensure_ascii=False, separators=(",", ":"))
+        if len(encoded_body) > 12000:
+            entry["body"] = {"truncated": True, "preview": encoded_body[:11500], "notice": "Response body was truncated to protect memory and keep the inspector responsive."}
+    except (TypeError, ValueError):
+        entry["body"] = {"notice": "Response body could not be safely serialized."}
+    with _api_history_lock:
+        _api_response_history.appendleft(entry)
+    return response
+
+@main.get("/api/developer/api-inspector")
+def developer_api_inspector():
+    if not role_ok("developer"):
+        return jsonify(error="Forbidden"), 403
+    query = str(request.args.get("q") or "").strip().lower()[:120]
+    status_filter = str(request.args.get("status") or "all")[:20]
+    with _api_history_lock:
+        logs = list(_api_response_history)
+    if query:
+        logs = [x for x in logs if query in x["path"].lower() or query in x["method"].lower() or query in str(x["status"])]
+    if status_filter == "errors":
+        logs = [x for x in logs if x["status"] >= 400]
+    elif status_filter == "success":
+        logs = [x for x in logs if 200 <= x["status"] < 400]
+    endpoints = []
+    seen = set()
+    for rule in current_app.url_map.iter_rules():
+        path = str(rule)
+        if not path.startswith("/api/") or path.startswith("/api/developer/api-inspector/"):
+            continue
+        methods = sorted(set(rule.methods or ()) - {"HEAD", "OPTIONS"})
+        for method in methods:
+            key = (method, path)
+            if key not in seen:
+                seen.add(key)
+                endpoints.append({"method": method, "path": path, "safe_to_probe": method == "GET" and path in {"/api/config", "/api/categories", "/api/products", "/api/developer/health", "/api/developer/settings", "/api/developer/archive/history", "/api/developer/scheduler/status"}})
+    endpoints.sort(key=lambda x: (x["path"], x["method"]))
+    return jsonify(ok=True, count=len(logs), limit=_API_HISTORY_LIMIT, logs=logs[:100], endpoints=endpoints)
+
+@main.post("/api/developer/api-inspector/clear")
+def developer_api_inspector_clear():
+    if not role_ok("developer"):
+        return jsonify(error="Forbidden"), 403
+    with _api_history_lock:
+        _api_response_history.clear()
+    return jsonify(ok=True, message="In-memory API response history cleared.")
 
 
 def active_categories():
