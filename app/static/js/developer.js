@@ -200,8 +200,7 @@ const SETTINGS_SECTIONS = {
     brochure: { icon: '📖', title: 'Brochure Settings',   note: 'Brochure link, headings and prices.' },
     business: { icon: '🏢', title: 'Business Settings',   note: 'Name, mobile, WhatsApp, UPI, location and delivery.' },
     login:    { icon: '🔐', title: 'Login and OTP Settings', note: 'How customers receive their login code (Telegram now, WhatsApp / SMS later).' },
-    alerts:   { icon: '🔔', title: 'Telegram Alerts', note: 'Order updates, admin alerts, delivery assignments and the daily summary.' },
-    maps:     { icon: '🗺️', title: 'Delivery & Maps Settings', note: 'Control customer tracking, delivery navigation, admin maps and optional GPS.' }
+    alerts:   { icon: '🔔', title: 'Telegram Alerts', note: 'Order updates, admin alerts, delivery assignments and the daily summary.' }
 };
 
 function settingToggle(id, checked, label, hint) {
@@ -578,26 +577,6 @@ async function tgSummaryNow() {
     if (msg) msg.textContent = r._ok ? `✅ Summary sent to ${r.sent_to} admin(s).` : '❌ ' + (r.error || 'Could not send');
 }
 
-function settingsMapsHtml(st) {
-    return `
-        <p class="muted">These switches control map features across the customer, admin and delivery dashboards. Live GPS is off by default and should only be enabled with delivery staff consent.</p>
-        ${settingToggle('ds_maps_enabled', st.maps_enabled !== false, 'Enable maps globally', 'Master switch for map features.')}
-        ${settingToggle('ds_map_customer_tracking', st.map_customer_tracking !== false, 'Customer order timeline and maps', 'Let customers view their order timeline and saved delivery location.')}
-        ${settingToggle('ds_map_delivery_navigation', st.map_delivery_navigation !== false, 'Delivery navigation', 'Show one-tap navigation links for assigned orders.')}
-        ${settingToggle('ds_map_admin_view', st.map_admin_view !== false, 'Admin delivery map', 'Allow the admin dashboard to display orders with saved coordinates.')}
-        <h3 style="margin:18px 0 8px">Estimated delivery windows</h3>
-        <p class="muted" style="font-size:12px">These are simple business estimates, not live traffic or GPS-based ETAs. Values are remaining minutes and the maximum must be at least the minimum.</p>
-        <div class="ds-eta-grid">
-          <label>Confirmed – minimum (min)<input id="ds_eta_confirmed_min" type="number" min="0" max="1440" value="${esc(st.eta_confirmed_min ?? '30')}"></label>
-          <label>Confirmed – maximum (min)<input id="ds_eta_confirmed_max" type="number" min="0" max="1440" value="${esc(st.eta_confirmed_max ?? '60')}"></label>
-          <label>Preparing – minimum (min)<input id="ds_eta_preparing_min" type="number" min="0" max="1440" value="${esc(st.eta_preparing_min ?? '20')}"></label>
-          <label>Preparing – maximum (min)<input id="ds_eta_preparing_max" type="number" min="0" max="1440" value="${esc(st.eta_preparing_max ?? '45')}"></label>
-          <label>Out for delivery – minimum (min)<input id="ds_eta_out_min" type="number" min="0" max="1440" value="${esc(st.eta_out_for_delivery_min ?? '10')}"></label>
-          <label>Out for delivery – maximum (min)<input id="ds_eta_out_max" type="number" min="0" max="1440" value="${esc(st.eta_out_for_delivery_max ?? '25')}"></label>
-        </div>
-        <p class="muted" style="font-size:12px">Note: public map tile and geocoding services have fair-use limits. Do not use them for unlimited high-volume requests.</p>`;
-}
-
 function settingsPicker() {
     modal(`
         <h2>Settings</h2>
@@ -637,8 +616,7 @@ async function developerSettings(section) {
         brochure: settingsBrochureHtml,
         business: settingsBusinessHtml,
         login: settingsLoginHtml,
-        alerts: settingsAlertsHtml,
-        maps: settingsMapsHtml
+        alerts: settingsAlertsHtml
     }[section](st);
 
     modal(`
@@ -767,19 +745,7 @@ async function saveDeveloperSettings(section) {
         notify_admin_low_stock: check('#ds_n_lowstock'),
         notify_delivery_assign: check('#ds_n_delivery'),
         notify_daily_summary: check('#ds_n_summary'),
-        summary_time: text('#ds_summary_time'),
-
-        /* Delivery & maps */
-        maps_enabled: check('#ds_maps_enabled'),
-        map_customer_tracking: check('#ds_map_customer_tracking'),
-        map_delivery_navigation: check('#ds_map_delivery_navigation'),
-        map_admin_view: check('#ds_map_admin_view'),
-        eta_confirmed_min: $('#ds_eta_confirmed_min')?.value,
-        eta_confirmed_max: $('#ds_eta_confirmed_max')?.value,
-        eta_preparing_min: $('#ds_eta_preparing_min')?.value,
-        eta_preparing_max: $('#ds_eta_preparing_max')?.value,
-        eta_out_for_delivery_min: $('#ds_eta_out_min')?.value,
-        eta_out_for_delivery_max: $('#ds_eta_out_max')?.value,
+        summary_time: text('#ds_summary_time')
     });
 
     if (!result._ok) {
@@ -1933,6 +1899,43 @@ window.saveDeveloperArchiveSettings = saveDeveloperArchiveSettings;
 window.checkDeveloperArchive = checkDeveloperArchive;
 window.loadDeveloperArchiveHistory = loadDeveloperArchiveHistory;
 
+
+
+async function loadDeveloperHealth(showRunning = false) {
+    const summary = document.getElementById('developerHealthSummary');
+    const checksBox = document.getElementById('developerHealthChecks');
+    const button = document.getElementById('developerHealthRefresh');
+    if (!summary || !checksBox) return;
+    if (showRunning && button) { button.disabled = true; button.textContent = 'Checking…'; }
+    summary.textContent = 'Running application checks…';
+    try {
+        const result = await api('/api/developer/health');
+        if (!result._ok) {
+            summary.textContent = result.error || 'Health check could not be completed.';
+            checksBox.textContent = 'Unable to read health details. Confirm you are logged in as Developer.';
+            return;
+        }
+        const status = result.status || 'unknown';
+        const label = status === 'healthy' ? 'HEALTHY' : (status === 'warning' ? 'NEEDS ATTENTION' : 'UNHEALTHY');
+        const checkedAt = result.checked_at ? new Date(result.checked_at).toLocaleString() : 'Unknown';
+        const counts = result.summary || {};
+        summary.innerHTML = `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><strong>${esc(label)}</strong><span class="muted">${Number(counts.healthy || 0)} passed · ${Number(counts.warnings || 0)} warnings · ${Number(counts.errors || 0)} errors</span></div><small class="muted">Last checked: ${esc(checkedAt)}</small>`;
+        checksBox.innerHTML = `<table><thead><tr><th>Component</th><th>Status</th><th>Details</th></tr></thead><tbody>${(result.checks || []).map(item => {
+            const state = String(item.status || 'unknown').toLowerCase();
+            const symbol = state === 'healthy' ? '✓' : (state === 'warning' ? '!' : '✕');
+            return `<tr><td>${esc(item.name)}</td><td><strong>${symbol} ${esc(state.toUpperCase())}</strong></td><td>${esc(item.detail)}</td></tr>`;
+        }).join('')}</tbody></table>`;
+    } catch (error) {
+        summary.textContent = 'Health check failed.';
+        checksBox.textContent = 'Network or server error. Check the browser console and Render logs.';
+    } finally {
+        if (showRunning && button) { button.disabled = false; button.textContent = 'Run health check'; }
+    }
+}
+window.loadDeveloperHealth = loadDeveloperHealth;
+
+
 document.addEventListener('DOMContentLoaded', () => {
     if (document.getElementById('developerArchivePanel')) loadDeveloperArchive();
+    if (document.getElementById('developerHealthPanel')) loadDeveloperHealth();
 });
