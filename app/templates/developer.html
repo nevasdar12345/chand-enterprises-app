@@ -117,6 +117,20 @@ Developer · Chand Enterprises
     </section>
 
 
+    <section class="panel" id="developerHealthPanel">
+        <div class="row" style="align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+            <div>
+                <h2 style="margin:0">🩺 Application Health Monitor</h2>
+                <p class="muted" style="margin:6px 0 0">Check app response, database connectivity, core tables, configuration and writable storage.</p>
+            </div>
+            <button class="primary" type="button" id="developerHealthRefresh" onclick="loadDeveloperHealth(true)">Run health check</button>
+        </div>
+        <div id="developerHealthSummary" class="muted" style="margin:14px 0">Loading health status…</div>
+        <div id="developerHealthChecks" class="table-wrap" aria-live="polite">Checking services…</div>
+        <p class="muted" style="font-size:12px;margin-bottom:0">This is an on-demand diagnostic, not an external uptime monitor. For full incident diagnosis, also review Render logs and database-provider status.</p>
+    </section>
+
+
     <!-- =========================
          QUICK SETTINGS
          ========================= -->
