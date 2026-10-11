@@ -1939,3 +1939,77 @@ document.addEventListener('DOMContentLoaded', () => {
     if (document.getElementById('developerArchivePanel')) loadDeveloperArchive();
     if (document.getElementById('developerHealthPanel')) loadDeveloperHealth();
 });
+
+
+/* =========================================================
+   API RESPONSE INSPECTOR
+   ========================================================= */
+let developerApiInspectorData = { logs: [], endpoints: [] };
+
+async function loadDeveloperApiInspector() {
+    const box = document.getElementById('developerApiInspectorLogs');
+    const summary = document.getElementById('developerApiInspectorSummary');
+    const endpointBox = document.getElementById('developerApiEndpointList');
+    if (!box) return;
+    box.textContent = 'Loading API response history…';
+    const status = document.getElementById('apiInspectorStatus')?.value || 'all';
+    try {
+        const response = await fetch(`/api/developer/api-inspector?status=${encodeURIComponent(status)}`, {headers: {'Accept': 'application/json'}});
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || !data.ok) throw new Error(data.error || `HTTP ${response.status}`);
+        developerApiInspectorData = {logs: data.logs || [], endpoints: data.endpoints || []};
+        if (summary) summary.textContent = `${data.count || 0} matching recent responses · keeping up to ${data.limit || 250} entries per server worker. Make normal app actions to populate this list.`;
+        renderDeveloperApiLogs();
+        if (endpointBox) endpointBox.innerHTML = developerApiInspectorData.endpoints.length ? `<table><thead><tr><th>Method</th><th>Endpoint</th><th>Probe policy</th></tr></thead><tbody>${developerApiInspectorData.endpoints.map(e => `<tr><td><span class="api-method">${esc(e.method)}</span></td><td><code>${esc(e.path)}</code></td><td>${e.safe_to_probe ? 'Read-only route' : 'Not auto-probed'}</td></tr>`).join('')}</tbody></table>` : '<p class="muted">No API endpoints found.</p>';
+    } catch (error) {
+        box.textContent = `Could not load API inspector: ${error.message}`;
+        if (summary) summary.textContent = 'Check that you are logged in as Developer and the latest code is deployed.';
+    }
+}
+
+function filterDeveloperApiLogs() { renderDeveloperApiLogs(); }
+
+function renderDeveloperApiLogs() {
+    const box = document.getElementById('developerApiInspectorLogs');
+    if (!box) return;
+    const q = (document.getElementById('apiInspectorSearch')?.value || '').trim().toLowerCase();
+    const logs = developerApiInspectorData.logs.filter(x => !q || `${x.path} ${x.method} ${x.status} ${x.content_type}`.toLowerCase().includes(q));
+    if (!logs.length) { box.innerHTML = '<p class="muted">No matching API responses yet. Use the storefront, admin, delivery or developer features, then refresh this panel.</p>'; return; }
+    box.innerHTML = `<table><thead><tr><th>Time (UTC)</th><th>Method</th><th>Endpoint</th><th>Status</th><th>Time</th><th>Response</th></tr></thead><tbody>${logs.map((x, i) => {
+        const state = x.status >= 500 ? 'api-bad' : x.status >= 400 ? 'api-warn' : 'api-good';
+        return `<tr><td>${esc(x.time)}</td><td><span class="api-method">${esc(x.method)}</span></td><td><code>${esc(x.path)}</code><br><small>${esc(x.content_type)}</small></td><td><span class="${state}">${Number(x.status)}</span></td><td>${Number(x.duration_ms || 0)} ms</td><td><button type="button" onclick="showDeveloperApiResponse(${i})">View body</button></td></tr>`;
+    }).join('')}</tbody></table><div id="developerApiResponseDetail" style="margin-top:12px"></div>`;
+    box.dataset.filteredLogs = JSON.stringify(logs);
+}
+
+function showDeveloperApiResponse(index) {
+    const box = document.getElementById('developerApiResponseDetail');
+    let logs = []; try { logs = JSON.parse(document.getElementById('developerApiInspectorLogs')?.dataset.filteredLogs || '[]'); } catch (_) {}
+    const entry = logs[index]; if (!box || !entry) return;
+    const body = JSON.stringify(entry.body, null, 2) ?? 'null';
+    box.innerHTML = `<div class="panel" style="padding:12px"><div class="row" style="justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><strong>${esc(entry.method)} ${esc(entry.path)} · HTTP ${Number(entry.status)}</strong><button type="button" onclick="copyDeveloperApiResponse(${index})">Copy response JSON</button></div><pre style="white-space:pre-wrap;overflow:auto;max-height:420px;padding:12px;border-radius:8px;background:var(--surface-2, #f3f4f6)">${esc(body)}</pre></div>`;
+}
+
+async function copyDeveloperApiResponse(index) {
+    let logs = []; try { logs = JSON.parse(document.getElementById('developerApiInspectorLogs')?.dataset.filteredLogs || '[]'); } catch (_) {}
+    const entry = logs[index]; if (!entry) return;
+    const text = JSON.stringify({method: entry.method, path: entry.path, status: entry.status, duration_ms: entry.duration_ms, content_type: entry.content_type, body: entry.body}, null, 2);
+    try { await navigator.clipboard.writeText(text); alert('Response copied.'); } catch (_) { prompt('Copy API response:', text); }
+}
+
+async function clearDeveloperApiHistory() {
+    if (!confirm('Clear the recent API response history stored in this server worker?')) return;
+    try {
+        const response = await fetch('/api/developer/api-inspector/clear', {method: 'POST', headers: {'Accept': 'application/json'}});
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || !data.ok) throw new Error(data.error || `HTTP ${response.status}`);
+        await loadDeveloperApiInspector();
+    } catch (error) { alert(`Could not clear API history: ${error.message}`); }
+}
+
+window.loadDeveloperApiInspector = loadDeveloperApiInspector;
+window.filterDeveloperApiLogs = filterDeveloperApiLogs;
+window.showDeveloperApiResponse = showDeveloperApiResponse;
+window.copyDeveloperApiResponse = copyDeveloperApiResponse;
+window.clearDeveloperApiHistory = clearDeveloperApiHistory;
+document.addEventListener('DOMContentLoaded', () => { if (document.getElementById('developerApiInspectorPanel')) loadDeveloperApiInspector(); });
