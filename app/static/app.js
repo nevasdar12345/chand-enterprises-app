@@ -1501,15 +1501,122 @@ async function trackOrder(code) {
     ${order.estimated_delivery_window ? `<div class="ce-track-section"><small>Estimated delivery window</small><b>${esc(order.estimated_delivery_window)}</b><p class="muted">Estimate only; actual timing may vary.</p></div>` : ''}
     <div class="ce-track-section">${contact}</div>
     <div class="ce-track-section"><small>Payment status</small><b>${esc(order.payment_status || "Pending")}</b></div>
-    ${order.status === "Out for Delivery" && features.customer_tracking ? `<div class="ce-track-section"><h3>Live delivery location</h3><p id="ceLiveLocationState" class="muted">Checking for the latest delivery-person location…</p><div id="ceLiveLocationMap" class="ce-live-location-map"></div><a id="ceLiveLocationLink" target="_blank" rel="noopener" hidden>Open latest location in Maps ↗</a></div>` : ""}
+    ${order.status === "Out for Delivery" && features.customer_tracking ? `<div class="ce-track-section"><h3>Live delivery location</h3><p id="ceLiveLocationState" class="muted">Checking for the latest delivery-person location…</p><div id="ceLiveLocationMap" class="ce-live-location-map" data-order-code="${esc(order.code)}"></div><p id="ceTrackRouteInfo" class="ce-track-route-info">Loading road route…</p><a id="ceLiveLocationLink" target="_blank" rel="noopener" hidden>Open latest location in Maps ↗</a></div>` : ""}
     <button class="primary" onclick="closeModal()">Close tracking</button>
   </div>`);
   if (order.status === "Out for Delivery" && features.customer_tracking) startLiveLocationPolling(code);
 }
 
 let LIVE_LOCATION_TIMER = null;
+let CE_TRACK_MAP = null;
+let CE_TRACK_VEHICLE = null;
+let CE_TRACK_DESTINATION = null;
+let CE_TRACK_ROUTE = null;
+let CE_TRACK_MAP_CODE = null;
+let CE_TRACK_LAST_ROUTE_POINT = null;
+let CE_TRACK_LEAFLET_PROMISE = null;
+
+function loadTrackingLeaflet() {
+  if (window.L) return Promise.resolve();
+  if (CE_TRACK_LEAFLET_PROMISE) return CE_TRACK_LEAFLET_PROMISE;
+  CE_TRACK_LEAFLET_PROMISE = new Promise((resolve, reject) => {
+    if (!document.getElementById('ce-track-leaflet-css')) {
+      const css = document.createElement('link');
+      css.id = 'ce-track-leaflet-css'; css.rel = 'stylesheet';
+      css.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+      document.head.appendChild(css);
+    }
+    const script = document.createElement('script');
+    script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+    script.onload = resolve;
+    script.onerror = () => reject(new Error('Map library could not load'));
+    document.head.appendChild(script);
+  });
+  return CE_TRACK_LEAFLET_PROMISE;
+}
+
+function validMapPoint(lat, lng) {
+  return Number.isFinite(Number(lat)) && Number.isFinite(Number(lng)) &&
+    Math.abs(Number(lat)) <= 90 && Math.abs(Number(lng)) <= 180 &&
+    !(Number(lat) === 0 && Number(lng) === 0);
+}
+
+function initCustomerTrackingMap(destinationLat, destinationLng) {
+  const mapBox = document.getElementById('ceLiveLocationMap');
+  if (!mapBox || !validMapPoint(destinationLat, destinationLng)) return;
+  loadTrackingLeaflet().then(() => {
+    if (!document.getElementById('ceLiveLocationMap')) return;
+    if (CE_TRACK_MAP && CE_TRACK_MAP_CODE !== mapBox.dataset.orderCode) {
+      CE_TRACK_MAP.remove(); CE_TRACK_MAP = CE_TRACK_VEHICLE = CE_TRACK_DESTINATION = CE_TRACK_ROUTE = null;
+    }
+    if (!CE_TRACK_MAP) {
+      CE_TRACK_MAP = L.map(mapBox, {scrollWheelZoom: false}).setView([Number(destinationLat), Number(destinationLng)], 14);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+      }).addTo(CE_TRACK_MAP);
+      const customerIcon = L.divIcon({className:'ce-map-pin-wrap', html:'<span class="ce-map-pin ce-map-pin-destination">⌂</span>', iconSize:[32,32], iconAnchor:[16,28]});
+      CE_TRACK_DESTINATION = L.marker([Number(destinationLat), Number(destinationLng)], {icon:customerIcon}).addTo(CE_TRACK_MAP).bindPopup('Delivery destination');
+      CE_TRACK_MAP_CODE = mapBox.dataset.orderCode || '';
+    }
+    setTimeout(() => CE_TRACK_MAP && CE_TRACK_MAP.invalidateSize(), 100);
+  }).catch(err => {
+    const state = document.getElementById('ceLiveLocationState');
+    if (state) state.textContent = 'Map could not load. Use the Open Maps link to see the latest location.';
+    console.warn('Tracking map load failed', err);
+  });
+}
+
+async function drawRoadRoute(driverLat, driverLng, destinationLat, destinationLng) {
+  if (!CE_TRACK_MAP || !validMapPoint(driverLat, driverLng) || !validMapPoint(destinationLat, destinationLng)) return;
+  const point = `${Number(driverLat).toFixed(4)},${Number(driverLng).toFixed(4)}`;
+  // Avoid repeatedly asking the public routing service for an almost identical position.
+  if (CE_TRACK_LAST_ROUTE_POINT === point && CE_TRACK_ROUTE) return;
+  CE_TRACK_LAST_ROUTE_POINT = point;
+  try {
+    const url = `https://router.project-osrm.org/route/v1/driving/${Number(driverLng)},${Number(driverLat)};${Number(destinationLng)},${Number(destinationLat)}?overview=full&geometries=geojson&steps=false`;
+    const response = await fetch(url, {headers:{'Accept':'application/json'}});
+    if (!response.ok) throw new Error('Routing service unavailable');
+    const data = await response.json();
+    const route = data.routes && data.routes[0];
+    if (!route || !route.geometry || !Array.isArray(route.geometry.coordinates)) throw new Error('No road route found');
+    const latlngs = route.geometry.coordinates.map(c => [c[1], c[0]]);
+    if (CE_TRACK_ROUTE) CE_TRACK_MAP.removeLayer(CE_TRACK_ROUTE);
+    CE_TRACK_ROUTE = L.polyline(latlngs, {color:'#1677ff', weight:6, opacity:.88, lineCap:'round', lineJoin:'round'}).addTo(CE_TRACK_MAP);
+    const km = route.distance / 1000;
+    const mins = Math.max(1, Math.round(route.duration / 60));
+    const info = document.getElementById('ceTrackRouteInfo');
+    if (info) info.textContent = `Road route · ${km < 10 ? km.toFixed(1) : Math.round(km)} km · approx. ${mins} min (estimate)`;
+    const bounds = L.latLngBounds(latlngs);
+    CE_TRACK_MAP.fitBounds(bounds, {padding:[28,28], maxZoom:16});
+  } catch (err) {
+    const info = document.getElementById('ceTrackRouteInfo');
+    if (info) info.textContent = 'Road route is temporarily unavailable. The live vehicle position is still shown.';
+    console.warn('Road route request failed', err);
+  }
+}
+
+function updateTrackingVehicle(lat, lng, destinationLat, destinationLng) {
+  if (!validMapPoint(lat, lng)) return;
+  initCustomerTrackingMap(destinationLat, destinationLng);
+  loadTrackingLeaflet().then(() => {
+    if (!CE_TRACK_MAP || !document.getElementById('ceLiveLocationMap')) return;
+    const position = [Number(lat), Number(lng)];
+    if (!CE_TRACK_VEHICLE) {
+      const vanIcon = L.divIcon({className:'ce-map-vehicle-wrap', html:'<span class="ce-map-vehicle" aria-label="Delivery vehicle">🚚</span>', iconSize:[42,42], iconAnchor:[21,21]});
+      CE_TRACK_VEHICLE = L.marker(position, {icon:vanIcon, zIndexOffset:1000}).addTo(CE_TRACK_MAP).bindPopup('Delivery partner live location');
+    } else {
+      // Leaflet moves the real GPS marker to the newest received coordinate; no simulated movement.
+      CE_TRACK_VEHICLE.setLatLng(position);
+    }
+    drawRoadRoute(lat, lng, destinationLat, destinationLng);
+  }).catch(() => {});
+}
+
 function startLiveLocationPolling(code) {
   if (LIVE_LOCATION_TIMER) clearInterval(LIVE_LOCATION_TIMER);
+  CE_TRACK_MAP = CE_TRACK_VEHICLE = CE_TRACK_DESTINATION = CE_TRACK_ROUTE = null;
+  CE_TRACK_LAST_ROUTE_POINT = null;
   const refresh = async () => {
     const state = document.getElementById('ceLiveLocationState');
     if (!state) { clearInterval(LIVE_LOCATION_TIMER); LIVE_LOCATION_TIMER = null; return; }
@@ -1517,12 +1624,19 @@ function startLiveLocationPolling(code) {
     const link = document.getElementById('ceLiveLocationLink');
     const map = document.getElementById('ceLiveLocationMap');
     if (!result || result._ok === false || !result.ok) { state.textContent = result?.error || 'Live location is not available yet.'; return; }
-    if (!result.available) { state.textContent = 'The delivery person has not shared a location yet.'; return; }
+    if (!result.available) { state.textContent = 'Waiting for the delivery partner to share live location. Keep this page open while tracking.'; return; }
     const lat = Number(result.latitude), lng = Number(result.longitude);
-    if (!Number.isFinite(lat) || !Number.isFinite(lng)) { state.textContent = 'Location data is invalid.'; return; }
-    state.textContent = `${result.stale ? 'Last known location (may be outdated)' : 'Latest location'} · Updated ${result.updated_at || 'recently'}${result.accuracy_m ? ` · accuracy ±${Math.round(result.accuracy_m)} m` : ''}`;
-    if (map) map.innerHTML = `<iframe title="Latest delivery location" loading="lazy" referrerpolicy="no-referrer-when-downgrade" src="https://www.openstreetmap.org/export/embed.html?bbox=${encodeURIComponent(lng-0.006)}%2C${encodeURIComponent(lat-0.006)}%2C${encodeURIComponent(lng+0.006)}%2C${encodeURIComponent(lat+0.006)}&layer=mapnik&marker=${encodeURIComponent(lat)}%2C${encodeURIComponent(lng)}"></iframe>`;
+    if (!validMapPoint(lat, lng)) { state.textContent = 'Location data is invalid.'; return; }
+    state.textContent = `${result.stale ? 'Last known location (may be outdated)' : 'Live location'} · Updated ${result.updated_at || 'recently'}${result.accuracy_m ? ` · accuracy ±${Math.round(result.accuracy_m)} m` : ''}`;
+    if (map) map.dataset.orderCode = code;
+    const tracking = await api(`/api/orders/${encodeURIComponent(code)}/tracking`);
+    const destination = tracking?.order || {};
     if (link) { link.hidden = false; link.href = `https://www.google.com/maps?q=${encodeURIComponent(lat)},${encodeURIComponent(lng)}`; }
+    if (validMapPoint(destination.latitude, destination.longitude)) {
+      updateTrackingVehicle(lat, lng, Number(destination.latitude), Number(destination.longitude));
+    } else {
+      state.textContent += ' · Customer destination pin is missing, so a road route cannot be drawn.';
+    }
   };
   refresh(); LIVE_LOCATION_TIMER = setInterval(refresh, 12000);
 }
