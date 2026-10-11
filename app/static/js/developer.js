@@ -585,6 +585,16 @@ function settingsMapsHtml(st) {
         ${settingToggle('ds_map_customer_tracking', st.map_customer_tracking !== false, 'Customer order timeline and maps', 'Let customers view their order timeline and saved delivery location.')}
         ${settingToggle('ds_map_delivery_navigation', st.map_delivery_navigation !== false, 'Delivery navigation', 'Show one-tap navigation links for assigned orders.')}
         ${settingToggle('ds_map_admin_view', st.map_admin_view !== false, 'Admin delivery map', 'Allow the admin dashboard to display orders with saved coordinates.')}
+        <h3 style="margin:18px 0 8px">Estimated delivery windows</h3>
+        <p class="muted" style="font-size:12px">These are simple business estimates, not live traffic or GPS-based ETAs. Values are remaining minutes and the maximum must be at least the minimum.</p>
+        <div class="ds-eta-grid">
+          <label>Confirmed – minimum (min)<input id="ds_eta_confirmed_min" type="number" min="0" max="1440" value="${esc(st.eta_confirmed_min ?? '30')}"></label>
+          <label>Confirmed – maximum (min)<input id="ds_eta_confirmed_max" type="number" min="0" max="1440" value="${esc(st.eta_confirmed_max ?? '60')}"></label>
+          <label>Preparing – minimum (min)<input id="ds_eta_preparing_min" type="number" min="0" max="1440" value="${esc(st.eta_preparing_min ?? '20')}"></label>
+          <label>Preparing – maximum (min)<input id="ds_eta_preparing_max" type="number" min="0" max="1440" value="${esc(st.eta_preparing_max ?? '45')}"></label>
+          <label>Out for delivery – minimum (min)<input id="ds_eta_out_min" type="number" min="0" max="1440" value="${esc(st.eta_out_for_delivery_min ?? '10')}"></label>
+          <label>Out for delivery – maximum (min)<input id="ds_eta_out_max" type="number" min="0" max="1440" value="${esc(st.eta_out_for_delivery_max ?? '25')}"></label>
+        </div>
         <p class="muted" style="font-size:12px">Note: public map tile and geocoding services have fair-use limits. Do not use them for unlimited high-volume requests.</p>`;
 }
 
@@ -764,6 +774,12 @@ async function saveDeveloperSettings(section) {
         map_customer_tracking: check('#ds_map_customer_tracking'),
         map_delivery_navigation: check('#ds_map_delivery_navigation'),
         map_admin_view: check('#ds_map_admin_view'),
+        eta_confirmed_min: $('#ds_eta_confirmed_min')?.value,
+        eta_confirmed_max: $('#ds_eta_confirmed_max')?.value,
+        eta_preparing_min: $('#ds_eta_preparing_min')?.value,
+        eta_preparing_max: $('#ds_eta_preparing_max')?.value,
+        eta_out_for_delivery_min: $('#ds_eta_out_min')?.value,
+        eta_out_for_delivery_max: $('#ds_eta_out_max')?.value,
     });
 
     if (!result._ok) {
