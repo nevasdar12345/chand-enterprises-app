@@ -1751,6 +1751,7 @@ async function loadAdminDeliveryMap() {
     const panel = document.getElementById('ceAdminMapPanel');
     const mapBox = document.getElementById('ceAdminDeliveryMap');
     const note = document.getElementById('ceAdminMapNote');
+    const warningsBox = document.getElementById('ceAdminLocationWarnings');
     if (!panel || !mapBox || !note) return;
     const result = await api('/api/admin/delivery-map');
     if (!result || result._ok === false) {
@@ -1763,6 +1764,9 @@ async function loadAdminDeliveryMap() {
     }
     panel.style.display = '';
     const orders = Array.isArray(result.orders) ? result.orders : [];
+    const validOrders = orders.filter(order => order.location_valid && Number.isFinite(Number(order.latitude)) && Number.isFinite(Number(order.longitude)) && !(Number(order.latitude) === 0 && Number(order.longitude) === 0));
+    const locationWarnings = orders.filter(order => !order.location_valid);
+    if (warningsBox) warningsBox.innerHTML = locationWarnings.length ? `<div class="ce-location-warning"><b>Location attention needed (${locationWarnings.length})</b><ul>${locationWarnings.slice(0, 12).map(order => `<li><b>${esc(order.code)}</b> — ${esc(order.customer)}: ${esc(order.location_issue || 'Valid map location is missing')} <small>(${esc(order.status)})</small></li>`).join('')}</ul>${locationWarnings.length > 12 ? `<small>And ${locationWarnings.length - 12} more active orders.</small>` : ''}</div>` : '<p class="ce-location-ok">All active orders have valid map coordinates.</p>';
     try {
         await loadLeafletForAdminMap();
         if (!ceAdminMap) {
@@ -1775,7 +1779,7 @@ async function loadAdminDeliveryMap() {
         }
         ceAdminMarkers.clearLayers();
         const bounds = [];
-        orders.forEach(order => {
+        validOrders.forEach(order => {
             const lat = Number(order.latitude), lng = Number(order.longitude);
             if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
             const marker = L.marker([lat, lng]).bindPopup(
@@ -1785,7 +1789,7 @@ async function loadAdminDeliveryMap() {
         });
         if (bounds.length) ceAdminMap.fitBounds(bounds, {padding: [24, 24], maxZoom: 14});
         setTimeout(() => ceAdminMap.invalidateSize(), 100);
-        note.textContent = orders.length ? `${orders.length} active order(s) with saved map coordinates.` : 'No active orders have saved coordinates yet.';
+        note.textContent = `${validOrders.length} active order(s) mapped · ${locationWarnings.length} need location attention.`;
     } catch (error) {
         console.error('Delivery map error:', error);
         note.textContent = 'Map could not load. You can still open individual directions from order details.';
