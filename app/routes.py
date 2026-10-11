@@ -18,7 +18,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 from . import db
 
-from .models import User, Product, Category, Order, OrderItem, Enquiry, Payment, OtpChallenge, SiteSetting, Coupon, LedgerEntry, OrderArchive, ArchivedOrder, OrderTrackingEvent, TelegramLink, TelegramToken, StaffTelegramLink
+from .models import User, Product, Category, Order, OrderItem, Enquiry, Payment, OtpChallenge, SiteSetting, Coupon, LedgerEntry, OrderArchive, ArchivedOrder, OrderTrackingEvent, TelegramLink, TelegramToken, StaffTelegramLink, LiveDeliveryLocation
 
 
 main = Blueprint("main", __name__)
@@ -1718,6 +1718,111 @@ def enquiry():
 
 # ---------- admin ----------
 
+@main.post("/api/delivery/live-tracking/<int:oid>/start")
+def start_live_delivery_tracking(oid):
+    u = current_user()
+    if not u or u.role != "delivery":
+        return jsonify(error="Delivery login required"), 403
+    o = db.session.get(Order, oid)
+    if not o or o.delivery_person_id != u.id:
+        return jsonify(error="Order is not assigned to you"), 404
+    if o.status != "Out for Delivery":
+        return jsonify(error="Live tracking is available only while an order is out for delivery"), 400
+    if not _flag("maps_enabled") or not _flag("map_delivery_navigation"):
+        return jsonify(error="Delivery maps are disabled by the store"), 403
+    row = LiveDeliveryLocation.query.filter_by(order_id=o.id).first()
+    if row and row.delivery_person_id != u.id:
+        return jsonify(error="Tracking record does not match this delivery assignment"), 403
+    if row:
+        row.tracking_active = True
+    else:
+        # Coordinates are supplied by the first location update, not guessed here.
+        row = LiveDeliveryLocation(order_id=o.id, delivery_person_id=u.id,
+                                   latitude=0.0, longitude=0.0, tracking_active=True)
+        db.session.add(row)
+    add_tracking_event(o, "Delivery person started live location sharing", event_type="live_location", status=o.status,
+                       note="Location is shared only for this active delivery.", actor_user_id=u.id)
+    db.session.commit()
+    return jsonify(ok=True, tracking_active=True)
+
+
+@main.post("/api/delivery/live-tracking/<int:oid>/location")
+def update_live_delivery_location(oid):
+    u = current_user()
+    if not u or u.role != "delivery":
+        return jsonify(error="Delivery login required"), 403
+    o = db.session.get(Order, oid)
+    if not o or o.delivery_person_id != u.id:
+        return jsonify(error="Order is not assigned to you"), 404
+    if o.status != "Out for Delivery":
+        return jsonify(error="Tracking stops when the order is no longer out for delivery"), 400
+    if not _flag("maps_enabled") or not _flag("map_delivery_navigation"):
+        return jsonify(error="Delivery maps are disabled by the store"), 403
+    d = request.get_json(silent=True) or {}
+    try:
+        lat, lng = float(d.get("latitude")), float(d.get("longitude"))
+        accuracy = float(d.get("accuracy")) if d.get("accuracy") is not None else None
+    except (TypeError, ValueError):
+        return jsonify(error="Valid coordinates are required"), 400
+    if not (-90 <= lat <= 90 and -180 <= lng <= 180) or (lat == 0 and lng == 0):
+        return jsonify(error="Coordinates are outside the allowed range"), 400
+    if accuracy is not None and not (0 <= accuracy <= 10000):
+        accuracy = None
+    row = LiveDeliveryLocation.query.filter_by(order_id=o.id).first()
+    if not row:
+        row = LiveDeliveryLocation(order_id=o.id, delivery_person_id=u.id,
+                                   latitude=lat, longitude=lng, tracking_active=True)
+        db.session.add(row)
+    if row.delivery_person_id != u.id or not row.tracking_active:
+        return jsonify(error="Start live tracking before sending locations"), 400
+    row.latitude, row.longitude, row.accuracy_m = lat, lng, accuracy
+    row.updated_at = datetime.utcnow()
+    db.session.commit()
+    return jsonify(ok=True, updated_at=display_datetime(row.updated_at))
+
+
+@main.post("/api/delivery/live-tracking/<int:oid>/stop")
+def stop_live_delivery_tracking(oid):
+    u = current_user()
+    if not u or u.role != "delivery":
+        return jsonify(error="Delivery login required"), 403
+    o = db.session.get(Order, oid)
+    if not o or o.delivery_person_id != u.id:
+        return jsonify(error="Order is not assigned to you"), 404
+    row = LiveDeliveryLocation.query.filter_by(order_id=o.id, delivery_person_id=u.id).first()
+    if row and row.tracking_active:
+        row.tracking_active = False
+        add_tracking_event(o, "Live location sharing stopped", event_type="live_location", status=o.status,
+                           note="The latest location is no longer being updated.", actor_user_id=u.id)
+        db.session.commit()
+    return jsonify(ok=True, tracking_active=False)
+
+
+@main.get("/api/orders/<code>/live-location")
+def get_live_delivery_location(code):
+    u = current_user()
+    if not u:
+        return jsonify(error="Please login first"), 401
+    o = Order.query.filter_by(code=code).first()
+    if not o:
+        return jsonify(error="Order not found"), 404
+    if u.role == "customer" and u.mobile != o.mobile:
+        return jsonify(error="You can only view your own order"), 403
+    if u.role == "delivery" and o.delivery_person_id != u.id:
+        return jsonify(error="Order is not assigned to you"), 403
+    if u.role not in {"customer", "admin", "developer", "delivery"}:
+        return jsonify(error="Forbidden"), 403
+    if not _flag("maps_enabled") or not _flag("map_customer_tracking"):
+        return jsonify(error="Live customer tracking is disabled"), 403
+    row = LiveDeliveryLocation.query.filter_by(order_id=o.id).first()
+    if not row or not row.tracking_active or o.status != "Out for Delivery" or row.latitude == 0 and row.longitude == 0:
+        return jsonify(ok=True, available=False, tracking_active=False)
+    return jsonify(ok=True, available=True, tracking_active=True,
+                   latitude=row.latitude, longitude=row.longitude, accuracy_m=row.accuracy_m,
+                   updated_at=display_datetime(row.updated_at),
+                   stale=(datetime.utcnow() - row.updated_at).total_seconds() > 90)
+
+
 @main.get("/api/admin/delivery-map")
 def admin_delivery_map():
     if not role_ok("admin"):
@@ -2103,6 +2208,10 @@ def delivery_status(oid):
 
     old_status, old_pay = o.status, o.payment_status
     set_status(o, s)
+    if s in {"Delivered", "Cancelled"}:
+        live_row = LiveDeliveryLocation.query.filter_by(order_id=o.id).first()
+        if live_row and live_row.tracking_active:
+            live_row.tracking_active = False
 
     if s == "Delivered" and o.payment_method == "COD":
         if (o.cash_collected or 0) >= o.total:
