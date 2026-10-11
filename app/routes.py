@@ -3,7 +3,7 @@ from pathlib import Path
 
 import segno
 from email.message import EmailMessage
-from sqlalchemy import case
+from sqlalchemy import case, text, inspect
 
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment
@@ -2950,6 +2950,69 @@ def admin_archive_confirm(archive_id):
 
 
 # ---------- developer console ----------
+
+@main.get("/api/developer/health")
+def developer_app_health():
+    """Developer-only, read-only health snapshot. Never returns secret values."""
+    if not role_ok("developer"):
+        return jsonify(error="Forbidden"), 403
+
+    checks = []
+    overall = "healthy"
+
+    def add_check(name, status, detail):
+        nonlocal overall
+        if status == "error":
+            overall = "unhealthy"
+        elif status == "warning" and overall == "healthy":
+            overall = "warning"
+        checks.append({"name": name, "status": status, "detail": detail})
+
+    # App process / configuration
+    add_check("Flask application", "healthy", "Application is responding to authenticated health checks.")
+    if current_app.config.get("SECRET_KEY") == "change-this-in-production":
+        add_check("Secret key", "warning", "The default SECRET_KEY is active. Set a strong SECRET_KEY in Render environment variables.")
+    else:
+        add_check("Secret key", "healthy", "A non-default application secret is configured.")
+
+    # Database connectivity and expected core tables
+    try:
+        db.session.execute(text("SELECT 1"))
+        add_check("Database connection", "healthy", "A simple database query succeeded.")
+        tables = set(inspect(db.engine).get_table_names())
+        required = {User.__tablename__, Product.__tablename__, Order.__tablename__}
+        missing = sorted(required - tables)
+        if missing:
+            add_check("Core database tables", "error", "Missing tables: " + ", ".join(missing))
+        else:
+            add_check("Core database tables", "healthy", "User, product and order tables are present.")
+    except Exception as exc:
+        db.session.rollback()
+        current_app.logger.exception("Developer health check: database failure")
+        add_check("Database", "error", "Database query failed. Check Render database connection and logs.")
+
+    # Basic runtime storage check (only verifies that the instance directory is writable)
+    try:
+        probe = Path(current_app.instance_path) / (".health-check-" + secrets.token_hex(6))
+        probe.write_text("ok", encoding="utf-8")
+        probe.unlink(missing_ok=True)
+        add_check("Instance storage", "healthy", "The application instance directory is writable.")
+    except Exception:
+        add_check("Instance storage", "warning", "The instance directory is not writable. Check filesystem permissions; Render local files may be ephemeral.")
+
+    # Deployment/runtime metadata, with no environment secrets exposed.
+    db_url = str(current_app.config.get("SQLALCHEMY_DATABASE_URI", ""))
+    backend = "PostgreSQL" if db_url.startswith(("postgres://", "postgresql://")) else ("SQLite" if db_url.startswith("sqlite:") else "Configured database")
+    add_check("Database backend", "healthy", backend + " is configured.")
+
+    warnings = sum(1 for item in checks if item["status"] == "warning")
+    errors = sum(1 for item in checks if item["status"] == "error")
+    return jsonify(
+        ok=(errors == 0), status=overall, checked_at=datetime.now().astimezone().isoformat(timespec="seconds"),
+        summary={"healthy": sum(1 for item in checks if item["status"] == "healthy"), "warnings": warnings, "errors": errors},
+        checks=checks,
+    )
+
 
 @main.get("/api/developer/settings")
 def developer_get_settings():
