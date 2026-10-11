@@ -276,6 +276,8 @@
                 <button type="button" onclick="loadDeliveryMap()">Refresh map</button>
             </div>
             <div id="ceDeliveryMap" role="region" aria-label="Assigned delivery orders map"></div>
+            <div class="ce-route-tools"><button type="button" onclick="suggestDeliveryRoute()">🧭 Suggest multi-stop route</button><button type="button" onclick="suggestDeliveryRoute(true)">Use my current location</button></div>
+            <div id="ceDeliveryRouteResult" class="ce-route-result" aria-live="polite"></div>
             <p id="ceDeliveryMapNote" class="muted">Loading map…</p>
         </section>
         <div id="deliveryRows" class="dlv-list"></div>
