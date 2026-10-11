@@ -326,6 +326,16 @@
             <p id="ceAdminMapNote" class="muted">Loading map…</p>
         </section>
 
+        <section class="ce-ops-panel" id="ceDeliveryOpsPanel">
+            <div class="ce-admin-map-head">
+                <div><h2>📊 Delivery operations</h2><small>Operational alerts and delivery performance from recorded order history (last 30 days).</small></div>
+                <button type="button" onclick="loadDeliveryOperations()">Refresh overview</button>
+            </div>
+            <div id="ceDeliveryOpsSummary" class="ce-ops-summary"><p class="muted">Loading delivery operations…</p></div>
+            <div id="ceDeliveryOpsAlerts" class="ce-ops-alerts"></div>
+            <div id="ceDeliveryOpsStaff" class="ce-ops-staff"></div>
+        </section>
+
         <!-- Filters -->
 
         <div class="admin-toolbar">
