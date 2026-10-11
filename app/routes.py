@@ -1,3281 +1,2527 @@
-import csv, io, secrets, urllib.parse, math, re, os, base64, json, mimetypes, urllib.request, urllib.error, smtplib, tempfile, uuid, threading
-from pathlib import Path
+/* =========================================================
+   CHAND ENTERPRISES
+   COMMON / CUSTOMER JAVASCRIPT
+   ========================================================= */
 
-import segno
-from email.message import EmailMessage
-from sqlalchemy import case
+/* =========================
+   HELPERS
+   ========================= */
 
-from openpyxl import Workbook
-from openpyxl.styles import Font, PatternFill, Alignment
-from sqlalchemy.orm import joinedload, selectinload
+const $ = (selector) => document.querySelector(selector);
 
-from datetime import datetime, timedelta
+const money = (value) => "₹" + Number(value || 0).toFixed(0);
 
-from flask import (Blueprint, render_template, request, redirect, url_for,
-                   session, jsonify, Response, current_app, g, send_file)
+const esc = (value) =>
+  String(value ?? "").replace(
+    /[&<>"']/g,
+    (char) =>
+      ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;",
+      })[char],
+  );
 
-from werkzeug.security import generate_password_hash, check_password_hash
+async function api(url, method = "GET", body = undefined) {
+  try {
+    const response = await fetch(url, {
+      method,
 
-from . import db
+      headers: {
+        "Content-Type": "application/json",
+      },
 
-from .models import User, Product, Category, Order, OrderItem, Enquiry, Payment, OtpChallenge, SiteSetting, Coupon, LedgerEntry, OrderArchive, ArchivedOrder, OrderTrackingEvent, TelegramLink, TelegramToken, StaffTelegramLink
+      body: body ? JSON.stringify(body) : undefined,
+    });
 
+    const data = await response.json().catch(() => ({}));
 
-main = Blueprint("main", __name__)
+    data._ok = response.ok;
 
-# Fast hash for the short-lived 4-digit OTP (the default scrypt costs ~100 ms and 32 MB per call).
-# Old hashes keep working: check_password_hash reads the method from the stored hash.
-OTP_HASH_METHOD = "pbkdf2:sha256:30000"
+    return data;
+  } catch (error) {
+    console.error("API error:", error);
 
-ORDER_STATUSES = {"Confirmed", "Preparing", "Out for Delivery", "Delivered", "Cancelled"}
-
-PAY_STATUSES = {"Pending", "Verifying", "Paid", "Failed"}
-
-# ---------- developer settings ----------
-DEFAULT_SETTINGS = {
-    "business_name": "Chand Enterprises",
-    "business_mobile": "9304285574",
-    "whatsapp": "9304285574",
-    "business_location": "Darbhanga, Bihar",
-    "upi": "chandenterprises@upi",
-    "payment_name": "Chand Enterprises",
-    "business_lat": "",
-    "business_lng": "",
-    "delivery_base": "30",
-    "delivery_per_km": "10",
-    "delivery_free_above": "500",
-    "maps_enabled": "1",
-    "map_customer_tracking": "1",
-    "map_delivery_navigation": "1",
-    "map_admin_view": "1",
-    "eta_confirmed_min": "30",
-    "eta_confirmed_max": "60",
-    "eta_preparing_min": "20",
-    "eta_preparing_max": "45",
-    "eta_out_for_delivery_min": "10",
-    "eta_out_for_delivery_max": "25",
-    "show_prices_home": "1",
-    "show_prices_brochure": "1",
-    "ordering_enabled": "1",
-    "customer_login_enabled": "1",
-    "brochure_url": "",
-    "brochure_eyebrow": "CHAND ENTERPRISES · DARBHANGA, BIHAR",
-    "brochure_title": "Premium Product Brochure",
-    "brochure_subtitle": "Explore our three product collections — Nevas Package Drinking Water, Cold Drinks and Energy Drinks.",
-    "instagram_url": "",
-    "facebook_url": "",
-    "social_links": "",
-    "about_title": "About Chand Enterprises",
-    "about_text": "Chand Enterprises supplies cold drinks, energy drinks and premium packaged drinking water across Darbhanga, Bihar. We deliver locally, accept QR or cash on delivery, and welcome bulk orders for shops, events and offices.",
-    "footer_tagline": "Drinks & premium water",
-    "home_delivery_title": "Local delivery",
-    "home_delivery_text": "Fast delivery across Darbhanga",
-    "home_payment_title": "Easy payment",
-    "home_payment_text": "Pay by QR or Cash on Delivery",
-    "home_support_title": "WhatsApp support",
-    "home_support_text": "Bulk orders are welcome",
-    "home_store_eyebrow": "OUR STORE",
-    "home_products_title": "Popular products",
-    "home_products_text": "Quality drinks, simple pricing.",
-    "home_bulk_badge": "WhatsApp enquiry",
-    "home_bulk_title": "Need a bulk order?",
-    "home_bulk_text": "Tell us what you need and we'll help you arrange your order directly.",
-    "home_bulk_button": "Enquire on WhatsApp",
-    "home_event_button": "🎉 Plan a function",
-    "home_bulk_order_button": "📦 Bulk order",
-    "footer_contact_title": "Contact",
-    "footer_whatsapp_label": "WhatsApp us",
-    "footer_copyright_prefix": "©",
-    "archive_days": "7",
-    "archive_method": "email",
-    "archive_email": "",
-    "archive_whatsapp": "",
-    "otp_provider": "demo",
-    "telegram_bot_username": "",
-    "notify_customer_status": "1",
-    "notify_admin_orders": "1",
-    "notify_admin_low_stock": "1",
-    "notify_delivery_assign": "1",
-    "notify_daily_summary": "1",
-    "last_summary_date": "",
-    "summary_time": "21:30",
-    "last_cron_tick": "",
+    return {
+      _ok: false,
+      error: "Network error",
+    };
+  }
 }
 
-# Maximum length of the brochure heading texts the developer can edit
-BROCHURE_TEXT_LIMITS = {"brochure_eyebrow": 80, "brochure_title": 80, "brochure_subtitle": 300}
+/* =========================
+   CUSTOMER STATE
+   ========================= */
 
-DEFAULT_OFFERS = [
-    "🥤 Pepsi 200ml @ ₹12",
-    "⚡ Energy Drink 250ml - Buy 2, get ₹20 off",
-    "🚰 Premium Water 20L - special bulk rate",
-    "🚚 Free delivery above ₹500",
-    "🎟️ Use code WELCOME10 - 10% off your first order",
-    "🍋 Lemon Soda 750ml - summer special",
-]
+let CART = JSON.parse(localStorage.getItem("cart") || "{}");
 
+let CAT = "All";
 
-def _settings_cache():
-    """
-    All SiteSetting rows, loaded ONCE per request.
-    (Before: every setting_value() call ran its own database query -
-    /api/config alone ran about 20 of them.)
-    """
-    cache = getattr(g, "_site_settings", None)
-    if cache is None:
-        cache = {row.key: row.value for row in SiteSetting.query.all()}
-        g._site_settings = cache
-    return cache
+/* Shop filters, sort and wishlist */
+let SORT = "featured";
+let SIZE = "";
+let INSTOCK = false;
+let WISH_ONLY = false;
+let WISH = new Set();
+try {
+  WISH = new Set((JSON.parse(localStorage.getItem("wishlist") || "[]") || []).map(Number));
+} catch (e) {
+  WISH = new Set();
+}
 
+let ME = null;
 
-def setting_value(key):
-    value = _settings_cache().get(key)
-    if value is not None:
-        return value
-    return DEFAULT_SETTINGS.get(key, "")
+let ORD = {};
 
+/* Remember if login was started from checkout */
+let LOGIN_FROM_CHECKOUT = false;
 
-def set_setting(key, value):
-    row = SiteSetting.query.filter_by(key=key).first()
-    if not row:
-        row = SiteSetting(key=key, value="")
-        db.session.add(row)
-    row.value = str(value or "")
-    _settings_cache()[key] = row.value      # keep this request's cache in sync
+/* Telegram login: mobile being verified + link-polling state */
+let LOGIN_MOBILE = "";
+let TG_POLL = null;
+let TG_BUSY = false;
 
+let DELIVERY_QUOTE = null;
 
-def float_setting(key, default=0):
-    try:
-        return float(setting_value(key) or default)
-    except (TypeError, ValueError):
-        return float(default)
+let deferredInstallPrompt = null;
 
+let CFG = {
+  whatsapp: "919304285574",
 
-def _flag(key, legacy=None):
-    """On/off site switch. Anything except "0" means ON. `legacy` = older single
-    key to fall back to, so a site that already saved the old setting keeps its choice."""
-    cache = _settings_cache()
-    raw = cache.get(key)
-    if raw is None and legacy:
-        raw = cache.get(legacy)
-    return str(raw if raw is not None else "1").strip() != "0"
+  upi: "chandenterprises@upi",
 
+  business_name: "Chand Enterprises",
 
-def prices_home():
-    """Developer switch: show prices on the home page product cards."""
-    return _flag("show_prices_home", "show_prices")
+  business_mobile: "9304295574",
 
+  business_location: "Darbhanga, Bihar",
 
-def prices_brochure():
-    """Developer switch: show prices on the brochure page."""
-    return _flag("show_prices_brochure", "show_prices")
+  payment_name: "Chand Enterprises",
 
+  offers: [],
+  coupons: [],
+  categories: [],
+  instagram_url: "",
+  facebook_url: "",
+  brochure_url: "",
+  /* Developer switch. The server writes the real value into the page, so there is no flash. */
+  show_prices_home: document.getElementById("productData")?.dataset.showPrices !== "false",
+  ordering_enabled: document.documentElement.dataset.ordering !== "off",
+  customer_login_enabled: document.documentElement.dataset.login !== "off",
+};
 
-def ordering_enabled():
-    """Developer switch: cart + checkout on/off."""
-    return _flag("ordering_enabled")
+/* =========================
+   OFFERS / TICKER
+   ========================= */
 
+const DEFAULT_OFFERS = [
+  "🥤 Pepsi 200ml @ ₹12",
 
-def customer_login_enabled():
-    """Developer switch: customer (OTP) login on/off. Staff/admin/developer login is never affected."""
-    return _flag("customer_login_enabled")
+  "⚡ Energy Drink 250ml - Buy 2, get ₹20 off",
 
+  "🚰 Premium Water 20L - special bulk rate",
 
-LOGIN_PAUSED_MESSAGE = "Customer login is paused right now. Please order on WhatsApp."
+  "🚚 Free delivery above ₹500",
 
+  "🎟️ Use code WELCOME10 - 10% off your first order",
 
-SOCIAL_LIMIT = 12
+  "🍋 Lemon Soda 750ml - summer special",
+];
 
+let OFFERS = [...DEFAULT_OFFERS];
 
-def social_links():
-    """
-    Social media links shown in the footer and on the About page.
-    Developer manages them as a list: [{"name": "Instagram", "url": "https://..."}, ...]
-    Older sites that only saved instagram_url / facebook_url keep working.
-    """
-    raw = setting_value("social_links")
-    links = []
-    if raw:
-        try:
-            data = json.loads(raw)
-        except ValueError:
-            data = []
-        for item in data if isinstance(data, list) else []:
-            if not isinstance(item, dict):
-                continue
-            name = str(item.get("name") or "").strip()[:30]
-            url = _clean_http_url(item.get("url"))
-            if name and url:
-                links.append({"name": name, "url": url})
-        return links[:SOCIAL_LIMIT]
-    for name, key in (("Instagram", "instagram_url"), ("Facebook", "facebook_url")):
-        url = _clean_http_url(setting_value(key))
-        if url:
-            links.append({"name": name, "url": url})
-    return links
+function renderCategories() {
+  const wrap = $("#cats");
+  if (!wrap) return;
+  const cats = Array.isArray(CFG.categories) ? CFG.categories : [];
+  wrap.innerHTML = `<button type="button" class="on category-card" onclick="category('All',this)"><span>🛍️</span><b>All</b></button>` + cats.map(c => `<button type="button" class="category-card" onclick="category(${JSON.stringify(c.name)},this)"><span>${esc(c.icon || "🛍️")}</span><b>${esc(c.name)}</b></button>`).join("");
+}
 
+function ticker() {
+  const track = $("#track");
 
-def site_info():
-    """Everything the nav, footer and About page need - all editable by the developer."""
-    mobile = "".join(c for c in setting_value("business_mobile") if c.isdigit())
-    return {
-        "name": setting_value("business_name") or "Chand Enterprises",
-        "mobile": mobile,
-        "tel": ("+91" + mobile[-10:]) if len(mobile) >= 10 else mobile,
-        "location": setting_value("business_location") or "Darbhanga, Bihar",
-        "whatsapp_url": "https://wa.me/" + wa_number(),
-        "tagline": setting_value("footer_tagline") or DEFAULT_SETTINGS["footer_tagline"],
-        "about_title": setting_value("about_title") or DEFAULT_SETTINGS["about_title"],
-        "about_text": setting_value("about_text") or DEFAULT_SETTINGS["about_text"],
-        "social": social_links(),
-        "footer_contact_title": setting_value("footer_contact_title") or DEFAULT_SETTINGS["footer_contact_title"],
-        "footer_whatsapp_label": setting_value("footer_whatsapp_label") or DEFAULT_SETTINGS["footer_whatsapp_label"],
-        "copyright_prefix": setting_value("footer_copyright_prefix") or DEFAULT_SETTINGS["footer_copyright_prefix"],
+  if (!track) {
+    return;
+  }
+
+  const html = OFFERS.map((offer) => `<span>${esc(offer)}</span>`).join("");
+
+  track.innerHTML = html + html;
+}
+
+/* =========================
+   MODAL
+   ========================= */
+
+function modal(html) {
+  const element = $("#modal");
+
+  if (!element) {
+    return;
+  }
+
+  element.innerHTML = `<div class="box">${html}</div>`;
+
+  element.classList.add("open");
+
+  element.onclick = (event) => {
+    if (event.target === element) {
+      closeModal();
+    }
+  };
+}
+
+function closeModal() {
+  const element = $("#modal");
+
+  if (element) {
+    element.classList.remove("open");
+  }
+}
+
+/* =========================
+   CART
+   ========================= */
+
+/* Saves the cart and updates the cart counter (no product-grid redraw). */
+function persistCart() {
+  localStorage.setItem("cart", JSON.stringify(CART));
+
+  const count = $("#count");
+
+  if (count) {
+    const total = Object.values(CART).reduce((sum, value) => sum + value, 0);
+
+    if (Number(count.textContent) !== total) {
+      count.classList.remove("bump");
+
+      void count.offsetWidth;
+
+      count.classList.add("bump");
     }
 
+    count.textContent = total;
+    count.dataset.zero = total ? "" : "1";
+  }
+}
 
-@main.app_context_processor
-def inject_site_flags():
-    try:
-        return {"ordering_on": ordering_enabled(), "login_on": customer_login_enabled(), "site": site_info()}
-    except Exception:
-        return {"ordering_on": True, "login_on": True, "site": {
-            "name": "Chand Enterprises", "mobile": "", "tel": "", "location": "Darbhanga, Bihar",
-            "whatsapp_url": "", "tagline": "Drinks & premium water",
-            "about_title": "About Chand Enterprises", "about_text": "", "social": []}}
+function save(anim = false) {
+  persistCart();
+
+  render(anim);
+}
+
+function find(id) {
+  return (window.PRODUCTS || []).find((product) => product.id == id);
+}
+
+/* =========================
+   PRODUCT LIST
+   ========================= */
+
+function category(categoryName, button) {
+  CAT = categoryName;
+
+  document
+    .querySelectorAll("#cats button")
+    .forEach((item) => item.classList.remove("on"));
+
+  if (button) {
+    button.classList.add("on");
+  }
+
+  render(true);
+}
+
+/* =========================
+   PRODUCT ARTWORK
+   (clean bottle / can drawings used when a product has no photo)
+   ========================= */
+
+function artKind(product) {
+  const t = ((product.category || "") + " " + (product.name || "")).toLowerCase();
+  if (/water|aqua|nevas|bisleri|kinley/.test(t)) return "water";
+  if (/energy|monster|red ?bull|boost/.test(t)) return "energy";
+  if (/cola|coke|pepsi|soda|sprite|fanta|thums|drink|juice|limca/.test(t)) return "cola";
+  return "other";
+}
+
+function artScale(product) {
+  const text = (product.size || "") + " " + (product.name || "");
+  const m = text.match(/(\d+(?:\.\d+)?)\s*(ml|ltr|l)\b/i);
+  if (!m) return 0.9;
+  let ml = parseFloat(m[1]);
+  if (m[2].toLowerCase() !== "ml") ml *= 1000;
+  return 0.74 + 0.26 * Math.min(1, ml / 2000);
+}
+
+function cleanName(name) {
+  return String(name || "").replace(/[\s\-\u2013\u2014:]+$/, "");
+}
+
+function productArt(product) {
+  const kind = artKind(product);
+  const id = "pa" + String(product.id).replace(/\W/g, "");
+  const scale = artScale(product).toFixed(2);
+  const brand = esc(
+    cleanName(product.name).split(/\s+/)[0].toUpperCase().slice(0, 9),
+  );
+  const size = esc(product.size || "");
+  const brandSize = brand.length > 7 ? 6.6 : brand.length > 5 ? 8.4 : 9.5;
+
+  const label = (fill, ink, y) => `
+      <rect x="37" y="${y}" width="46" height="36" fill="${fill}"/>
+      <text x="60" y="${y + 16}" text-anchor="middle" font-family="Inter,system-ui,sans-serif" font-size="${brandSize}" font-weight="800" fill="${ink}" letter-spacing=".2">${brand}</text>
+      <text x="60" y="${y + 28}" text-anchor="middle" font-family="Inter,system-ui,sans-serif" font-size="8" font-weight="600" fill="${ink}" opacity=".8">${size}</text>`;
+
+  let body = "";
+
+  if (kind === "water") {
+    body = `
+      <defs><linearGradient id="${id}" x1="0" x2="1">
+        <stop offset="0" stop-color="#4aa8ee"/><stop offset=".45" stop-color="#cdeeff"/><stop offset="1" stop-color="#3f94dc"/>
+      </linearGradient></defs>
+      <rect x="47" y="8" width="26" height="15" rx="4" fill="#0a5fc4"/>
+      <rect x="47" y="13" width="26" height="2" fill="#fff" opacity=".35"/>
+      <path d="M51 23h18v9c0 5 14 11 14 23v83c0 6-5 10-10 10H47c-5 0-10-4-10-10V55c0-12 14-18 14-23z" fill="url(#${id})" stroke="#fff" stroke-opacity=".7"/>
+      ${label("#ffffff", "#0a5fc4", 76)}
+      <path d="M43 58v70" stroke="#fff" stroke-opacity=".6" stroke-width="3" stroke-linecap="round"/>`;
+  } else if (kind === "cola" || kind === "other") {
+    const liquid = kind === "cola" ? ["#7a3b22", "#2a0f06"] : ["#ffb347", "#e8590c"];
+    const band = kind === "cola" ? "#e11d2e" : "#0f766e";
+    body = `
+      <defs><linearGradient id="${id}" x1="0" x2="1">
+        <stop offset="0" stop-color="${liquid[0]}"/><stop offset=".5" stop-color="${liquid[1]}"/><stop offset="1" stop-color="${liquid[0]}"/>
+      </linearGradient></defs>
+      <rect x="49" y="8" width="22" height="14" rx="4" fill="${band}"/>
+      <path d="M52 22h16v13c0 7 11 10 15 23 3 10 3 21 3 32 0 14-2 26-2 42 0 8-4 12-10 12H49c-6 0-10-4-10-12 0-16-2-28-2-42 0-11 0-22 3-32 4-13 15-16 15-23z" fill="url(#${id})" stroke="#fff" stroke-opacity=".35"/>
+      ${label(band, "#ffffff", 80)}
+      <path d="M43 60v62" stroke="#fff" stroke-opacity=".4" stroke-width="3" stroke-linecap="round"/>`;
+  } else {
+    body = `
+      <defs><linearGradient id="${id}" x1="0" x2="1">
+        <stop offset="0" stop-color="#0b0b0f"/><stop offset=".5" stop-color="#2b2b36"/><stop offset="1" stop-color="#0b0b0f"/>
+      </linearGradient></defs>
+      <rect x="36" y="14" width="48" height="128" rx="9" fill="url(#${id})" stroke="#fff" stroke-opacity=".25"/>
+      <rect x="40" y="9" width="40" height="9" rx="3" fill="#b9bcc4"/>
+      <rect x="36" y="108" width="48" height="5" fill="#ffd21f"/>
+      <path d="M62 36 48 72h10l-4 26 18-38H61z" fill="#ffd21f"/>
+      <text x="60" y="128" text-anchor="middle" font-family="Inter,system-ui,sans-serif" font-size="9" font-weight="800" fill="#fff" letter-spacing=".4">${brand}</text>
+      <path d="M42 30v70" stroke="#fff" stroke-opacity=".25" stroke-width="3" stroke-linecap="round"/>`;
+  }
+
+  return `<svg class="pa-svg" viewBox="0 0 120 160" role="img" aria-label="${esc(product.name)}">
+      <ellipse cx="60" cy="152" rx="${(34 * scale).toFixed(1)}" ry="4" fill="#000" opacity=".16"/>
+      <g transform="translate(60 150) scale(${scale}) translate(-60 -150)">${body}</g>
+    </svg>`;
+}
+
+/* =========================
+   PRODUCT CARDS
+   ========================= */
+
+/* Product photos go through a free image-resizing service (wsrv.nl) so phones
+   download ~640px WebP files instead of the full-size originals.
+   Set to false to load the original image links directly. */
+const USE_IMAGE_CDN = true;
+
+function imgSrc(url) {
+  if (!USE_IMAGE_CDN || !/^https?:\/\//i.test(url)) return url;
+
+  return (
+    "https://wsrv.nl/?url=" +
+    encodeURIComponent(url) +
+    "&w=640&output=webp&q=85"
+  );
+}
+
+/* The bottle/can drawings are built once per product, then reused. */
+const ART_CACHE = new Map();
+
+function productVisual(product) {
+  if (product.image_url) {
+    const original = product.image_url;
+
+    const src = esc(imgSrc(original));
+
+    /* The first image is a blurred copy that fills the frame; the second is
+       the poster itself, shown whole and never cropped. */
+    return `<img class="ph-bg" src="${src}" alt="" aria-hidden="true" loading="lazy" decoding="async">` +
+      `<img class="ph" src="${src}" alt="${esc(product.name)}" loading="lazy" decoding="async" onerror="this.onerror=null;this.src='${esc(original)}'">`;
+  }
+
+  const key = [product.id, product.name, product.size, product.category].join("|");
+
+  let svg = ART_CACHE.get(key);
+
+  if (!svg) {
+    svg = productArt(product);
+
+    ART_CACHE.set(key, svg);
+  }
+
+  return svg;
+}
+
+function cardHtml(product, index, anim) {
+  const quantity = CART[product.id] || 0;
+  const soldOut = product.stock < 1;
+
+  const badge = soldOut
+    ? `<span class="badge">Out of stock</span>`
+    : product.low
+      ? `<span class="badge">Only ${product.stock} left</span>`
+      : "";
+
+  const action = CFG.ordering_enabled === false
+    ? `<button class="primary" onclick="enquiry()">Enquire</button>`
+    : soldOut
+    ? ""
+    : quantity
+      ? `<div class="qty"><button aria-label="Remove one" onclick="chg(${product.id}, -1)">−</button><b>${quantity}</b><button aria-label="Add one more" onclick="chg(${product.id}, 1)">+</button></div>`
+      : `<button class="primary" aria-label="Add ${esc(cleanName(product.name))} to cart" onclick="chg(${product.id}, 1)">Add</button>`;
+
+  const liked = WISH.has(Number(product.id));
+
+  return `<div class="card${anim ? " pop" : ""}${soldOut ? " oos" : ""}" data-pid="${product.id}" style="--i:${index}">
+    ${badge}
+    <button type="button" class="wish-btn${liked ? " on" : ""}" aria-pressed="${liked}" aria-label="${liked ? "Remove from" : "Add to"} wishlist" onclick="toggleWish(${product.id})">${liked ? "♥" : "♡"}</button>
+    <div class="ic product-image-box kind-${artKind(product)}">${productVisual(product)}</div>
+    <div class="p-info">
+      <b class="p-name">${esc(cleanName(product.name))}</b>
+      <div class="p-sub">
+        ${product.size ? `<span class="product-size">${esc(product.size)}</span>` : ""}
+        <small>${esc(product.category)}</small>
+      </div>
+    </div>
+    <div class="p-buy">
+      ${CFG.show_prices_home === false ? "" : `<div class="price">${money(product.price)}</div>`}
+      ${action}
+    </div>
+  </div>`;
+}
+
+function render(anim = false) {
+  const grid = $("#grid");
+
+  if (!grid) {
+    return;
+  }
+
+  const search = $("#search");
+
+  const query = (search?.value || "").toLowerCase();
+
+  const products = window.PRODUCTS || [];
+
+  const list = products.filter(
+    (product) =>
+      (CAT === "All" || product.category === CAT) &&
+      product.name.toLowerCase().includes(query) &&
+      (!SIZE || product.size === SIZE) &&
+      (!INSTOCK || product.stock > 0) &&
+      (!WISH_ONLY || WISH.has(Number(product.id))),
+  );
+
+  if (SORT === "price-asc") list.sort((a, b) => a.price - b.price);
+  else if (SORT === "price-desc") list.sort((a, b) => b.price - a.price);
+  else if (SORT === "name") list.sort((a, b) => cleanName(a.name).localeCompare(cleanName(b.name)));
+
+  grid.innerHTML =
+    list.map((product, index) => cardHtml(product, index, anim)).join("") ||
+    `
+            <p class="muted">
+                ${WISH_ONLY ? "Your wishlist is empty. Tap the heart on a product to save it." : "No products found."}
+            </p>
+        `;
+}
+
+/* Redraw only one product card (used when the cart quantity changes). */
+function updateCard(id) {
+  const grid = $("#grid");
+
+  const element = grid && grid.querySelector(`.card[data-pid="${id}"]`);
+
+  const product = find(id);
+
+  if (!element || !product) {
+    return render();
+  }
+
+  const index = parseInt(element.style.getPropertyValue("--i"), 10) || 0;
+
+  element.outerHTML = cardHtml(product, index, false);
+}
+
+/* =========================
+   CHANGE CART
+   ========================= */
+
+function orderingPausedModal() {
+  return modal(`
+    <h2>Ordering is paused</h2>
+    <p>Online ordering is not available right now. Please send us your order on WhatsApp.</p>
+    <button class="primary" onclick="enquiry()">Order on WhatsApp</button>
+    <button onclick="closeModal()">Close</button>
+  `);
+}
+
+function loginPausedModal() {
+  return modal(`
+    <h2>Login is paused</h2>
+    <p>Customer login is not available right now. Please send us your order on WhatsApp.</p>
+    <button class="primary" onclick="enquiry()">Order on WhatsApp</button>
+    <button onclick="closeModal()">Close</button>
+  `);
+}
+
+/* Hide the Login buttons while customer login is paused (logged-in customers keep their session). */
+function applyLoginUI() {
+  const paused = CFG.customer_login_enabled === false;
+  const loggedIn = !!(ME && ME.authenticated);
+  const hideLogin = paused && !loggedIn;
+  const accountButton = $("#accountBtn");
+  const menuAccountButton = $("#menuAccountBtn");
+  if (accountButton) accountButton.hidden = hideLogin;
+  if (menuAccountButton) menuAccountButton.hidden = hideLogin || loggedIn;
+}
+
+function applyOrderingUI() {
+  const on = CFG.ordering_enabled !== false;
+  document.querySelectorAll(".premium-cart").forEach((el) => { el.hidden = !on; });
+  const note = document.getElementById("orderPaused");
+  if (note) note.hidden = on;
+}
+
+function chg(id, change) {
+  if (CFG.ordering_enabled === false) return;
+  const product = find(id);
+
+  if (!product) {
+    return;
+  }
+
+  let quantity = (CART[id] || 0) + change;
+
+  if (quantity > product.stock) {
+    quantity = product.stock;
+  }
+
+  if (quantity <= 0) {
+    delete CART[id];
+  } else {
+    CART[id] = quantity;
+  }
+
+  persistCart();
+
+  updateCard(id);
+}
+
+/* =========================
+   TOTALS
+   ========================= */
+
+function totals(coupon = "") {
+  let subtotal = 0;
+  for (const id in CART) {
+    const product = find(id);
+    if (product) subtotal += product.price * CART[id];
+  }
+
+  coupon = coupon.trim().toUpperCase();
+  const c = (CFG.coupons || []).find(x => x.code === coupon && x.active);
+  let discount = 0;
+  if (c && subtotal >= Number(c.min_order || 0)) {
+    discount = c.discount_type === "fixed"
+      ? Number(c.discount_value || 0)
+      : subtotal * Number(c.discount_value || 0) / 100;
+    if (c.max_discount != null) discount = Math.min(discount, Number(c.max_discount));
+    discount = Math.min(discount, subtotal);
+  }
+
+  const quote = DELIVERY_QUOTE;
+  const fresh = quote && quote.coupon === coupon && Number(quote.subtotal) === Number(subtotal);
+  if (fresh && typeof quote.discount === "number") discount = Number(quote.discount || 0);
+  const delivery = fresh
+    ? Number(quote.delivery_charge || 0)
+    : (subtotal - discount >= freeDeliveryAbove() ? 0 : 30);
+
+  return {
+    sub: subtotal,
+    disc: discount,
+    del: delivery,
+    distance: fresh ? (quote?.distance_km ?? null) : null,
+    total: Math.max(0, subtotal - discount + delivery)
+  };
+}
+
+async function refreshDeliveryQuote() {
+  const subtotal = Object.entries(CART).reduce((sum, [id, qty]) => {
+    const p = find(id);
+    return sum + (p ? p.price * qty : 0);
+  }, 0);
+  const coupon = ($('#cc')?.value || '').trim().toUpperCase();
+  if (!subtotal) { DELIVERY_QUOTE = null; return; }
+  const loc = typeof LocPicker !== 'undefined' ? LocPicker.get() : {};
+  const result = await api('/api/delivery/quote', 'POST', {
+    subtotal, coupon, latitude: loc.latitude, longitude: loc.longitude
+  });
+  if (result?._ok) {
+    DELIVERY_QUOTE = Object.assign(result, {coupon});
+  } else if (result?.error) {
+    DELIVERY_QUOTE = null;
+  }
+  const total = totals(coupon);
+  const el = $('#ctot');
+  if (el) el.textContent = money(total.total);
+  const cm = $('#couponMsg');
+  if (cm) {
+    if (!coupon) { cm.textContent = ''; }
+    else {
+      const ok = result?.coupon_ok;
+      cm.textContent = (ok ? '✅ ' : '❌ ') + (result?.coupon_message || (ok ? 'Coupon applied' : 'Invalid or inactive coupon'));
+      cm.style.color = ok ? '#0a7a3b' : '#c0392b';
+    }
+  }
+  const info = $('#deliveryInfo');
+  if (info) info.textContent = total.distance != null
+    ? `Delivery: ${total.del ? money(total.del) : 'Free'} · ${total.distance} km`
+    : `Delivery: ${total.del ? money(total.del) : 'Free'}`;
+}
 
 
-def offers_list():
-    raw = setting_value("offers")
-    return [x.strip() for x in raw.splitlines() if x.strip()] if raw else DEFAULT_OFFERS[:]
+/* =========================
+   CART MODAL
+   ========================= */
 
+/* delivery tracker: bar + truck that moves as the cart fills */
+function cartTrack(t) {
+  const above = freeDeliveryAbove();
+  if (above <= 0) return "";
 
-def image_thumb(url, width=640):
-    """Same resized WebP URL the storefront uses, so the browser cache is shared
-    and the brochure no longer downloads multi-MB originals."""
-    url = (url or "").strip()
-    if not url.lower().startswith(("http://", "https://")):
-        return url
-    return "https://wsrv.nl/?url=" + urllib.parse.quote(url, safe="") + f"&w={width}&output=webp&q=85"
+  const amount = t.sub - t.disc;
 
+  if (amount >= above) {
+    return `<div class="cx-track done"><p>🎉 <b>FREE delivery</b> unlocked on this order!</p>
+      <div class="cx-bar"><i style="width:100%"></i><span style="left:100%">🚚</span></div></div>`;
+  }
 
-def haversine_km(lat1, lon1, lat2, lon2):
-    rad = math.pi / 180
-    dlat = (lat2 - lat1) * rad
-    dlon = (lon2 - lon1) * rad
-    a = math.sin(dlat / 2) ** 2 + math.cos(lat1 * rad) * math.cos(lat2 * rad) * math.sin(dlon / 2) ** 2
-    return 6371.0 * 2 * math.asin(min(1, math.sqrt(a)))
+  const pct = Math.max(4, Math.min(96, Math.round((amount / above) * 100)));
 
+  return `<div class="cx-track"><p>🚚 Add <b>${money(Math.ceil(above - amount))}</b> more for <b>FREE delivery</b></p>
+    <div class="cx-bar"><i style="width:${pct}%"></i><span style="left:${pct}%">🚚</span><em>FREE at ${money(above)}</em></div></div>`;
+}
 
-def calculate_delivery(subtotal_after_discount, lat=None, lng=None):
-    free_above = float_setting("delivery_free_above", 500)
-    if subtotal_after_discount >= free_above:
-        return 0, 0
-    store_lat = parse_coord(setting_value("business_lat"), -90, 90)
-    store_lng = parse_coord(setting_value("business_lng"), -180, 180)
-    if store_lat is None or store_lng is None or lat is None or lng is None:
-        return float_setting("delivery_base", 30), None
-    distance = haversine_km(store_lat, store_lng, lat, lng)
-    base = float_setting("delivery_base", 30)
-    per_km = float_setting("delivery_per_km", 10)
-    # Simple, predictable formula: base + per-km charge, rounded up to nearest ₹5.
-    charge = math.ceil((base + distance * per_km) / 5) * 5
-    return float(charge), distance
+function cartHtml() {
+  const ids = Object.keys(CART).filter((id) => find(id));
 
+  if (!ids.length) {
+    return `
+      <div class="cc-empty">
+        <div class="big">🛒</div>
+        <h2>Your cart is empty</h2>
+        <p class="muted">Add some cold drinks or water to get started.</p>
+        <button class="primary" onclick="closeModal()">Browse products</button>
+      </div>`;
+  }
 
-def coupon_dict(c):
-    return dict(id=c.id, code=c.code, discount_type=c.discount_type,
-                discount_value=c.discount_value, max_discount=c.max_discount,
-                min_order=c.min_order, active=c.active)
+  const total = totals();
+  const pieces = ids.reduce((sum, id) => sum + CART[id], 0);
+  const codes = (CFG.coupons || []).filter((c) => c.active).map((c) => esc(c.code));
 
+  return `
+    <div class="cx">
+      <div class="cx-grab"></div>
 
-def calculate_coupon(code, subtotal):
-    if not code:
-        return None, 0
-    c = Coupon.query.filter_by(code=code.upper(), active=True).first()
-    if not c:
-        return None, 0
-    if subtotal < (c.min_order or 0):
-        return c, 0
-    if c.discount_type == "fixed":
-        discount = c.discount_value
-    else:
-        discount = subtotal * c.discount_value / 100
-    if c.max_discount is not None:
-        discount = min(discount, c.max_discount)
-    return c, max(0, min(discount, subtotal))
+      <div class="cx-head">
+        <div>
+          <h2>Your cart</h2>
+          <small>${ids.length} product${ids.length > 1 ? "s" : ""} · ${pieces} item${pieces > 1 ? "s" : ""}</small>
+        </div>
+        <button class="cx-x" aria-label="Close" onclick="closeModal()">✕</button>
+      </div>
 
+      ${cartTrack(total)}
 
-def developer_settings():
-    raw = setting_value("offers")
-    offers = [x.strip() for x in raw.splitlines() if x.strip()] if raw else DEFAULT_OFFERS[:]
-    return {"business_name": setting_value("business_name"), "business_mobile": setting_value("business_mobile"), "whatsapp": setting_value("whatsapp"), "business_location": setting_value("business_location"), "upi": setting_value("upi"), "payment_name": setting_value("payment_name"), "business_lat": setting_value("business_lat"), "business_lng": setting_value("business_lng"), "delivery_base": setting_value("delivery_base"), "delivery_per_km": setting_value("delivery_per_km"), "delivery_free_above": setting_value("delivery_free_above"), "instagram_url": setting_value("instagram_url"), "facebook_url": setting_value("facebook_url"), "social_links": social_links(), "about_title": setting_value("about_title"), "about_text": setting_value("about_text"), "footer_tagline": setting_value("footer_tagline"), "home_delivery_title": setting_value("home_delivery_title"), "home_delivery_text": setting_value("home_delivery_text"), "home_payment_title": setting_value("home_payment_title"), "home_payment_text": setting_value("home_payment_text"), "home_support_title": setting_value("home_support_title"), "home_support_text": setting_value("home_support_text"), "home_store_eyebrow": setting_value("home_store_eyebrow"), "home_products_title": setting_value("home_products_title"), "home_products_text": setting_value("home_products_text"), "home_bulk_badge": setting_value("home_bulk_badge"), "home_bulk_title": setting_value("home_bulk_title"), "home_bulk_text": setting_value("home_bulk_text"), "home_bulk_button": setting_value("home_bulk_button"), "home_event_button": setting_value("home_event_button"), "home_bulk_order_button": setting_value("home_bulk_order_button"), "footer_contact_title": setting_value("footer_contact_title"), "footer_whatsapp_label": setting_value("footer_whatsapp_label"), "footer_copyright_prefix": setting_value("footer_copyright_prefix"), "show_prices_home": prices_home(), "show_prices_brochure": prices_brochure(), "ordering_enabled": ordering_enabled(), "customer_login_enabled": customer_login_enabled(), "brochure_url": setting_value("brochure_url"), "brochure_eyebrow": setting_value("brochure_eyebrow"), "brochure_title": setting_value("brochure_title"), "brochure_subtitle": setting_value("brochure_subtitle"), "archive_days": setting_value("archive_days") or "7", "archive_method": setting_value("archive_method") or "email", "archive_email": setting_value("archive_email"), "archive_whatsapp": setting_value("archive_whatsapp"), "offers": offers, "otp_provider": setting_value("otp_provider") or "demo", "telegram_bot_username": setting_value("telegram_bot_username"), "notify_customer_status": _flag("notify_customer_status"), "notify_admin_orders": _flag("notify_admin_orders"), "notify_admin_low_stock": _flag("notify_admin_low_stock"), "notify_delivery_assign": _flag("notify_delivery_assign"), "notify_daily_summary": _flag("notify_daily_summary"), "summary_time": setting_value("summary_time") or "21:30",
-            "maps_enabled": _flag("maps_enabled"), "map_customer_tracking": _flag("map_customer_tracking"),
-            "map_delivery_navigation": _flag("map_delivery_navigation"), "map_admin_view": _flag("map_admin_view"),
-            "eta_confirmed_min": setting_value("eta_confirmed_min") or "30",
-            "eta_confirmed_max": setting_value("eta_confirmed_max") or "60",
-            "eta_preparing_min": setting_value("eta_preparing_min") or "20",
-            "eta_preparing_max": setting_value("eta_preparing_max") or "45",
-            "eta_out_for_delivery_min": setting_value("eta_out_for_delivery_min") or "10",
-            "eta_out_for_delivery_max": setting_value("eta_out_for_delivery_max") or "25",
+      ${ids
+        .map((id, n) => {
+          const product = find(id);
+          const art = product.image_url
+            ? `<img src="${esc(imgSrc(product.image_url))}" alt="" loading="lazy" decoding="async" onerror="this.onerror=null;this.src='${esc(product.image_url)}'">`
+            : `<span>${esc(product.icon || "🥤")}</span>`;
+          return `
+        <div class="cx-item" style="--i:${n}">
+          <div class="cx-art kind-${artKind(product)}">${art}</div>
+          <div class="cx-info">
+            <b>${esc(cleanName(product.name))}</b>
+            <small>${product.size ? esc(product.size) + " · " : ""}${money(product.price)} each</small>
+            <div class="cx-row">
+              <div class="cx-step">
+                <button onclick="cartChg(${product.id}, -1)" aria-label="Remove one">−</button>
+                <b>${CART[id]}</b>
+                <button onclick="cartChg(${product.id}, 1)" aria-label="Add one more">+</button>
+              </div>
+              <div class="cx-price">${money(product.price * CART[id])}</div>
+            </div>
+          </div>
+        </div>`;
+        })
+        .join("")}
+
+      ${codes.length ? `<div class="cx-coupon"><i>🏷️</i><div>Have a coupon? Use <b>${codes.join(", ")}</b> at checkout</div></div>` : ""}
+
+      <div class="cx-sum">
+        <div><span>Subtotal</span><span>${money(total.sub)}</span></div>
+        <div><span>Delivery</span><span>${total.del ? money(total.del) : "Free"}</span></div>
+        <div class="cx-tot"><span>Total</span><span>${money(total.total)}</span></div>
+      </div>
+
+      <button class="cx-cta" onclick="checkout()">
+        <span><small>Total to pay</small>Checkout · ${money(total.total)}</span>
+        <em>→</em>
+      </button>
+
+      <div class="cx-trust"><span>🔒 Secure</span><span>💵 COD / UPI</span><span>⚡ Fast local delivery</span></div>
+    </div>`;
+}
+
+function cart() {
+  if (CFG.ordering_enabled === false) return orderingPausedModal();
+  modal(cartHtml());
+}
+
+/* +/- inside the cart popup: updates in place (no pop-in replay) */
+function cartChg(id, change) {
+  chg(id, change);
+  const box = $("#modal .box");
+  if (!box) return;
+  if (!Object.keys(CART).length) return cart();
+  box.innerHTML = cartHtml();
+  box.querySelectorAll(".cx-item").forEach((el) => (el.style.animation = "none"));
+}
+
+/* =========================
+   CHECKOUT
+   ========================= */
+
+async function checkout() {
+  if (CFG.ordering_enabled === false) return orderingPausedModal();
+  if (!navigator.onLine) return showMessage("You're offline. Please check your internet connection to place an order.");
+  if (!ME) {
+    ME = await api("/api/me");
+  }
+
+  // pick up coupons the admin created after this page was opened
+  // (runs in the background so checkout opens immediately;
+  //  the server still checks the coupon and delivery charge)
+  refreshConfig().catch(() => {});
+
+  if (!ME.authenticated || ME.role !== "customer") {
+    LOGIN_FROM_CHECKOUT = true;
+
+    return account("Login to place your order");
+  }
+
+  modal(`
+        <div class="cc-head">
+          <h2>Checkout</h2>
+          <button class="cc-x" aria-label="Close" onclick="closeModal()">✕</button>
+        </div>
+
+        <div class="cc-steps">
+          <span class="ok"><i>✓</i>Cart</span><hr class="on"><span class="on"><i>2</i>Details</span><hr><span><i>3</i>Pay</span>
+        </div>
+
+        <div class="cc-sec" style="--i:0">
+          <h4>Your details</h4>
+          <label>
+            Name
+            <input id="cn" value="${esc(ME.name === "Customer" ? "" : ME.name)}">
+          </label>
+          <label>
+            Delivery address
+            <textarea id="ca" rows="3">${esc(ME.address || "")}</textarea>
+          </label>
+        </div>
+
+        <div class="cc-sec" style="--i:1">
+          <h4>Delivery location</h4>
+          ${LocPicker.html()}
+          <div id="deliveryInfo" class="muted">Delivery charge will be calculated from your location.</div>
+        </div>
+
+        <div class="cc-sec" style="--i:2">
+          <h4>Payment</h4>
+          <div class="cc-pay">
+            <label><input type="radio" name="cpm" value="COD" checked onchange="$('#cp').value=this.value"><span>💵</span><b>Cash on delivery</b></label>
+            <label><input type="radio" name="cpm" value="QR" onchange="$('#cp').value=this.value"><span>📱</span><b>Pay by QR (UPI)</b></label>
+          </div>
+          <input type="hidden" id="cp" value="COD">
+          <label style="margin-top:12px">
+            Coupon (optional)
+            <input id="cc" oninput="cTot()" autocapitalize="characters" autocomplete="off">
+          </label>
+          <div id="couponMsg" class="muted" style="margin:-4px 0 0;font-size:.9rem"></div>
+        </div>
+
+        <div class="row cc-total" style="font-size:1.15rem"><b>Total</b><b id="ctot"></b></div>
+
+        <p class="err" id="cerr"></p>
+
+        <div class="cc-foot">
+          <button onclick="cart()">← Back</button>
+          <button class="primary cc-cta" id="placeBtn" onclick="placeOrder()">Place order</button>
+        </div>
+    `);
+
+  LocPicker.mount();
+  DELIVERY_QUOTE = null;
+  window.onlocationchange = refreshDeliveryQuote;
+  cTot();
+  refreshDeliveryQuote();
+}
+
+function cTot() {
+  const element = $("#ctot");
+
+  if (!element) {
+    return;
+  }
+
+  element.textContent = money(totals($("#cc")?.value || "").total);
+  clearTimeout(window.__quoteTimer);
+  window.__quoteTimer = setTimeout(refreshDeliveryQuote, 350);
+}
+
+/* =========================
+   PLACE ORDER
+   ========================= */
+
+async function placeOrder() {
+  const btn = $("#placeBtn");
+  if (btn) {
+    if (btn.disabled) return;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="cc-spin"></span>Placing order…';
+  }
+  const items = Object.entries(CART).map(([id, quantity]) => ({
+    id: Number(id),
+    qty: quantity,
+  }));
+
+  const result = await api("/api/orders", "POST", {
+    name: $("#cn").value,
+
+    address: $("#ca").value,
+
+    ...LocPicker.get(),
+
+    coupon: $("#cc").value,
+
+    payment_method: $("#cp").value,
+
+    items,
+  });
+
+  if (!result._ok) {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = "Place order";
+    }
+    return ($("#cerr").textContent = result.error || "Could not place order");
+  }
+
+  CART = {};
+
+  localStorage.setItem("cart", "{}");
+
+  save();
+
+  // refresh the stock numbers in the background - the customer
+  // sees their order confirmation straight away
+  api("/api/products").then((products) => {
+    if (!Array.isArray(products)) {
+      return;
+    }
+
+    products.forEach((product) => {
+      const current = find(product.id);
+
+      if (current) {
+        Object.assign(current, product);
+      }
+    });
+
+    render();
+  });
+
+  ORD[result.order_id] = {
+    upi_url: result.upi_url,
+  };
+
+  if (result.payment_method === "QR") {
+    payQR(result.order_id, result.total);
+  } else {
+    done(result);
+  }
+}
+
+/* =========================
+   QR PAYMENT
+   ========================= */
+
+function payQR(code, total) {
+  const order = ORD[code] || {};
+
+  modal(`
+        <div class="qrbox">
+
+            <h2>Scan &amp; pay</h2>
+
+            <div class="amt">${money(total)}</div>
+
+            <small>
+                The amount is already filled
+                in the QR. Open GPay, PhonePe,
+                Paytm or any UPI app and scan.
+            </small>
+
+            <div class="qrwrap">
+                <img
+                    src="/api/orders/${encodeURIComponent(code)}/qr.svg?t=${Date.now()}"
+                    alt="UPI QR for ${money(total)}"
+                >
+            </div>
+
+            <p>
+                <small>Paying to</small>
+                <b>${esc(CFG.upi)}</b>
+            </p>
+
+            ${
+              order.upi_url
+                ? `
+                    <a class="add upilink" href="${esc(order.upi_url)}">
+                        📱 Pay with UPI app
+                        (on phone)
+                    </a>
+                `
+                : ""
             }
 
+            <label>
+                UPI reference / UTR
+                (after paying)
+                <input id="utr" inputmode="numeric" placeholder="12-digit reference">
+            </label>
 
-def display_datetime(dt):
-    if not dt:
-        return ""
-    # Existing database timestamps are stored as UTC; display in India time.
-    return (dt + timedelta(hours=5, minutes=30)).strftime("%d-%m-%Y %I:%M %p")
+            <p class="err" id="uerr"></p>
 
+            <button class="primary" onclick="paid('${esc(code)}')">
+                I have paid
+                ${money(total)}
+            </button>
 
-def developer_product_dict(p):
-    return dict(
-        id=p.id,
-        name=p.name,
-        category=p.category,
-        size=p.size or "1L",
-        price=p.price,
-        stock=p.stock,
-        low_stock_threshold=p.low_stock_threshold or 10,
-        icon=p.icon,
-        image_url=p.image_url or "",
-        active=p.active,
-    )
+            <button onclick="done({order_id: '${esc(code)}', pay_later: 1})">
+                Pay later
+            </button>
 
+        </div>
+    `);
+}
 
-# ---------- helpers ----------
+async function paid(code) {
+  const result = await api(`/api/orders/${code}/paid`, "POST", {
+    utr: $("#utr").value,
+  });
 
-def wa_number():
-    n = "".join(c for c in (setting_value("whatsapp") or current_app.config["WHATSAPP_NUMBER"]) if c.isdigit())
-    return "91" + n if len(n) == 10 else n          # wa.me needs the country code
+  if (!result._ok) {
+    return ($("#uerr").textContent =
+      result.error || "Could not confirm payment");
+  }
 
+  done({
+    order_id: code,
+    verifying: 1,
+  });
+}
 
-def wa_link(text):
-    return f"https://wa.me/{wa_number()}?text=" + urllib.parse.quote(text)
+/* =========================
+   ORDER COMPLETE
+   ========================= */
 
+function confetti() {
+  const colors = ["#0a7cff", "#12a150", "#ffb300", "#ff5470", "#2fd0b5"];
+  return `<div class="cc-conf">${Array.from({ length: 28 }, (_, i) =>
+    `<i style="left:${Math.random() * 100}%;background:${colors[i % 5]};animation-delay:${(Math.random() * 0.5).toFixed(2)}s"></i>`
+  ).join("")}</div>`;
+}
 
-def current_user():
-    uid = session.get("user_id")
-    if not uid:
-        return None
-    u = db.session.get(User, uid)
-    if u and u.active is False:
-        session.clear()
-        return None
-    return u
+async function done(result) {
+  modal(`
+        <div class="cc-done">
+        ${confetti()}
+        <svg class="tick" viewBox="0 0 52 52">
+            <circle cx="26" cy="26" r="24" fill="none" stroke="#12a150" stroke-width="3"/>
+            <path d="M14 27l8 8 16-16" fill="none" stroke="#12a150" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
 
+        <h2 style="text-align:center">Order placed</h2>
 
-def role_ok(*roles):
-    u = current_user()
-    return bool(u) and (not roles or u.role in roles)
+        <p>
+            Order ID:
+            <b>${esc(result.order_id)}</b>
+        </p>
 
-
-def active_categories():
-    return Category.query.filter_by(active=True).order_by(Category.id).all()
-
-
-def category_dict(c):
-    return dict(id=c.id, name=c.name, icon=c.icon or "🛍️", active=bool(c.active))
-
-
-def validate_category_name(name, current_id=None):
-    name = str(name or "").strip()
-    if not name or len(name) > 80:
-        return None, "Category name is required (max 80 characters)"
-    q = Category.query.filter(db.func.lower(Category.name) == name.lower())
-    if current_id is not None:
-        q = q.filter(Category.id != current_id)
-    if q.first():
-        return None, "Category already exists"
-    return name, None
-
-
-def bill_text(o):
-    lines = [
-        "🧾 *Chand Enterprises Bill*",
-        f"Order: {o.code}",
-        f"Customer: {o.customer_name}",
-        "",
-    ]
-
-    for i in o.items:
-        item_name = i.product_name
-        if i.product_size:
-            item_name += f" ({i.product_size})"
-        lines.append(
-            f"• {item_name} x {i.quantity} = ₹{i.line_total:.0f}"
-        )
-
-    lines += [
-        "",
-        f"Subtotal: ₹{o.subtotal:.0f}",
-        f"Discount: ₹{o.discount:.0f}",
-        f"Delivery: ₹{o.delivery_charge:.0f}",
-        f"*Total: ₹{o.total:.0f}*",
-        f"Payment: {o.payment_method} ({o.payment_status})",
-        f"Status: {o.status}",
-    ]
-
-    return "\n".join(lines)
-
-
-def product_dict(p):
-    return dict(id=p.id, name=p.name, category=p.category, size=p.size or "1L", price=p.price,
-                stock=p.stock, icon=p.icon, image_url=p.image_url or "", low=p.stock <= (p.low_stock_threshold or 10))
-
-
-def upi_uri(o):
-    """UPI deep-link with the exact order amount pre-filled (this is what the QR encodes)."""
-    q = urllib.parse.quote
-    pa = q(setting_value("upi") or current_app.config["UPI_ID"], safe="@")
-    pn = q(setting_value("payment_name") or "Chand Enterprises")
-    return f"upi://pay?pa={pa}&pn={pn}&am={o.total:.2f}&cu=INR&tn={q('Order ' + o.code)}"
-
-
-def parse_coord(value, low, high):
-    try:
-        number = float(value)
-    except (TypeError, ValueError):
-        return None
-    return number if math.isfinite(number) and low <= number <= high else None
-
-
-def valid_order_coordinates(lat, lng):
-    """Reject absent, out-of-range and Null Island coordinates."""
-    return lat is not None and lng is not None and not (float(lat) == 0 and float(lng) == 0) and -90 <= float(lat) <= 90 and -180 <= float(lng) <= 180
-
-
-def location_issue(o):
-    if not (o.address or '').strip():
-        return 'Delivery address is missing'
-    if not valid_order_coordinates(o.latitude, o.longitude):
-        return 'Valid map location is missing'
-    return ''
-
-
-def estimated_delivery_window(status):
-    """A configurable operational estimate, not a traffic-aware/live ETA."""
-    status_key = {
-        'Confirmed': 'confirmed',
-        'Preparing': 'preparing',
-        'Out for Delivery': 'out_for_delivery',
-    }.get(status)
-    if not status_key:
-        return ''
-    try:
-        low = max(0, int(setting_value(f'eta_{status_key}_min') or 0))
-        high = max(low, int(setting_value(f'eta_{status_key}_max') or low))
-    except (TypeError, ValueError):
-        low, high = {'confirmed': (30, 60), 'preparing': (20, 45), 'out_for_delivery': (10, 25)}[status_key]
-    return f'{low}–{high} min estimated remaining'
-
-
-def order_dict(o):
-    dp = o.delivery_person
-    pay = o.payments[0] if o.payments else None
-    paid = o.total if o.payment_status == "Paid" else 0
-
-    return dict(id=o.id, code=o.code, customer=o.customer_name, mobile=o.mobile,
-                address=o.address, latitude=o.latitude, longitude=o.longitude,
-                location_valid=valid_order_coordinates(o.latitude, o.longitude),
-                location_issue=location_issue(o),
-                estimated_delivery_window=estimated_delivery_window(o.status),
-                map_url=o.map_url, directions_url=o.directions_url,
-                map_features={"enabled": _flag("maps_enabled"),
-                              "customer_tracking": _flag("maps_enabled") and _flag("map_customer_tracking"),
-                              "delivery_navigation": _flag("maps_enabled") and _flag("map_delivery_navigation"),
-                              "admin_view": _flag("maps_enabled") and _flag("map_admin_view")},
-                total=o.total, subtotal=o.subtotal, discount=o.discount,
-                delivery_charge=o.delivery_charge, payment=o.payment_method,
-                payment_status=o.payment_status, status=o.status,
-                created=display_datetime(o.created_at),
-                delivery_person_id=o.delivery_person_id, delivery_person=dp.name if dp else "",
-                items=[
-                    (
-                        f"{i.product_name} ({i.product_size}) x {i.quantity}"
-                        if i.product_size
-                        else f"{i.product_name} x {i.quantity}"
-                    )
-                    for i in o.items
-                ],
-                lines=[
-                    dict(
-                        product_id=i.product_id,
-                        name=i.product_name,
-                        size=i.product_size or "1L",
-                        qty=i.quantity,
-                        price=i.unit_price,
-                        total=i.line_total,
-                    )
-                    for i in o.items
-                ],
-                coupon=o.coupon_code or "", paid=paid, due=0 if o.status == "Cancelled" else o.total - paid,
-                utr=(pay.transaction_id or "") if pay else "",
-                upi_url=upi_uri(o) if o.payment_method == "QR" else "")
-
-
-def restock(o):
-    for i in o.items:
-        p = db.session.get(Product, i.product_id)
-        if p:
-            p.stock += i.quantity
-
-
-def add_tracking_event(o, title, event_type="status", status=None, note="", actor_user_id=None):
-    """Append a customer-safe order timeline event; caller commits the transaction."""
-    db.session.add(OrderTrackingEvent(
-        order_id=o.id, event_type=event_type, status=status or o.status,
-        title=str(title or "Order updated")[:120], note=str(note or "")[:500],
-        actor_user_id=actor_user_id if actor_user_id is not None else session.get("user_id")
-    ))
-
-
-def set_status(o, status):
-    old_status = o.status
-    if status == "Cancelled" and old_status != "Cancelled":
-        restock(o)
-    o.status = status
-    if old_status != status:
-        labels = {
-            "Confirmed": "Order confirmed", "Preparing": "Order is being prepared",
-            "Out for Delivery": "Order is out for delivery", "Delivered": "Order delivered",
-            "Cancelled": "Order cancelled"
+        ${
+          result.verifying
+            ? `<p>Payment is being verified by our team.</p>`
+            : result.pay_later
+              ? `<p>Please complete the payment from My Orders.</p>`
+              : ""
         }
-        add_tracking_event(o, labels.get(status, f"Status changed to {status}"), status=status)
 
+        <p class="muted">We will confirm your delivery shortly.</p>
 
-# ---------- login code (OTP) delivery ----------
+        <span id="waSlot"></span>
 
-# Where the customer's login code is sent. The developer picks one in
-# Developer > Login and OTP Settings.
-#   demo     = old behaviour (code shown on screen when env DEV_OTP=1)
-#   telegram = free Telegram bot
-# Add "whatsapp" / "sms" here later (see the commented lines in deliver_otp).
-OTP_PROVIDERS = {"demo", "telegram"}
+        <button class="add" onclick="bill('${esc(result.order_id)}')">View bill</button>
+        <button onclick="closeModal()">Close</button>
+        </div>
+    `);
 
+  // The confirmation is already on screen; the WhatsApp button appears
+  // as soon as its link is ready.
+  api(`/api/orders/${result.order_id}/whatsapp`).then((whatsapp) => {
+    const slot = $("#waSlot");
 
-def telegram_ready():
-    return bool(os.getenv("TELEGRAM_BOT_TOKEN") and os.getenv("TELEGRAM_WEBHOOK_SECRET")
-                and setting_value("telegram_bot_username"))
-
-
-def tg_call(method, payload=None):
-    """Call the Telegram Bot API. Returns the parsed JSON, or None if the token is missing / network fails."""
-    token = (os.getenv("TELEGRAM_BOT_TOKEN") or "").strip()
-    if not token:
-        return None
-    req = urllib.request.Request(
-        f"https://api.telegram.org/bot{token}/{method}",
-        data=json.dumps(payload or {}).encode("utf-8"),
-        headers={"Content-Type": "application/json"})
-    try:
-        with urllib.request.urlopen(req, timeout=8) as response:
-            return json.loads(response.read().decode("utf-8"))
-    except urllib.error.HTTPError as exc:
-        try:
-            return json.loads(exc.read().decode("utf-8"))      # Telegram explains 4xx errors in JSON
-        except Exception:
-            return {"ok": False, "error_code": exc.code}
-    except Exception:
-        current_app.logger.warning("Telegram call %s failed", method)   # never log the URL: it contains the token
-        return None
-
-
-def telegram_send_otp(mobile, otp):
-    if not telegram_ready():
-        return {"ok": False, "error": "Telegram login is not set up yet. Please order on WhatsApp."}
-    now = datetime.utcnow()
-
-    link = TelegramLink.query.filter_by(mobile=mobile).first()
-    if link:
-        business = setting_value("business_name") or "Chand Enterprises"
-        r = tg_call("sendMessage", {
-            "chat_id": link.chat_id,
-            "text": f"🔐 Your {business} login code: {otp}\nValid for 5 minutes. Do not share it with anyone."})
-        if r and r.get("ok"):
-            return {"ok": True, "channel": "telegram"}
-        if r is None:
-            return {"ok": False, "error": "Could not reach Telegram. Please try again."}
-        if r.get("error_code") in (400, 403):          # user blocked the bot / chat no longer exists -> relink
-            db.session.delete(link)
-            db.session.commit()
-        else:
-            return {"ok": False, "error": "Could not send the code on Telegram. Please try again."}
-
-    # Not linked yet: give the website a one-time "Open Telegram" link.
-    TelegramToken.query.filter(TelegramToken.expires_at < now - timedelta(days=1)).delete(synchronize_session=False)
-    pending = TelegramToken.query.filter(TelegramToken.mobile == mobile, TelegramToken.used == False,
-                                         TelegramToken.expires_at > now).count()
-    if pending >= 5:
-        db.session.commit()
-        return {"ok": False, "error": "Too many attempts. Please wait a few minutes and try again."}
-    token = secrets.token_urlsafe(12)
-    db.session.add(TelegramToken(token=token, mobile=mobile, expires_at=now + timedelta(minutes=10)))
-    db.session.commit()
-    return {"ok": True, "needs_link": True, "token": token,
-            "link": f"https://t.me/{setting_value('telegram_bot_username')}?start={token}"}
-
-
-def deliver_otp(mobile, otp):
-    """Send the code through whichever provider the developer selected."""
-    provider = (setting_value("otp_provider") or "demo").strip().lower()
-    if provider == "telegram":
-        return telegram_send_otp(mobile, otp)
-    # --- later, add more providers here and in OTP_PROVIDERS: ---
-    # if provider == "whatsapp": return whatsapp_send_otp(mobile, otp)
-    # if provider == "sms":      return sms_send_otp(mobile, otp)
-    out = {"ok": True, "channel": "demo"}
-    if current_app.config["DEV_OTP"]:               # demo only: code is shown on screen
-        out["dev_otp"] = otp
-    return out
-
-
-def new_otp(mobile):
-    now = datetime.utcnow()
-    last = OtpChallenge.query.filter_by(mobile=mobile, verified=False).order_by(OtpChallenge.id.desc()).first()
-    if last and (now - last.last_sent_at).total_seconds() < 30:
-        wait = 30 - int((now - last.last_sent_at).total_seconds())
-        return jsonify(ok=False, error=f"Please wait {wait} seconds before requesting another OTP"), 429
-    otp = f"{secrets.randbelow(10000):04d}"
-    challenge = OtpChallenge(mobile=mobile, otp_hash=generate_password_hash(otp, method=OTP_HASH_METHOD),
-                             expires_at=now + timedelta(minutes=5), last_sent_at=now)
-    db.session.add(challenge)
-    db.session.commit()
-    session["otp_mobile"] = mobile
-
-    sent = deliver_otp(mobile, otp)
-    if not sent.get("ok") or sent.get("needs_link"):
-        # nothing was delivered yet, so don't make the customer wait 30 s (resend right after linking)
-        challenge.last_sent_at = now - timedelta(seconds=31)
-        db.session.commit()
-    if not sent.get("ok"):
-        return jsonify(ok=False, error=sent.get("error") or "Could not send the login code"), 502
-
-    out = dict(ok=True, otp_sent=not sent.get("needs_link"), expires_in=300, channel=sent.get("channel", ""))
-    if sent.get("needs_link"):
-        out.update(needs_link=True, channel="telegram", link=sent["link"], token=sent["token"])
-    if sent.get("dev_otp"):
-        out["dev_otp"] = sent["dev_otp"]
-    return jsonify(out)
-
-
-# ---------- pages ----------
-
-@main.route("/")
-def home():
-    prods = [product_dict(p) for p in Product.query.filter_by(active=True)]
-    home_keys = ["home_delivery_title", "home_delivery_text", "home_payment_title", "home_payment_text",
-                 "home_support_title", "home_support_text", "home_store_eyebrow", "home_products_title",
-                 "home_products_text", "home_bulk_badge", "home_bulk_title", "home_bulk_text",
-                 "home_bulk_button", "home_event_button", "home_bulk_order_button"]
-    home_copy = {key: setting_value(key) for key in home_keys}
-    return render_template("index.html", products=prods, show_prices=prices_home(), home_copy=home_copy)
-
-
-def _clean_http_url(value):
-    """Return a safe http(s) URL or '' (blocks javascript:, data:, etc.)."""
-    value = (value or "").strip()
-    try:
-        parts = urllib.parse.urlsplit(value)
-    except ValueError:
-        return ""
-    if parts.scheme not in ("http", "https") or not parts.netloc or any(ch in value for ch in " \t\r\n<>\"'"):
-        return ""
-    return value
-
-
-def brochure_links(url):
-    """
-    Turn whatever link the admin pasted (Google Drive, Google Docs/Slides,
-    or a direct .pdf/.docx link) into links the brochure page can use.
-    Returns dict: embed, view, pdf, docx, kind  (empty strings when unknown)
-    """
-    url = _clean_http_url(url)
-    out = dict(url=url, embed="", view=url, pdf="", docx="", kind="")
-    if not url:
-        return out
-    q = urllib.parse.quote
-    m = re.search(r"drive\.google\.com/(?:file/d/|open\?id=|uc\?(?:[^#]*&)?id=)([\w-]+)", url)
-    if m:
-        fid = m.group(1)
-        out.update(kind="drive", embed=f"https://drive.google.com/file/d/{fid}/preview",
-                   view=f"https://drive.google.com/file/d/{fid}/view",
-                   pdf=f"https://drive.google.com/uc?export=download&id={fid}")
-        return out
-    m = re.search(r"docs\.google\.com/document/d/([\w-]+)", url)
-    if m:
-        did = m.group(1)
-        base = f"https://docs.google.com/document/d/{did}"
-        out.update(kind="gdoc", embed=f"{base}/preview", view=f"{base}/preview",
-                   pdf=f"{base}/export?format=pdf", docx=f"{base}/export?format=docx")
-        return out
-    m = re.search(r"docs\.google\.com/presentation/d/([\w-]+)", url)
-    if m:
-        did = m.group(1)
-        base = f"https://docs.google.com/presentation/d/{did}"
-        out.update(kind="gslides", embed=f"{base}/embed", view=f"{base}/preview",
-                   pdf=f"{base}/export/pdf")
-        return out
-    path = urllib.parse.urlsplit(url).path.lower()
-    if path.endswith(".pdf"):
-        out.update(kind="pdf", pdf=url, embed=f"https://docs.google.com/gview?embedded=1&url={q(url, safe='')}")
-    elif path.endswith((".docx", ".doc")):
-        out.update(kind="docx", docx=url,
-                   embed=f"https://view.officeapps.live.com/op/embed.aspx?src={q(url, safe='')}")
-    return out
-
-
-@main.route("/about")
-def about():
-    return render_template("about.html", offers=offers_list())
-
-
-@main.route("/brochure")
-def brochure():
-    pdf_path = os.path.join(current_app.static_folder, "brochure.pdf")
-    links = brochure_links(setting_value("brochure_url"))
-    products = Product.query.filter_by(active=True).order_by(Product.category, Product.id).all()
-    # Keep the most useful catalog order for the brochure while still showing
-    # any future categories created by Developer/Admin.
-    preferred = ["Premium Water", "Nevas Package Drinking Water", "Cold Drinks", "Energy Drinks"]
-    grouped = []
-    seen = set()
-    for category_name in preferred:
-        items = [p for p in products if (p.category or "").strip().lower() == category_name.lower()]
-        if items:
-            grouped.append((category_name, items))
-            seen.add(category_name.lower())
-    for category_name in sorted({(p.category or "Other").strip() or "Other" for p in products}, key=str.lower):
-        if category_name.lower() not in seen:
-            grouped.append((category_name, [p for p in products if (p.category or "Other").strip().lower() == category_name.lower()]))
-    brochure_text = {
-        "eyebrow": setting_value("brochure_eyebrow").strip() or DEFAULT_SETTINGS["brochure_eyebrow"],
-        "title": setting_value("brochure_title").strip() or DEFAULT_SETTINGS["brochure_title"],
-        "subtitle": setting_value("brochure_subtitle").strip() or DEFAULT_SETTINGS["brochure_subtitle"],
+    if (slot && whatsapp.whatsapp_url) {
+      slot.innerHTML = `<a class="primary" target="_blank" rel="noopener" href="${esc(whatsapp.whatsapp_url)}">Send order on WhatsApp</a>`;
     }
-    return render_template("brochure.html", brochure_pdf_exists=os.path.exists(pdf_path), b=links,
-                           product_groups=grouped, brochure_text=brochure_text,
-                           show_prices=prices_brochure(), offers=offers_list(),
-                           products=[product_dict(p) for p in products], thumb=image_thumb)
+  });
+}
 
+/* =========================
+   BILL
+   ========================= */
 
-# ============================================================
-# PRODUCT IMAGE HOSTING (FREE GITHUB STORAGE)
-# ============================================================
+async function bill(code) {
+  const list = await api("/api/my-orders");
 
-ALLOWED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
-MAX_PRODUCT_IMAGE_BYTES = 5 * 1024 * 1024
+  if (Array.isArray(list)) {
+    list.forEach((order) => {
+      ORD[order.code] = Object.assign(ORD[order.code] || {}, order);
+    });
+  }
 
+  const order = ORD[code];
 
-def github_image_config():
-    """Read GitHub image-hosting settings from environment variables."""
-    return {
-        "token": (os.getenv("GITHUB_TOKEN") or "").strip(),
-        "repo": (os.getenv("GITHUB_REPO") or "").strip().strip("/"),
-        "branch": (os.getenv("GITHUB_BRANCH") or "main").strip() or "main",
-        "folder": (os.getenv("GITHUB_IMAGE_FOLDER") or "static/product-images").strip("/") or "static/product-images",
+  if (!order || !order.lines) {
+    return alert("Bill not available");
+  }
+
+  const status =
+    order.status === "Cancelled"
+      ? ["CANCELLED", ""]
+      : order.payment_status === "Paid"
+        ? ["PAID", "ok"]
+        : order.payment_status === "Verifying"
+          ? ["PAYMENT BEING VERIFIED", ""]
+          : ["PAYMENT PENDING", ""];
+
+  modal(`
+        <div class="bill">
+
+            <div class="billhead">
+                <b>${esc(CFG.business_name || "Chand Enterprises")}</b>
+                <small>
+                    ${esc(CFG.business_location || "Darbhanga, Bihar")}
+                    · Bill
+                </small>
+            </div>
+
+            <div class="row"><span>Order</span><b>${esc(order.code)}</b></div>
+
+            <div class="row"><span>Date</span><span>${esc(order.created)}</span></div>
+
+            <div class="row"><span>Customer</span><span>${esc(order.customer)}</span></div>
+
+            <div class="row"><span>Mobile</span><span>${esc(order.mobile)}</span></div>
+
+            <div class="row">
+                <span>Address</span>
+                <span>
+                    ${esc(order.address)}
+                    ${order.map_url ? `<br><a class="loc-map-link" target="_blank" rel="noopener" href="${esc(order.map_url)}">📍 View on map</a>` : ""}
+                </span>
+            </div>
+
+            <hr>
+
+            ${order.lines
+              .map(
+                (item) => `
+                            <div class="row">
+                                <span>
+                                    ${esc(item.name)}
+                                    ${item.size ? `(${esc(item.size)})` : ""}
+                                    × ${item.qty}
+                                </span>
+                                <b>${money(item.total)}</b>
+                            </div>
+                        `,
+              )
+              .join("")}
+
+            <hr>
+
+            <div class="row"><span>Subtotal</span><span>${money(order.subtotal)}</span></div>
+
+            <div class="row"><span>Discount</span><span>${money(order.discount)}</span></div>
+
+            <div class="row">
+                <span>Delivery</span>
+                <span>${order.delivery_charge ? money(order.delivery_charge) : "Free"}</span>
+            </div>
+
+            <div class="row total"><b>Total</b><b>${money(order.total)}</b></div>
+
+            <div class="billstatus ${status[1]}">${status[0]}</div>
+
+            <button class="primary" onclick="window.print()">Print bill</button>
+            <button onclick="closeModal()">Close</button>
+
+        </div>
+    `);
+}
+
+/* =========================
+   CUSTOMER LOGIN
+   ========================= */
+
+async function account(message = "") {
+  if (CFG.customer_login_enabled === false) return loginPausedModal();
+  modal(`
+        <h2>Customer Login</h2>
+
+        ${message ? `<p class="muted">${esc(message)}</p>` : ""}
+
+        <label>
+            Mobile number
+            <input id="lm" maxlength="10" inputmode="numeric" placeholder="10-digit mobile number">
+        </label>
+
+        <p class="err" id="lerr"></p>
+
+        <button class="primary" onclick="sendOTP()">Continue</button>
+        <button onclick="closeModal()">Close</button>
+    `);
+}
+
+async function sendOTP() {
+  const mobile = $("#lm").value.trim();
+
+  const result = await api("/api/login", "POST", {
+    role: "customer",
+    mobile,
+  });
+
+  if (!result._ok) {
+    if (result.login_paused) {
+      CFG.customer_login_enabled = false;
+      applyLoginUI();
+      return loginPausedModal();
+    }
+    return ($("#lerr").textContent = result.error || "Could not send OTP");
+  }
+
+  LOGIN_MOBILE = mobile;
+
+  if (result.needs_link) return telegramLinkModal(mobile, result);
+
+  otpModal(mobile, result);
+}
+
+function otpModal(mobile, result) {
+  const where =
+    result.channel === "telegram"
+      ? "Login code sent to your <b>Telegram</b>"
+      : `OTP sent to <b>${esc(mobile)}</b>`;
+
+  modal(`
+        <h2>Verify OTP</h2>
+
+        <p>${where}</p>
+
+        ${
+          result.dev_otp
+            ? `<p class="muted">Demo OTP: <b>${esc(result.dev_otp)}</b></p>`
+            : ""
+        }
+
+        <label>
+            Enter OTP
+            <input id="otp" maxlength="4" inputmode="numeric" autofocus>
+        </label>
+
+        <p class="err" id="oerr"></p>
+
+        <button class="primary" onclick="verifyOTP()">Verify</button>
+        <button onclick="resendOTP()">Resend OTP</button>
+    `);
+}
+
+/* One-time Telegram connection (first login only) */
+function telegramLinkModal(mobile, result) {
+  modal(`
+        <h2>Connect Telegram</h2>
+
+        <p>We send your login code on Telegram. One-time setup for <b>${esc(mobile)}</b>:</p>
+
+        <ol class="muted" style="text-align:left;margin:8px 0 14px 18px">
+            <li>Tap <b>Open Telegram</b> and press <b>Start</b></li>
+            <li>Tap <b>Share my number</b></li>
+        </ol>
+
+        <a class="primary" target="_blank" rel="noopener" href="${esc(result.link)}">✈️ Open Telegram</a>
+
+        <p class="muted" id="tgWait">Waiting for you to press Start…</p>
+        <p class="err" id="oerr"></p>
+
+        <button onclick="tgCheckLink('${esc(mobile)}','${esc(result.token)}')">I have pressed Start</button>
+        <button onclick="closeModal()">Cancel</button>
+    `);
+
+  clearInterval(TG_POLL);
+  const started = Date.now();
+  TG_POLL = setInterval(() => {
+    if (!$("#tgWait") || Date.now() - started > 10 * 60 * 1000) {
+      return clearInterval(TG_POLL);
+    }
+    tgCheckLink(mobile, result.token);
+  }, 3000);
+}
+
+async function tgCheckLink(mobile, token) {
+  if (TG_BUSY || !$("#tgWait")) return;
+  TG_BUSY = true;
+
+  try {
+    const status = await api(
+      "/api/telegram/link-status?token=" + encodeURIComponent(token) + "&_=" + Date.now(),
+    );
+    if (!status._ok || !status.linked) return;
+
+    const sent = await api("/api/otp/resend", "POST");
+    if (!sent._ok) {
+      clearInterval(TG_POLL);
+      const err = $("#oerr");
+      if (err) err.textContent = (sent.error || "Could not send the code.") + " Tap “I have pressed Start” to retry.";
+      return;
     }
 
+    clearInterval(TG_POLL);
+    if (sent.needs_link) return telegramLinkModal(mobile, sent);
+    otpModal(mobile, sent);
+  } finally {
+    TG_BUSY = false;
+  }
+}
 
-def github_upload_bytes(filename, content, content_type, message):
-    """Upload a file to a PUBLIC GitHub repository using the Contents API."""
-    cfg = github_image_config()
-    if not cfg["token"] or not cfg["repo"]:
-        raise RuntimeError("GitHub image storage is not configured. Add GITHUB_TOKEN and GITHUB_REPO in Render Environment Variables.")
-    if "/" not in cfg["repo"]:
-        raise RuntimeError("GITHUB_REPO must be in owner/repository format.")
+async function resendOTP() {
+  const result = await api("/api/otp/resend", "POST");
+  const err = $("#oerr");
 
-    # Keep the file name safe and predictable.
-    safe_name = re.sub(r"[^A-Za-z0-9._-]+", "-", filename).strip(".-") or "product-image"
-    path = f"{cfg['folder']}/{safe_name}"
-    api_url = f"https://api.github.com/repos/{cfg['repo']}/contents/{urllib.parse.quote(path, safe='/-._')}"
-    payload = {
-        "message": message,
-        "content": base64.b64encode(content).decode("ascii"),
-        "branch": cfg["branch"],
+  if (!result._ok) {
+    return (err.textContent = result.error || "Could not resend OTP");
+  }
+
+  if (result.needs_link) return telegramLinkModal(LOGIN_MOBILE, result);
+
+  err.textContent = result.dev_otp ? "Demo OTP: " + result.dev_otp : "New code sent.";
+}
+
+async function verifyOTP() {
+  const result = await api("/api/verify-otp", "POST", {
+    otp: $("#otp").value.trim(),
+  });
+
+  if (!result._ok) {
+    return ($("#oerr").textContent = result.error || "Incorrect OTP");
+  }
+
+  ME = {
+    authenticated: true,
+
+    role: "customer",
+
+    name: result.user.name,
+
+    mobile: result.user.mobile,
+  };
+
+  await refreshMe();
+
+
+  if (LOGIN_FROM_CHECKOUT) {
+    LOGIN_FROM_CHECKOUT = false;
+
+    return checkout();
+  }
+
+
+  closeModal();
+}
+
+async function refreshMe() {
+  ME = await api("/api/me");
+
+  const accountButton = $("#accountBtn");
+  const logoutButton = $("#logoutBtn");
+
+  // Hamburger menu auth controls
+  const menuAccountButton = $("#menuAccountBtn");
+  const menuLogoutButton = $("#menuLogoutBtn");
+
+  if (ME && ME.authenticated) {
+    if (accountButton) {
+      accountButton.textContent = `Hi, ${ME.name || "Customer"}`;
     }
-    request_obj = urllib.request.Request(
-        api_url,
-        data=json.dumps(payload).encode("utf-8"),
-        method="PUT",
-        headers={
-            "Accept": "application/vnd.github+json",
-            "Authorization": f"Bearer {cfg['token']}",
-            "X-GitHub-Api-Version": "2022-11-28",
-            "User-Agent": "Chand-Enterprises/1.0",
-            "Content-Type": "application/json",
-        },
-    )
-    try:
-        with urllib.request.urlopen(request_obj, timeout=25) as response:
-            data = json.loads(response.read().decode("utf-8"))
-    except urllib.error.HTTPError as exc:
-        try:
-            body = json.loads(exc.read().decode("utf-8"))
-            detail = body.get("message") or f"GitHub returned HTTP {exc.code}"
-        except Exception:
-            detail = f"GitHub returned HTTP {exc.code}"
-        raise RuntimeError(detail)
-    except urllib.error.URLError as exc:
-        raise RuntimeError(f"Could not reach GitHub: {exc.reason}")
 
-    # Raw GitHub URL works for public repositories.
-    raw_url = f"https://raw.githubusercontent.com/{cfg['repo']}/{urllib.parse.quote(cfg['branch'], safe='')}/{urllib.parse.quote(path, safe='/')}"
-    return raw_url, path, data
-
-
-def github_path_from_url(url):
-    """
-    Return the repo path of an image that WE uploaded (inside GITHUB_IMAGE_FOLDER of our
-    repo/branch), or "" for anything else (pasted external URLs are never touched).
-    """
-    cfg = github_image_config()
-    url = (url or "").strip()
-    if not (cfg["token"] and cfg["repo"] and url):
-        return ""
-    prefix = f"https://raw.githubusercontent.com/{cfg['repo']}/{urllib.parse.quote(cfg['branch'], safe='')}/"
-    if not url.lower().startswith(prefix.lower()):
-        return ""
-    path = urllib.parse.unquote(url[len(prefix):].split("?")[0].split("#")[0])
-    if ".." in path or not path.startswith(cfg["folder"] + "/"):
-        return ""
-    return path
-
-
-def github_delete_file(path, message):
-    """Delete one file from the GitHub repo (Contents API). A file that is already gone counts as deleted."""
-    cfg = github_image_config()
-    api_url = f"https://api.github.com/repos/{cfg['repo']}/contents/{urllib.parse.quote(path, safe='/-._')}"
-    headers = {
-        "Accept": "application/vnd.github+json",
-        "Authorization": f"Bearer {cfg['token']}",
-        "X-GitHub-Api-Version": "2022-11-28",
-        "User-Agent": "Chand-Enterprises/1.0",
+    if (logoutButton) {
+      logoutButton.hidden = false;
     }
-    try:
-        get_req = urllib.request.Request(api_url + "?ref=" + urllib.parse.quote(cfg["branch"], safe=""), headers=headers)
-        with urllib.request.urlopen(get_req, timeout=20) as response:
-            sha = json.loads(response.read().decode("utf-8")).get("sha")
-        if not sha:
-            raise RuntimeError("GitHub did not return the file id")
-        del_req = urllib.request.Request(
-            api_url,
-            data=json.dumps({"message": message, "sha": sha, "branch": cfg["branch"]}).encode("utf-8"),
-            method="DELETE",
-            headers=dict(headers, **{"Content-Type": "application/json"}),
-        )
-        with urllib.request.urlopen(del_req, timeout=25):
-            pass
-    except urllib.error.HTTPError as exc:
-        if exc.code == 404:
-            return True
-        raise RuntimeError(f"GitHub returned HTTP {exc.code}")
-    except urllib.error.URLError as exc:
-        raise RuntimeError(f"Could not reach GitHub: {exc.reason}")
-    return True
 
-
-def delete_replaced_image(old_url, new_url=""):
-    """
-    Call AFTER the product row is saved. If old_url was one of our uploaded GitHub images and
-    nothing uses it any more, delete it from the repo. Best-effort: a GitHub problem never
-    breaks the product update. Returns True (deleted), False (tried, failed) or None (nothing to do).
-    """
-    old_url = (old_url or "").strip()
-    if not old_url or old_url == (new_url or "").strip():
-        return None
-    path = github_path_from_url(old_url)
-    if not path:
-        return None
-    if Product.query.filter(Product.image_url == old_url).first():
-        return None                      # another product still shows this image
-    try:
-        return github_delete_file(path, f"Remove replaced product image: {path.rsplit('/', 1)[-1]}")
-    except RuntimeError as exc:
-        current_app.logger.warning("Could not delete old product image %s: %s", path, exc)
-        return False
-
-
-@main.post("/api/product/<int:pid>/image")
-def product_image(pid):
-    if not role_ok("admin", "developer"):
-        return jsonify(error="Forbidden"), 403
-    p = db.session.get(Product, pid)
-    if not p:
-        return jsonify(error="Product not found"), 404
-
-    # URL mode: no GitHub upload required.
-    image_url = str(request.form.get("image_url") or "").strip()
-    if image_url:
-        clean = _clean_http_url(image_url)
-        if not clean:
-            return jsonify(error="Image URL must start with https:// or http://"), 400
-        old_url = p.image_url
-        p.image_url = clean
-        db.session.commit()
-        deleted = delete_replaced_image(old_url, clean)
-        return jsonify(ok=True, image_url=p.image_url, source="url", old_image_deleted=deleted)
-
-    uploaded = request.files.get("image")
-    if not uploaded or not uploaded.filename:
-        return jsonify(error="Choose an image or paste an image URL"), 400
-
-    ext = Path(uploaded.filename).suffix.lower()
-    content_type = (uploaded.mimetype or mimetypes.guess_type(uploaded.filename)[0] or "").lower()
-    if ext not in ALLOWED_IMAGE_EXTENSIONS or not content_type.startswith("image/"):
-        return jsonify(error="Allowed image types: JPG, JPEG, PNG, WEBP and GIF"), 400
-
-    content = uploaded.read(MAX_PRODUCT_IMAGE_BYTES + 1)
-    if len(content) > MAX_PRODUCT_IMAGE_BYTES:
-        return jsonify(error="Image is too large. Maximum size is 5 MB."), 400
-
-    # Unique name means changing an image never requires deleting an old Git blob.
-    base = re.sub(r"[^A-Za-z0-9]+", "-", p.name.lower()).strip("-") or "product"
-    filename = f"{base}-{p.id}-{int(datetime.utcnow().timestamp())}{ext}"
-    try:
-        raw_url, path, _ = github_upload_bytes(
-            filename,
-            content,
-            content_type,
-            f"Add product image: {p.name} (#{p.id})",
-        )
-    except RuntimeError as exc:
-        return jsonify(error=str(exc)), 400
-
-    old_url = p.image_url
-    p.image_url = raw_url
-    db.session.commit()
-    deleted = delete_replaced_image(old_url, raw_url)
-    return jsonify(ok=True, image_url=raw_url, github_path=path, source="github", old_image_deleted=deleted)
-
-
-@main.delete("/api/product/<int:pid>/image")
-def product_image_remove(pid):
-    if not role_ok("admin", "developer"):
-        return jsonify(error="Forbidden"), 403
-    p = db.session.get(Product, pid)
-    if not p:
-        return jsonify(error="Product not found"), 404
-    old_url = p.image_url
-    p.image_url = ""
-    db.session.commit()
-    deleted = delete_replaced_image(old_url, "")      # also removes the file from GitHub
-    return jsonify(ok=True, old_image_deleted=deleted)
-
-
-@main.get("/api/product-image-config")
-def product_image_config():
-    if not role_ok("admin", "developer"):
-        return jsonify(error="Forbidden"), 403
-    cfg = github_image_config()
-    return jsonify(
-        ok=True,
-        github_configured=bool(cfg["token"] and cfg["repo"]),
-        repository=cfg["repo"],
-        branch=cfg["branch"],
-        folder=cfg["folder"],
-    )
-
-
-@main.get("/api/admin/brochure")
-def admin_get_brochure():
-    if not role_ok("admin", "developer"):
-        return jsonify(error="Forbidden"), 403
-    return jsonify(url=setting_value("brochure_url"), links=brochure_links(setting_value("brochure_url")))
-
-
-@main.post("/api/admin/brochure")
-def admin_save_brochure():
-    if not role_ok("admin", "developer"):
-        return jsonify(error="Forbidden"), 403
-    raw = str((request.json or {}).get("url") or "").strip()
-    if raw and not _clean_http_url(raw):
-        return jsonify(error="Please paste a full link starting with https://"), 400
-    set_setting("brochure_url", raw)
-    db.session.commit()
-    return jsonify(ok=True, url=raw, links=brochure_links(raw))
-
-
-@main.route("/staff")
-def staff_login():
-    if role_ok("admin", "delivery", "developer"):
-        return redirect(url_for("main.dashboard"))
-    return render_template("staff.html")
-
-
-@main.route("/dashboard")
-def dashboard():
-    if not role_ok("admin", "delivery", "developer"):
-        return redirect(url_for("main.staff_login"))
-
-    role = session["role"]
-
-    if role == "admin":
-        return render_template("admin.html",
-                               delivery_users=User.query.filter_by(role="delivery", active=True).all(),
-                               products=Product.query.order_by(Product.id).all())
-
-    if role == "developer":
-        return render_template("developer.html", settings=developer_settings())
-    return render_template("role.html", role=role)
-
-
-@main.route("/whatsapp")
-def whatsapp_page():
-    return render_template("whatsapp.html", number=wa_number())
-
-
-@main.route("/logout", methods=["GET", "POST"])
-def logout():
-    # GET as well as POST, so a plain link / address-bar visit never gives 405
-    session.clear()
-    return redirect(url_for("main.home"))
-
-
-# ---------- auth ----------
-
-@main.post("/api/login")
-def login():
-    d = request.json or {}
-
-    if d.get("role", "customer") == "customer":
-        if not customer_login_enabled():
-            return jsonify(ok=False, login_paused=True, error=LOGIN_PAUSED_MESSAGE), 403
-        mobile = str(d.get("mobile", "")).strip()
-        if not (mobile.isdigit() and len(mobile) == 10):
-            return jsonify(ok=False, error="Enter a valid 10-digit mobile number"), 400
-        return new_otp(mobile)
-
-    username = str(d.get("username") or "").strip()
-    u = User.query.filter(db.func.lower(User.username) == username.lower()).first()
-
-    if not u or not u.active or not u.password or u.role == "customer" or not check_password_hash(u.password, d.get("password", "")):
-        return jsonify(ok=False, error="Invalid credentials"), 401
-
-    session.clear()
-    session.update(user_id=u.id, role=u.role, name=u.name)
-    return jsonify(ok=True, redirect=url_for("main.dashboard"))
-
-
-@main.post("/api/otp/resend")
-def resend_otp():
-    if not customer_login_enabled():
-        return jsonify(ok=False, login_paused=True, error=LOGIN_PAUSED_MESSAGE), 403
-    m = session.get("otp_mobile")
-    if not m:
-        return jsonify(ok=False, error="OTP session expired"), 400
-    return new_otp(m)
-
-
-@main.post("/api/verify-otp")
-def verify_otp():
-    if not customer_login_enabled():
-        return jsonify(ok=False, login_paused=True, error=LOGIN_PAUSED_MESSAGE), 403
-    d = request.json or {}
-    mobile = session.get("otp_mobile")
-
-    if not mobile:
-        return jsonify(ok=False, error="OTP session expired. Request a new OTP."), 400
-
-    ch = OtpChallenge.query.filter_by(mobile=mobile, verified=False).order_by(OtpChallenge.id.desc()).first()
-
-    if not ch or datetime.utcnow() > ch.expires_at:
-        return jsonify(ok=False, error="OTP expired. Request a new OTP."), 400
-
-    if ch.attempts >= 5:
-        return jsonify(ok=False, error="Too many attempts. Request a new OTP."), 429
-
-    ch.attempts += 1
-
-    entered_otp = str(d.get("otp", "")).strip()
-
-    # Master OTP for testing
-    master_otp = current_app.config.get("MASTER_OTP", "")
-    if (not master_otp or entered_otp != master_otp) and not check_password_hash(ch.otp_hash, entered_otp):
-        db.session.commit()
-        return jsonify(
-            ok=False,
-            error="Incorrect OTP",
-            attempts_left=max(0, 5 - ch.attempts)
-        ), 400
-
-    ch.verified = True
-
-    u = User.query.filter_by(mobile=mobile).first()
-
-    if not u:
-        u = User(name="Customer", mobile=mobile, role="customer")
-        db.session.add(u)
-        db.session.flush()
-
-    session.clear()
-    session.update(user_id=u.id, role="customer", name=u.name)
-    db.session.commit()
-    return jsonify(ok=True, user=dict(name=u.name, mobile=u.mobile))
-
-
-@main.get("/api/me")
-def me():
-    u = current_user()
-    if not u:
-        return jsonify(authenticated=False)
-    return jsonify(authenticated=True, id=u.id, name=u.name, mobile=u.mobile, role=u.role,
-                   address=u.address or "", landmark=u.landmark or "")
-
-
-@main.put("/api/profile")
-def update_profile():
-    u = current_user()
-    if not u or u.role != "customer":
-        return jsonify(error="Please login"), 401
-
-    d = request.json or {}
-    name = (d.get("name") or "").strip()
-
-    if not name:
-        return jsonify(error="Name is required"), 400
-
-    u.name, u.address, u.landmark = name, (d.get("address") or "").strip(), (d.get("landmark") or "").strip()
-    session["name"] = u.name
-    db.session.commit()
-    return jsonify(ok=True)
-
-
-# ---------- Telegram alerts (orders, admin, delivery, daily summary) ----------
-# All alerts are sent from a background thread so a slow Telegram never slows down an order,
-# and a Telegram problem can never make an order, status change or assignment fail.
-
-def telegram_bot_ready():
-    """Bot token is set and the bot has been connected from the Developer panel."""
-    return bool(os.getenv("TELEGRAM_BOT_TOKEN") and setting_value("telegram_bot_username"))
-
-
-def tg_send_async(chat_ids, text):
-    chat_ids = [c for c in dict.fromkeys(chat_ids or []) if c]
-    if not chat_ids or not text or not telegram_bot_ready():
-        return
-    app = current_app._get_current_object()
-
-    def run():
-        with app.app_context():
-            for chat_id in chat_ids:
-                try:
-                    tg_call("sendMessage", {"chat_id": chat_id, "text": text[:4000],
-                                            "disable_web_page_preview": True})
-                except Exception:
-                    pass
-
-    threading.Thread(target=run, daemon=True).start()
-
-
-def safe_notify(fn, *args):
-    try:
-        fn(*args)
-    except Exception:
-        db.session.rollback()
-        current_app.logger.exception("Telegram alert failed (%s)", getattr(fn, "__name__", "?"))
-
-
-def admin_chat_ids():
-    rows = (db.session.query(StaffTelegramLink.chat_id)
-            .join(User, User.id == StaffTelegramLink.user_id)
-            .filter(User.role == "admin", User.active == True).all())
-    return [r[0] for r in rows]
-
-
-def staff_chat_id(user_id):
-    row = StaffTelegramLink.query.filter_by(user_id=user_id).first() if user_id else None
-    return row.chat_id if row else None
-
-
-def customer_chat_id(mobile):
-    row = TelegramLink.query.filter_by(mobile=mobile).first() if mobile else None
-    return row.chat_id if row else None
-
-
-def _business_name():
-    return setting_value("business_name") or "Chand Enterprises"
-
-
-def _order_lines_text(o):
-    return "\n".join(
-        f"• {i.product_name}" + (f" ({i.product_size})" if i.product_size else "") + f" x {i.quantity} = ₹{i.line_total:.0f}"
-        for i in o.items)
-
-
-def notify_customer_order(o, kind):
-    """kind: 'placed' | an order status | 'paid'. Only customers who linked Telegram get it."""
-    if not _flag("notify_customer_status"):
-        return
-    chat_id = customer_chat_id(o.mobile)
-    if not chat_id:
-        return
-    biz = _business_name()
-    if kind == "placed":
-        text = (f"✅ {biz}: order received\nOrder: {o.code}\n\n{_order_lines_text(o)}\n\n"
-                f"Subtotal: ₹{o.subtotal:.0f}\nDiscount: ₹{o.discount:.0f}\nDelivery: ₹{o.delivery_charge:.0f}\n"
-                f"Total: ₹{o.total:.0f}\nPayment: {o.payment_method} ({o.payment_status})\n\n"
-                "We will update you here as your order moves.")
-    elif kind == "Confirmed":
-        text = f"✅ Your order {o.code} is confirmed."
-    elif kind == "Preparing":
-        text = f"👨‍🍳 Your order {o.code} is being prepared."
-    elif kind == "Out for Delivery":
-        who = o.delivery_person.name if o.delivery_person else ""
-        text = f"🚚 Your order {o.code} is out for delivery." + (f"\nDelivery partner: {who}" if who else "")
-    elif kind == "Delivered":
-        text = f"📦 Your order {o.code} has been delivered. Total ₹{o.total:.0f}. Thank you for choosing {biz}!"
-    elif kind == "Cancelled":
-        text = f"❌ Your order {o.code} has been cancelled."
-    elif kind == "paid":
-        text = f"💰 Payment of ₹{o.total:.0f} received for order {o.code}. Thank you!"
-    else:
-        return
-    tg_send_async([chat_id], text)
-
-
-def _admin_order_text(o, title):
-    loc = f"\n📍 {o.map_url}" if o.map_url else ""
-    return (f"{title}\nOrder: {o.code}\n{o.customer_name} · {o.mobile}\n{o.address}{loc}\n\n"
-            f"{_order_lines_text(o)}\n\nTotal: ₹{o.total:.0f} · {o.payment_method} ({o.payment_status})")
-
-
-def notify_admins_order(o, title, extra=""):
-    if not _flag("notify_admin_orders"):
-        return
-    tg_send_async(admin_chat_ids(), _admin_order_text(o, title) + (("\n" + extra) if extra else ""))
-
-
-def notify_low_stock(products):
-    if not _flag("notify_admin_low_stock"):
-        return
-    low = [p for p in products if p.stock <= (p.low_stock_threshold or 10)]
-    if not low:
-        return
-    lines = [f"• {p.name}" + (f" ({p.size})" if p.size else "") + f": {p.stock} left (alert at {p.low_stock_threshold or 10})"
-             for p in low]
-    tg_send_async(admin_chat_ids(), "⚠️ Low stock\n" + "\n".join(lines))
-
-
-def notify_delivery_assigned(o):
-    if not _flag("notify_delivery_assign"):
-        return
-    chat_id = staff_chat_id(o.delivery_person_id)
-    if not chat_id:
-        return
-    loc = f"\n📍 {o.map_url}" if o.map_url else ""
-    cash = ""
-    if o.payment_method == "COD" and o.payment_status != "Paid":
-        cash = f"\n💵 Collect cash: ₹{max(0, o.total - (o.cash_collected or 0)):.0f}"
-    text = (f"📦 New delivery assigned\nOrder: {o.code}\n{o.customer_name} · {o.mobile}\n{o.address}{loc}\n\n"
-            f"{_order_lines_text(o)}\n\nTotal: ₹{o.total:.0f} · {o.payment_method} ({o.payment_status}){cash}")
-    tg_send_async([chat_id], text)
-
-
-def build_daily_summary():
-    """Summary of today (India time) for the admin chats."""
-    ist_now = datetime.utcnow() + timedelta(hours=5, minutes=30)
-    day_ist = ist_now.replace(hour=0, minute=0, second=0, microsecond=0)
-    start = day_ist - timedelta(hours=5, minutes=30)          # back to UTC for the database
-    end = start + timedelta(days=1)
-    orders = Order.query.filter(Order.created_at >= start, Order.created_at < end).all()
-    live = [o for o in orders if o.status != "Cancelled"]
-    revenue = sum(o.total for o in live if o.payment_status == "Paid")
-    unpaid = sum(o.total for o in live if o.payment_status != "Paid")
-    cash = sum((o.cash_collected or 0) for o in live if o.payment_method == "COD")
-    delivered = sum(1 for o in live if o.status == "Delivered")
-    qty_sum = db.func.sum(OrderItem.quantity)
-    top = (db.session.query(OrderItem.product_name, qty_sum)
-           .join(Order, Order.id == OrderItem.order_id)
-           .filter(Order.created_at >= start, Order.created_at < end, Order.status != "Cancelled")
-           .group_by(OrderItem.product_name).order_by(qty_sum.desc()).limit(3).all())
-    low = Product.query.filter(Product.active == True, Product.stock <= Product.low_stock_threshold).count()
-    lines = [f"📊 {_business_name()} · {day_ist.strftime('%d %b %Y')}",
-             f"Orders: {len(live)} (cancelled {len(orders) - len(live)})",
-             f"Delivered: {delivered}",
-             f"Paid revenue: ₹{revenue:.0f}",
-             f"Not paid yet: ₹{unpaid:.0f}",
-             f"COD cash collected: ₹{cash:.0f}"]
-    if top:
-        lines.append("Top products: " + ", ".join(f"{n} x{int(q)}" for n, q in top))
-    if low:
-        lines.append(f"⚠️ {low} product(s) at or below the low-stock alert")
-    return day_ist.strftime("%Y-%m-%d"), "\n".join(lines)
-
-
-def _ist_today():
-    return (datetime.utcnow() + timedelta(hours=5, minutes=30)).strftime("%Y-%m-%d")
-
-
-def claim_summary_day(day):
-    """Atomically mark `day` as sent. True only for the ONE caller that wins (safe with several workers)."""
-    if not SiteSetting.query.filter_by(key="last_summary_date").first():
-        try:
-            db.session.add(SiteSetting(key="last_summary_date", value=""))
-            db.session.commit()
-        except Exception:
-            db.session.rollback()
-    won = SiteSetting.query.filter(SiteSetting.key == "last_summary_date", SiteSetting.value != day) \
-        .update({"value": day}, synchronize_session=False)
-    db.session.commit()
-    _settings_cache()["last_summary_date"] = day
-    return won == 1
-
-
-def send_daily_summary(force=False):
-    """force=True is the manual 'send now' button: it never blocks the scheduled summary."""
-    if not telegram_bot_ready():
-        return {"ok": False, "error": "Telegram bot is not connected yet"}
-    today = _ist_today()
-    if not force and setting_value("last_summary_date") == today:
-        return {"ok": True, "skipped": "already sent today"}
-    chats = admin_chat_ids()
-    if not chats:
-        return {"ok": False, "error": "No admin has linked Telegram yet"}
-    if not force and not claim_summary_day(today):
-        return {"ok": True, "skipped": "already sent today"}
-    try:
-        _, text = build_daily_summary()
-    except Exception:
-        if not force:
-            set_setting("last_summary_date", "")
-            db.session.commit()
-        raise
-    tg_send_async(chats, text)
-    return {"ok": True, "sent_to": len(chats)}
-
-
-TIME_RE = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
-
-
-def cron_run():
-    """One scheduler pass. A free pinger calls this every few minutes (and the Developer
-    'Run check now' button). It decides what is due, using the settings the developer chose."""
-    now_utc = datetime.utcnow()
-    set_setting("last_cron_tick", now_utc.strftime("%Y-%m-%d %H:%M:%S"))
-    db.session.commit()
-    result = {"ok": True, "tick": True, "summary": "switched off"}
-    if _flag("notify_daily_summary"):
-        hhmm = setting_value("summary_time") or "21:30"
-        if not TIME_RE.match(hhmm):
-            hhmm = "21:30"
-        ist = now_utc + timedelta(hours=5, minutes=30)
-        if ist.strftime("%H:%M") < hhmm:
-            result["summary"] = f"waiting for {hhmm} India time"
-        else:
-            r = send_daily_summary()
-            result["summary"] = ("sent" if r.get("sent_to") else (r.get("skipped") or r.get("error") or "not sent"))
-    return result
-
-
-def _staff_link_payload(u):
-    """One-time t.me link that connects THIS staff account's Telegram (no contact sharing needed)."""
-    if not telegram_bot_ready():
-        return None, "Connect the Telegram bot first (Settings > Login and OTP)"
-    now = datetime.utcnow()
-    TelegramToken.query.filter(TelegramToken.mobile == f"staff:{u.id}").delete(synchronize_session=False)
-    token = secrets.token_urlsafe(12)
-    db.session.add(TelegramToken(token=token, mobile=f"staff:{u.id}", expires_at=now + timedelta(minutes=10)))
-    db.session.commit()
-    link = f"https://t.me/{setting_value('telegram_bot_username')}?start={token}"
-    digits = "".join(c for c in (u.mobile or "") if c.isdigit())
-    wa = ""
-    if len(digits) >= 10:
-        wa = "https://wa.me/91" + digits[-10:] + "?text=" + urllib.parse.quote(
-            f"Open this link on your phone to get {_business_name()} alerts on Telegram (valid 10 minutes): {link}")
-    return {"link": link, "whatsapp_url": wa, "expires_in": 600}, None
-
-
-# ---------- shop ----------
-
-@main.post("/api/delivery/quote")
-def delivery_quote():
-    """Live total preview for checkout: coupon discount + distance-based delivery."""
-    d = request.json or {}
-    try:
-        subtotal = float(d.get("subtotal") or 0)
-    except (TypeError, ValueError):
-        return jsonify(error="Invalid subtotal"), 400
-    code = str(d.get("coupon") or "").strip().upper()
-    lat = parse_coord(d.get("latitude"), -90, 90)
-    lng = parse_coord(d.get("longitude"), -180, 180)
-    if not valid_order_coordinates(lat, lng):
-        lat = lng = None
-    row, discount = calculate_coupon(code, subtotal)
-    coupon_msg, coupon_ok = "", False
-    if code:
-        if not row:
-            coupon_msg = "Invalid or inactive coupon"
-        elif discount <= 0:
-            coupon_msg = f"Minimum order for {row.code} is \u20b9{(row.min_order or 0):.0f}"
-        else:
-            coupon_ok = True
-            coupon_msg = f"{row.code} applied: \u2212\u20b9{discount:.0f}"
-    delivery, distance = calculate_delivery(subtotal - discount, lat, lng)
-    return jsonify(ok=True, subtotal=subtotal, discount=discount, delivery_charge=delivery,
-                   distance_km=None if distance is None else round(distance, 1),
-                   coupon_ok=coupon_ok, coupon_message=coupon_msg)
-
-
-@main.get("/api/config")
-def config():
-    cfg = developer_settings()
-    return jsonify(_ok=True, whatsapp=wa_number(), upi=cfg["upi"] or current_app.config["UPI_ID"], business_name=cfg["business_name"], business_mobile=cfg["business_mobile"], business_location=cfg["business_location"], payment_name=cfg["payment_name"], offers=cfg["offers"], show_prices_home=cfg["show_prices_home"], show_prices_brochure=cfg["show_prices_brochure"], ordering_enabled=cfg["ordering_enabled"], customer_login_enabled=cfg["customer_login_enabled"], maps_enabled=cfg["maps_enabled"], map_customer_tracking=cfg["map_customer_tracking"], map_delivery_navigation=cfg["map_delivery_navigation"], map_admin_view=cfg["map_admin_view"], business_lat=cfg["business_lat"], business_lng=cfg["business_lng"], eta_confirmed_min=cfg["eta_confirmed_min"], eta_confirmed_max=cfg["eta_confirmed_max"], eta_preparing_min=cfg["eta_preparing_min"], eta_preparing_max=cfg["eta_preparing_max"], eta_out_for_delivery_min=cfg["eta_out_for_delivery_min"], eta_out_for_delivery_max=cfg["eta_out_for_delivery_max"], free_delivery_above=float_setting("delivery_free_above", 500), instagram_url=cfg["instagram_url"], facebook_url=cfg["facebook_url"], social_links=cfg["social_links"], about_title=cfg["about_title"], about_text=cfg["about_text"], footer_tagline=cfg["footer_tagline"], brochure_url=cfg["brochure_url"], categories=[category_dict(c) for c in active_categories()], coupons=[coupon_dict(c) for c in Coupon.query.filter_by(active=True).order_by(Coupon.code).all()])
-
-
-@main.get("/api/categories")
-def api_categories():
-    return jsonify([category_dict(c) for c in active_categories()])
-
-
-@main.get("/api/products")
-def api_products():
-    return jsonify([product_dict(p) for p in Product.query.filter_by(active=True)])
-
-
-@main.post("/api/orders")
-def create_order():
-    if not ordering_enabled():
-        return jsonify(error="Online ordering is paused right now. Please order on WhatsApp."), 403
-
-    u = current_user()
-
-    if not u or u.role != "customer":
-        return jsonify(error="Please login as customer"), 401
-
-    d = request.json or {}
-    name = (d.get("name") or u.name or "").strip()
-    address = (d.get("address") or u.address or "").strip()
-    method = d.get("payment_method", "COD")
-    lat = parse_coord(d.get("latitude"), -90, 90)
-    lng = parse_coord(d.get("longitude"), -180, 180)
-
-    if not valid_order_coordinates(lat, lng):
-        lat = lng = None
-
-    coupon = (d.get("coupon") or "").strip().upper()
-    items = d.get("items") or []
-
-    if not name or not address:
-        return jsonify(error="Name and delivery address are required"), 400
-
-    if not items:
-        return jsonify(error="Cart is empty"), 400
-
-    if method not in {"COD", "QR"}:
-        return jsonify(error="Invalid payment method"), 400
-
-    subtotal, lines = 0, []
-
-    for x in items:
-        try:
-            p, qty = db.session.get(Product, int(x["id"])), int(x["qty"])
-        except (KeyError, TypeError, ValueError):
-            return jsonify(error="Invalid cart"), 400
-
-        if not p or not p.active:
-            return jsonify(error="Product unavailable"), 400
-
-        if qty < 1 or p.stock < qty:
-            return jsonify(error=f"Insufficient stock for {p.name}"), 400
-
-        subtotal += p.price * qty
-        lines.append((p, qty))
-
-    coupon_row, discount = calculate_coupon(coupon, subtotal)
-    if coupon and not coupon_row:
-        return jsonify(error="Invalid or inactive coupon"), 400
-    delivery, distance_km = calculate_delivery(subtotal - discount, lat, lng)
-    total = max(0, subtotal - discount + delivery)
-
-    code = "CE" + datetime.now().strftime("%y%m%d%H%M%S") + secrets.token_hex(1).upper()
-
-    o = Order(code=code, customer_name=name, mobile=u.mobile, address=address, latitude=lat, longitude=lng, total=total,
-              delivery_charge=delivery, cash_collected=0, payment_method=method, payment_status="Pending",
-              coupon_code=coupon_row.code if coupon_row else None, discount=discount)
-
-    db.session.add(o)
-    db.session.flush()
-    add_tracking_event(o, "Order placed", status=o.status, note="Your order has been received.", actor_user_id=u.id)
-
-    for p, qty in lines:
-        p.stock -= qty
-        db.session.add(
-            OrderItem(
-                order_id=o.id,
-                product_id=p.id,
-                product_name=p.name,
-                product_size=p.size or "1L",
-                quantity=qty,
-                unit_price=p.price,
-            )
-        )
-
-    db.session.add(Payment(order_id=o.id, method=method, amount=total))
-
-    if not u.address:
-        u.address = address
-
-    db.session.commit()
-
-    # Telegram alerts (never block or fail the order)
-    safe_notify(notify_customer_order, o, "placed")
-    safe_notify(notify_admins_order, o, "🛒 New order")
-    safe_notify(notify_low_stock, [p for p, _ in lines])
-
-    return jsonify(ok=True, order_id=code, total=total, subtotal=subtotal, discount=discount,
-                   delivery_charge=delivery, cash_collected=0, payment_method=method, upi=current_app.config["UPI_ID"],
-                   upi_url=upi_uri(o))
-
-
-def own_order(code):
-    u = current_user()
-    o = Order.query.filter_by(code=code).first()
-
-    if not o:
-        return None, (jsonify(error="Order not found"), 404)
-
-    if role_ok("customer") and (not u or u.mobile != o.mobile):
-        return None, (jsonify(error="Forbidden"), 403)
-
-    if not role_ok():
-        return None, (jsonify(error="Please login"), 401)
-
-    return o, None
-
-
-@main.get("/api/my-orders")
-def my_orders():
-    u = current_user()
-    if not u or u.role != "customer":
-        return jsonify(error="Please login"), 401
-    rows = Order.query.options(selectinload(Order.items), selectinload(Order.payments), joinedload(Order.delivery_person)).filter_by(mobile=u.mobile).order_by(Order.created_at.desc()).limit(30)
-    return jsonify([order_dict(o) for o in rows])
-
-
-@main.post("/api/orders/<code>/delivery-location")
-def update_order_delivery_location(code):
-    """Customers may correct their own delivery details before dispatch."""
-    u = current_user()
-    if not u or u.role != "customer":
-        return jsonify(error="Please login as customer"), 401
-    o = Order.query.filter_by(code=code).first()
-    if not o:
-        return jsonify(error="Order not found"), 404
-    if o.mobile != u.mobile:
-        return jsonify(error="You can only update your own order"), 403
-    if o.status not in {"Confirmed", "Preparing"}:
-        return jsonify(error="Delivery details can only be changed before dispatch"), 400
-    d = request.json or {}
-    address = str(d.get("address") or "").strip()
-    if not address or len(address) > 1000:
-        return jsonify(error="Enter a delivery address (up to 1000 characters)"), 400
-    raw_lat, raw_lng = d.get("latitude"), d.get("longitude")
-    if (raw_lat in (None, "") and raw_lng in (None, "")):
-        lat = lng = None
-    else:
-        lat = parse_coord(raw_lat, -90, 90)
-        lng = parse_coord(raw_lng, -180, 180)
-        if lat is None or lng is None or (lat == 0 and lng == 0):
-            return jsonify(error="Enter valid latitude and longitude, or clear both coordinates"), 400
-    old_address, old_lat, old_lng = o.address, o.latitude, o.longitude
-    if address == old_address and lat == old_lat and lng == old_lng:
-        return jsonify(ok=True, message="No changes were needed", order=order_dict(o))
-    o.address, o.latitude, o.longitude = address, lat, lng
-    add_tracking_event(o, "Delivery details updated", event_type="location", status=o.status,
-                       note="Customer updated the delivery address or map pin before dispatch.", actor_user_id=u.id)
-    db.session.commit()
-    return jsonify(ok=True, message="Delivery details updated", order=order_dict(o))
-
-
-@main.get("/api/orders/<code>/tracking")
-def order_tracking(code):
-    u = current_user()
-    if not u:
-        return jsonify(error="Please login to view order tracking"), 401
-    o = Order.query.filter_by(code=code).first()
-    if not o:
-        return jsonify(error="Order not found"), 404
-    if u.role == "customer" and u.mobile != o.mobile:
-        return jsonify(error="You can only track your own orders"), 403
-    if u.role == "delivery" and o.delivery_person_id != u.id:
-        return jsonify(error="This order is not assigned to you"), 403
-    if u.role not in {"customer", "admin", "developer", "delivery"}:
-        return jsonify(error="Forbidden"), 403
-    if not _flag("maps_enabled") or not _flag("map_customer_tracking"):
-        return jsonify(error="Customer order tracking is disabled by the store"), 403
-    events = OrderTrackingEvent.query.filter_by(order_id=o.id).order_by(OrderTrackingEvent.created_at.asc(), OrderTrackingEvent.id.asc()).all()
-    flags = {
-        "maps_enabled": _flag("maps_enabled"),
-        "customer_tracking": _flag("maps_enabled") and _flag("map_customer_tracking"),
-        "delivery_navigation": _flag("maps_enabled") and _flag("map_delivery_navigation"),
+    // Logged in: show Logout, hide Login in hamburger menu
+    if (menuAccountButton) {
+      menuAccountButton.hidden = true;
     }
-    return jsonify(ok=True, order={"code": o.code, "status": o.status, "created": display_datetime(o.created_at),
-                                  "address": o.address, "latitude": o.latitude, "longitude": o.longitude,
-                                  "map_url": o.map_url, "directions_url": o.directions_url, "delivery_person": o.delivery_person.name if o.delivery_person else "",
-                                  "delivery_mobile": o.delivery_person.mobile if o.delivery_person else "",
-                                  "payment_status": o.payment_status,
-                                  "location_valid": valid_order_coordinates(o.latitude, o.longitude),
-                                  "location_issue": location_issue(o),
-                                  "estimated_delivery_window": estimated_delivery_window(o.status),
-                                  "can_edit_location": u.role == "customer" and o.status in {"Confirmed", "Preparing"}},
-                   events=[{"title": e.title, "type": e.event_type, "status": e.status,
-                            "note": e.note or "", "at": display_datetime(e.created_at)} for e in events],
-                   features=flags)
 
-
-@main.get("/api/orders/<code>/qr.svg")
-def order_qr(code):
-    """Scannable UPI QR for exactly this order's total."""
-    o, err = own_order(code)
-    if err:
-        return err
-    if o.payment_method != "QR" or o.status == "Cancelled" or o.payment_status == "Paid":
-        return jsonify(error="No payment due"), 400
-    buf = io.BytesIO()
-    segno.make(upi_uri(o), error="m").save(buf, kind="svg", scale=6, border=2,
-                                           dark="#000000", light="#ffffff", xmldecl=False)
-    return Response(buf.getvalue(), mimetype="image/svg+xml", headers={"Cache-Control": "no-store"})
-
-
-@main.post("/api/orders/<code>/paid")
-def mark_paid(code):
-    """Customer says they paid via QR and gives the UPI reference; admin then confirms."""
-    o, err = own_order(code)
-    if err:
-        return err
-    if o.payment_method != "QR" or o.payment_status == "Paid":
-        return jsonify(error="Nothing to confirm"), 400
-    utr = ((request.json or {}).get("utr") or "").strip()
-    pay = Payment.query.filter_by(order_id=o.id).order_by(Payment.id.desc()).first()
-    if utr and not Payment.query.filter(Payment.transaction_id == utr, Payment.id != pay.id).first():
-        pay.transaction_id = utr
-    o.payment_status = pay.status = "Verifying"
-    add_tracking_event(o, "UPI payment submitted for verification", event_type="payment", status=o.status)
-    db.session.commit()
-    safe_notify(notify_admins_order, o, "💳 Payment to verify (UPI)", f"UTR: {pay.transaction_id or 'not given'}")
-    return jsonify(ok=True, status="Verifying")
-
-
-@main.post("/api/orders/<code>/cancel")
-def cancel_order(code):
-    o, err = own_order(code)
-    if err:
-        return err
-    if o.status != "Confirmed":
-        return jsonify(error="Order can no longer be cancelled"), 400
-    set_status(o, "Cancelled")
-    db.session.commit()
-    safe_notify(notify_admins_order, o, "❌ Customer cancelled an order")
-    return jsonify(ok=True)
-
-
-def order_text(o):
-    lines = "\n".join(
-        f"- {i.product_name}"
-        + (f" ({i.product_size})" if i.product_size else "")
-        + f" x {i.quantity} = ₹{i.line_total:.0f}"
-        for i in o.items
-    )
-
-    return (f"{setting_value('business_name') or 'Chand Enterprises'} - Order {o.code}\n\nCustomer: {o.customer_name}\nMobile: {o.mobile}\n"
-            f"Address: {o.address}\n" + (f"Location: {o.map_url}\n" if o.map_url else "") + f"\nItems:\n{lines}\n\nSubtotal: ₹{o.subtotal:.0f}\n"
-            f"Discount: ₹{o.discount:.0f}\nDelivery: ₹{o.delivery_charge:.0f}\nTotal: ₹{o.total:.0f}\n"
-            f"Payment: {o.payment_method} / {o.payment_status}")
-
-
-@main.get("/api/orders/<code>/whatsapp")
-def order_whatsapp(code):
-    o, err = own_order(code)
-    if err:
-        return err
-    text = bill_text(o)                       # built once (was built twice)
-    return jsonify(ok=True, message=text, whatsapp_url=wa_link(text))
-
-
-@main.post("/api/whatsapp/message")
-def whatsapp_message():
-    m = ((request.json or {}).get("message") or "").strip()
-    if not m:
-        return jsonify(error="Message is required"), 400
-    return jsonify(ok=True, whatsapp_url=wa_link(m))
-
-
-@main.post("/api/enquiry")
-def enquiry():
-    d = request.json or {}
-    name, mobile, msg = [(d.get(k) or "").strip() for k in ("name", "mobile", "message")]
-
-    if not (name and mobile and msg):
-        return jsonify(error="Name, mobile and message are required"), 400
-
-    db.session.add(Enquiry(name=name, mobile=mobile, message=msg))
-    db.session.commit()
-
-    return jsonify(ok=True, whatsapp_url=wa_link(
-        f"New enquiry - {setting_value('business_name') or 'Chand Enterprises'}\n\nName: {name}\nMobile: {mobile}\n\n{msg}"))
-
-
-# ---------- admin ----------
-
-@main.get("/api/admin/delivery-map")
-def admin_delivery_map():
-    if not role_ok("admin"):
-        return jsonify(error="Forbidden"), 403
-    if not _flag("maps_enabled") or not _flag("map_admin_view"):
-        return jsonify(ok=True, enabled=False, orders=[])
-    rows = Order.query.options(joinedload(Order.delivery_person)).filter(
-        Order.status.notin_(["Delivered", "Cancelled"])
-    ).order_by(Order.created_at.desc()).limit(250).all()
-    orders = []
-    for o in rows:
-        valid = valid_order_coordinates(o.latitude, o.longitude)
-        orders.append({
-            "code": o.code, "customer": o.customer_name, "address": o.address,
-            "latitude": o.latitude, "longitude": o.longitude, "location_valid": valid,
-            "location_issue": location_issue(o), "status": o.status,
-            "delivery_person": o.delivery_person.name if o.delivery_person else "Unassigned",
-            "map_url": o.map_url, "directions_url": o.directions_url,
-            "estimated_delivery_window": estimated_delivery_window(o.status),
-        })
-    return jsonify(ok=True, enabled=True, orders=orders)
-
-
-@main.get("/api/admin/orders")
-def admin_orders():
-    if not role_ok("admin"):
-        return jsonify(error="Forbidden"), 403
-
-    q = Order.query
-    s, pay, text = request.args.get("status", "All"), request.args.get("pay", "All"), request.args.get("q", "").strip()
-
-    if s != "All":
-        q = q.filter_by(status=s)
-
-    if pay != "All":
-        q = q.filter_by(payment_status=pay)
-
-    if text:
-        like = f"%{text}%"
-        q = q.filter(db.or_(Order.code.like(like), Order.customer_name.like(like), Order.mobile.like(like)))
-
-    rows = q.options(selectinload(Order.items), selectinload(Order.payments), joinedload(Order.delivery_person)).order_by(Order.created_at.desc()).limit(200).all()
-
-    # ONE aggregate query for orders, revenue and pending count
-    # (before: one query for orders+revenue and a second one for pending)
-    live_orders, live_revenue, pending_count = db.session.query(
-        db.func.count(Order.id),
-        db.func.coalesce(db.func.sum(case((Order.payment_status == "Paid", Order.total), else_=0)), 0),
-        db.func.coalesce(db.func.sum(case((Order.payment_status.in_(["Pending", "Verifying"]), 1), else_=0)), 0),
-    ).filter(Order.status != "Cancelled").one()
-
-    stats = dict(orders=live_orders,
-                 revenue=float(live_revenue or 0),
-                 pending=int(pending_count or 0),
-                 low=Product.query.filter(Product.active == True, Product.stock <= Product.low_stock_threshold).count())
-
-    return jsonify(orders=[order_dict(o) for o in rows], stats=stats)
-
-
-@main.post("/api/admin/order/<int:oid>")
-def update_order(oid):
-    if not role_ok("admin"):
-        return jsonify(error="Forbidden"), 403
-
-    o, d = db.session.get(Order, oid), request.json or {}
-
-    if not o:
-        return jsonify(error="Order not found"), 404
-
-    old_status, old_pay = o.status, o.payment_status
-
-    if d.get("status"):
-        if d["status"] not in ORDER_STATUSES:
-            return jsonify(error="Invalid status"), 400
-        set_status(o, d["status"])
-
-    if d.get("payment_status"):
-        if d["payment_status"] not in PAY_STATUSES:
-            return jsonify(error="Invalid payment status"), 400
-        o.payment_status = d["payment_status"]
-        add_tracking_event(o, f"Payment status: {d['payment_status']}", event_type="payment", status=o.status)
-        pay = Payment.query.filter_by(order_id=o.id).order_by(Payment.id.desc()).first()
-        if pay:
-            pay.status = d["payment_status"]
-
-    db.session.commit()
-
-    if o.status != old_status:
-        safe_notify(notify_customer_order, o, o.status)
-    if o.payment_status == "Paid" and old_pay != "Paid":
-        safe_notify(notify_customer_order, o, "paid")
-    return jsonify(ok=True)
-
-
-@main.post("/api/admin/order/<int:oid>/delivery")
-def assign_delivery(oid):
-    if not role_ok("admin"):
-        return jsonify(error="Forbidden"), 403
-    o = db.session.get(Order, oid)
-    if not o:
-        return jsonify(error="Order not found"), 404
-    old_person = o.delivery_person_id
-    val = (request.json or {}).get("delivery_person_id")
-    o.delivery_person_id = int(val) if val else None
-    if o.delivery_person_id != old_person:
-        assigned = db.session.get(User, o.delivery_person_id) if o.delivery_person_id else None
-        add_tracking_event(o, "Delivery partner assigned" if assigned else "Delivery partner unassigned",
-                           event_type="assignment", note=(assigned.name if assigned else "Assignment removed"))
-    db.session.commit()
-    if o.delivery_person_id and o.delivery_person_id != old_person:
-        safe_notify(notify_delivery_assigned, o)
-    return jsonify(ok=True)
-
-
-@main.post("/api/admin/stock/<int:pid>")
-def stock(pid):
-    if not role_ok("admin"):
-        return jsonify(error="Forbidden"), 403
-    p = db.session.get(Product, pid)
-    if not p:
-        return jsonify(error="Product not found"), 404
-    try:
-        p.stock = max(0, int((request.json or {}).get("stock", p.stock)))
-    except (TypeError, ValueError):
-        return jsonify(error="Invalid stock"), 400
-    db.session.commit()
-    return jsonify(ok=True, stock=p.stock)
-
-
-@main.post("/api/admin/product")
-def create_product():
-    if not role_ok("admin"):
-        return jsonify(error="Forbidden"), 403
-
-    d = request.json or {}
-
-    try:
-        p = Product(name=(d.get("name") or "").strip(), category=(d.get("category") or "Cold Drinks").strip(),
-                    price=float(d.get("price", 0)), stock=int(d.get("stock", 0)),
-                    icon=d.get("icon") or "🥤", image_url=_clean_http_url(d.get("image_url") or ""), size=str(d.get("size") or "1L").strip() or "1L", active=bool(d.get("active", True)))
-    except (TypeError, ValueError):
-        return jsonify(error="Invalid product data"), 400
-
-    if not p.name or p.price < 0 or p.stock < 0:
-        return jsonify(error="Invalid product data"), 400
-    cat = Category.query.filter(db.func.lower(Category.name) == p.category.lower(), Category.active == True).first()
-    if not cat:
-        return jsonify(error="Choose an active category"), 400
-    p.category = cat.name
-    db.session.add(p)
-    db.session.commit()
-    return jsonify(ok=True, id=p.id)
-
-
-@main.put("/api/admin/product/<int:pid>")
-def update_product(pid):
-    if not role_ok("admin"):
-        return jsonify(error="Forbidden"), 403
-
-    p, d = db.session.get(Product, pid), request.json or {}
-
-    if not p:
-        return jsonify(error="Product not found"), 404
-    previous_image_url = p.image_url
-
-    try:
-        if "name" in d:
-            p.name = d["name"].strip()
-
-        if "category" in d:
-            p.category = d["category"].strip()
-
-        if "size" in d:
-            p.size = str(d["size"] or "1L").strip() or "1L"
-
-        if "price" in d:
-            p.price = float(d["price"])
-
-        if "stock" in d:
-            p.stock = int(d["stock"])
-
-        if "icon" in d:
-            p.icon = d["icon"]
-
-        if "image_url" in d:
-            raw_image_url = str(d.get("image_url") or "").strip()
-            if raw_image_url and not _clean_http_url(raw_image_url):
-                return jsonify(error="Image URL must start with https:// or http://"), 400
-            p.image_url = raw_image_url
-
-        if "active" in d:
-            p.active = bool(d["active"])
-
-    except (TypeError, ValueError):
-        db.session.rollback()
-        return jsonify(error="Invalid product data"), 400
-
-    if not p.name or p.price < 0 or p.stock < 0:
-        db.session.rollback()
-        return jsonify(error="Invalid product data"), 400
-    cat = Category.query.filter(db.func.lower(Category.name) == p.category.lower(), Category.active == True).first()
-    if not cat:
-        db.session.rollback()
-        return jsonify(error="Choose an active category"), 400
-    p.category = cat.name
-    db.session.commit()
-    return jsonify(ok=True)
-
-
-@main.delete("/api/admin/product/<int:pid>")
-def delete_product(pid):
-    if not role_ok("admin"):
-        return jsonify(error="Forbidden"), 403
-    p = db.session.get(Product, pid)
-    if not p:
-        return jsonify(error="Product not found"), 404
-    p.active = False
-    db.session.commit()
-    return jsonify(ok=True)
-
-
-
-def _xlsx_response(workbook, filename):
-    out = io.BytesIO()
-    workbook.save(out)
-    out.seek(0)
-    return Response(
-        out.getvalue(),
-        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f"attachment; filename={filename}"},
-    )
-
-
-def _style_xlsx_sheet(ws):
-    header_fill = PatternFill("solid", fgColor="DCEEFF")
-    for cell in ws[1]:
-        cell.font = Font(bold=True)
-        cell.fill = header_fill
-        cell.alignment = Alignment(horizontal="center", vertical="center")
-    ws.freeze_panes = "A2"
-    ws.auto_filter.ref = ws.dimensions
-    for column_cells in ws.columns:
-        width = min(max(max(len(str(c.value or "")) for c in column_cells) + 2, 10), 40)
-        ws.column_dimensions[column_cells[0].column_letter].width = width
-
-
-@main.get("/admin/export-stock.xlsx")
-def export_stock_xlsx():
-    if not role_ok("admin"):
-        return redirect(url_for("main.staff_login"))
-
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "Stock"
-    ws.append(["ID", "Product", "Size", "Category", "Price", "Current Stock", "Alert At", "Status"])
-    for p in Product.query.order_by(Product.category, Product.name, Product.id).all():
-        ws.append([p.id, p.name, p.size or "1L", p.category, p.price, p.stock,
-                   p.low_stock_threshold or 10, "Active" if p.active else "Inactive"])
-    _style_xlsx_sheet(ws)
-    return _xlsx_response(wb, "chand-stock.xlsx")
-
-
-@main.get("/admin/export-sales.xlsx")
-def export_sales_xlsx():
-    if not role_ok("admin"):
-        return redirect(url_for("main.staff_login"))
-
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "Sales"
-    ws.append(["Order", "Date", "Customer", "Mobile", "Product", "Size", "Qty", "Unit Price",
-               "Line Total", "Order Total", "Payment Method", "Payment Status", "Order Status"])
-
-    orders = (Order.query
-              .options(selectinload(Order.items))
-              .filter(Order.status != "Cancelled", Order.payment_status == "Paid")
-              .order_by(Order.created_at.desc()).all())
-    for o in orders:
-        if o.items:
-            for item in o.items:
-                ws.append([o.code, o.created_at.strftime("%d-%m-%Y %H:%M"), o.customer_name, o.mobile,
-                           item.product_name, item.product_size or "1L", item.quantity, item.unit_price,
-                           item.line_total, o.total, o.payment_method or "", o.payment_status, o.status])
-        else:
-            ws.append([o.code, o.created_at.strftime("%d-%m-%Y %H:%M"), o.customer_name, o.mobile,
-                       "", "", 0, 0, 0, o.total, o.payment_method or "", o.payment_status, o.status])
-    _style_xlsx_sheet(ws)
-
-    top = wb.create_sheet("Top Products")
-    top.append(["Product", "Quantity Sold"])
-    qty_sum = db.func.sum(OrderItem.quantity)
-    top_rows = (db.session.query(OrderItem.product_name, qty_sum)
-                .join(Order, Order.id == OrderItem.order_id)
-                .filter(Order.status != "Cancelled", Order.payment_status == "Paid")
-                .group_by(OrderItem.product_name)
-                .order_by(qty_sum.desc(), db.func.min(OrderItem.id)).all())
-    for name, qty in top_rows:
-        top.append([name, int(qty)])
-    _style_xlsx_sheet(top)
-    return _xlsx_response(wb, "chand-sales.xlsx")
-
-
-@main.get("/admin/export-credit.xlsx")
-def export_credit_xlsx():
-    if not role_ok("admin"):
-        return redirect(url_for("main.staff_login"))
-
-    entries = LedgerEntry.query.order_by(LedgerEntry.created_at.desc()).all()
-    balances = {}
-    for e in entries:
-        key = e.customer_mobile
-        item = balances.setdefault(key, {"mobile": key, "name": e.customer_name, "balance": 0})
-        item["balance"] += e.amount if e.entry_type == "debit" else -e.amount
-
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "Credit Summary"
-    ws.append(["Customer", "Mobile", "Outstanding Credit"])
-    for item in sorted(balances.values(), key=lambda x: x["balance"], reverse=True):
-        ws.append([item["name"], item["mobile"], item["balance"]])
-    _style_xlsx_sheet(ws)
-
-    tx = wb.create_sheet("Transactions")
-    tx.append(["Date", "Customer", "Mobile", "Type", "Amount", "Note", "Order ID"])
-    for e in entries:
-        tx.append([e.created_at.strftime("%d-%m-%Y %H:%M"), e.customer_name, e.customer_mobile,
-                   "Credit" if e.entry_type == "debit" else "Payment", e.amount, e.note or "", e.order_id or ""])
-    _style_xlsx_sheet(tx)
-    return _xlsx_response(wb, "chand-credit.xlsx")
-
-
-@main.get("/admin/export.csv")
-def export_csv():
-    if not role_ok("admin"):
-        return redirect(url_for("main.staff_login"))
-
-    out = io.StringIO()
-    w = csv.writer(out)
-
-    w.writerow(["Order", "Date", "Customer", "Mobile", "Address", "Items", "Subtotal", "Discount",
-                "Delivery", "Total", "Payment", "Payment Status", "Status", "Delivery Person",
-                "Latitude", "Longitude", "Google Maps"])
-
-    for o in Order.query.options(selectinload(Order.items), selectinload(Order.payments), joinedload(Order.delivery_person)).order_by(Order.created_at.desc()):
-        d = order_dict(o)
-        w.writerow([o.code, d["created"], o.customer_name, o.mobile, o.address, "; ".join(d["items"]),
-                    o.subtotal, o.discount, o.delivery_charge, o.total, o.payment_method,
-                    o.payment_status, o.status, d["delivery_person"],
-                    o.latitude if o.latitude is not None else "",
-                    o.longitude if o.longitude is not None else "", o.map_url])
-
-    return Response(out.getvalue(), mimetype="text/csv",
-                    headers={"Content-Disposition": "attachment; filename=chand-orders.csv"})
-
-
-# ---------- delivery ----------
-
-@main.get("/api/delivery/orders")
-def delivery_orders():
-    if not role_ok("delivery"):
-        return jsonify(error="Forbidden"), 403
-    rows = Order.query.options(selectinload(Order.items), selectinload(Order.payments), joinedload(Order.delivery_person)).filter_by(delivery_person_id=session["user_id"]).order_by(Order.created_at.desc()).all()
-    return jsonify([order_dict(o) for o in rows])
-
-
-@main.post("/api/delivery/order/<int:oid>/status")
-def delivery_status(oid):
-    if not role_ok("delivery"):
-        return jsonify(error="Forbidden"), 403
-
-    o = db.session.get(Order, oid)
-
-    if not o or o.delivery_person_id != session["user_id"]:
-        return jsonify(error="Order not assigned to you"), 404
-
-    s = (request.json or {}).get("status")
-
-    if s not in {"Out for Delivery", "Delivered"}:
-        return jsonify(error="Invalid status"), 400
-
-    if o.status == "Cancelled":
-        return jsonify(error="Order is cancelled"), 400
-
-    old_status, old_pay = o.status, o.payment_status
-    set_status(o, s)
-
-    if s == "Delivered" and o.payment_method == "COD":
-        if (o.cash_collected or 0) >= o.total:
-            o.payment_status = "Paid"
-            add_tracking_event(o, "Cash payment recorded", event_type="payment", status=o.status,
-                               note=f"₹{(o.cash_collected or 0):.0f} collected")
-            pay = Payment.query.filter_by(order_id=o.id).order_by(Payment.id.desc()).first()
-            if pay:
-                pay.status = "Paid"
-
-    db.session.commit()
-
-    if o.status != old_status:
-        safe_notify(notify_customer_order, o, o.status)
-        if s == "Delivered":
-            who = session.get("name") or "Delivery partner"
-            extra = f"Delivered by: {who}" + (f"\nCash collected: ₹{(o.cash_collected or 0):.0f}" if o.payment_method == "COD" else "")
-            safe_notify(notify_admins_order, o, "✅ Order delivered", extra)
-    if o.payment_status == "Paid" and old_pay != "Paid":
-        safe_notify(notify_customer_order, o, "paid")
-    return jsonify(ok=True)
-
-
-# ---------- categories / team ----------
-
-@main.get("/api/admin/categories")
-def admin_categories():
-    if not role_ok("admin", "developer"):
-        return jsonify(error="Forbidden"), 403
-    return jsonify(categories=[category_dict(c) for c in Category.query.order_by(Category.id).all()])
-
-
-@main.post("/api/admin/categories")
-def create_category():
-    if not role_ok("developer"):
-        return jsonify(error="Developer access required"), 403
-    d = request.json or {}
-    name, error = validate_category_name(d.get("name"))
-    if error:
-        return jsonify(error=error), 400
-    c = Category(name=name, icon=str(d.get("icon") or "🛍️")[:20], active=True)
-    db.session.add(c)
-    db.session.commit()
-    return jsonify(ok=True, category=category_dict(c))
-
-
-@main.put("/api/admin/categories/<int:cid>")
-def update_category(cid):
-    if not role_ok("developer"):
-        return jsonify(error="Developer access required"), 403
-    c = db.session.get(Category, cid)
-    if not c:
-        return jsonify(error="Category not found"), 404
-    d = request.json or {}
-    if "name" in d:
-        name, error = validate_category_name(d.get("name"), cid)
-        if error:
-            return jsonify(error=error), 400
-        old = c.name
-        c.name = name
-        Product.query.filter_by(category=old).update({"category": name}, synchronize_session=False)
-    if "icon" in d:
-        c.icon = str(d.get("icon") or "🛍️")[:20]
-    if "active" in d:
-        c.active = bool(d["active"])
-    db.session.commit()
-    return jsonify(ok=True, category=category_dict(c))
-
-
-@main.delete("/api/admin/categories/<int:cid>")
-def delete_category(cid):
-    if not role_ok("developer"):
-        return jsonify(error="Developer access required"), 403
-    c = db.session.get(Category, cid)
-    if not c:
-        return jsonify(error="Category not found"), 404
-    if Product.query.filter_by(category=c.name).count():
-        return jsonify(error="Category still has products. Rename or move those products first."), 409
-    db.session.delete(c)
-    db.session.commit()
-    return jsonify(ok=True)
-
-
-def _team_dict(u):
-    return dict(id=u.id, name=u.name, username=u.username, mobile=u.mobile or "", role=u.role, active=bool(u.active))
-
-
-@main.get("/api/team")
-def team_list():
-    if not role_ok("admin", "developer"):
-        return jsonify(error="Forbidden"), 403
-    allowed = ["admin", "delivery"] if session.get("role") == "developer" else ["delivery"]
-    return jsonify(users=[_team_dict(u) for u in User.query.filter(User.role.in_(allowed)).order_by(User.role, User.id).all()])
-
-
-@main.post("/api/team")
-def team_create():
-    if not role_ok("admin", "developer"):
-        return jsonify(error="Forbidden"), 403
-    d = request.json or {}
-    role = str(d.get("role") or "delivery").lower()
-    if session.get("role") == "admin" and role != "delivery":
-        return jsonify(error="Admins can create delivery accounts only"), 403
-    if role not in {"admin", "delivery"}:
-        return jsonify(error="Invalid staff role"), 400
-    username = str(d.get("username") or "").strip()
-    name = str(d.get("name") or "").strip()
-    password = str(d.get("password") or "")
-    if not re.match(r"^[A-Za-z0-9_.-]{3,40}$", username) or not name or len(password) < 8:
-        return jsonify(error="Name, username and a password of at least 8 characters are required"), 400
-    if User.query.filter(db.func.lower(User.username) == username.lower()).first():
-        return jsonify(error="Username already exists"), 409
-    u = User(name=name, username=username, password=generate_password_hash(password), role=role, mobile=str(d.get("mobile") or "").strip(), active=True)
-    db.session.add(u)
-    db.session.commit()
-    return jsonify(ok=True, user=_team_dict(u))
-
-
-@main.put("/api/team/<int:uid>")
-def team_update(uid):
-    if not role_ok("admin", "developer"):
-        return jsonify(error="Forbidden"), 403
-    u = db.session.get(User, uid)
-    if not u or u.role == "customer":
-        return jsonify(error="Staff account not found"), 404
-    if session.get("role") == "admin" and u.role != "delivery":
-        return jsonify(error="Admins can manage delivery accounts only"), 403
-    d = request.json or {}
-    if "name" in d:
-        u.name = str(d["name"] or "").strip() or u.name
-    if "mobile" in d:
-        u.mobile = str(d["mobile"] or "").strip()
-    if "password" in d and str(d["password"]):
-        if len(str(d["password"])) < 8:
-            return jsonify(error="Password must be at least 8 characters"), 400
-        u.password = generate_password_hash(str(d["password"]))
-    if "active" in d:
-        active = bool(d["active"])
-        if u.role == "admin" and not active:
-            active_admins = User.query.filter_by(role="admin", active=True).count()
-            if active_admins <= 1:
-                return jsonify(error="The last active admin cannot be disabled"), 409
-        u.active = active
-        if not active and session.get("user_id") == u.id:
-            session.clear()
-    db.session.commit()
-    return jsonify(ok=True, user=_team_dict(u))
-
-
-@main.delete("/api/team/<int:uid>")
-def team_disable(uid):
-    if not role_ok("admin", "developer"):
-        return jsonify(error="Forbidden"), 403
-    u = db.session.get(User, uid)
-    if not u or u.role == "customer":
-        return jsonify(error="Staff account not found"), 404
-    if session.get("role") == "admin" and u.role != "delivery":
-        return jsonify(error="Admins can manage delivery accounts only"), 403
-    if u.role == "admin" and User.query.filter_by(role="admin", active=True).count() <= 1:
-        return jsonify(error="The last active admin cannot be disabled"), 409
-    u.active = False
-    if session.get("user_id") == u.id:
-        session.clear()
-    db.session.commit()
-    return jsonify(ok=True)
-
-
-@main.get("/api/admin/order/<int:oid>/bill")
-def admin_bill(oid):
-    if not role_ok("admin", "delivery"):
-        return jsonify(error="Forbidden"), 403
-    o = db.session.get(Order, oid)
-    if not o:
-        return jsonify(error="Order not found"), 404
-    if session.get("role") == "delivery" and o.delivery_person_id != session.get("user_id"):
-        return jsonify(error="Order not assigned to you"), 403
-    text = bill_text(o)
-    return jsonify(ok=True, message=text, whatsapp_url=f"https://wa.me/{''.join(c for c in o.mobile if c.isdigit())}?text=" + urllib.parse.quote(text))
-
-
-@main.post("/api/admin/order/<int:oid>/whatsapp")
-def admin_send_bill(oid):
-    if not role_ok("admin", "delivery"):
-        return jsonify(error="Forbidden"), 403
-    o = db.session.get(Order, oid)
-    if not o:
-        return jsonify(error="Order not found"), 404
-    if session.get("role") == "delivery" and o.delivery_person_id != session.get("user_id"):
-        return jsonify(error="Order not assigned to you"), 403
-    mobile = "".join(c for c in o.mobile if c.isdigit())
-    if len(mobile) == 10:
-        mobile = "91" + mobile
-    return jsonify(ok=True, whatsapp_url=f"https://wa.me/{mobile}?text=" + urllib.parse.quote(bill_text(o)))
-
-
-# ---------- admin analytics / credits / coupons ----------
-
-@main.get("/api/admin/sales")
-def admin_sales():
-    if not role_ok("admin"):
-        return jsonify(error="Forbidden"), 403
-    now = datetime.utcnow()
-    today_start = datetime(now.year, now.month, now.day)
-    month_start = datetime(now.year, now.month, 1)
-    # earliest moment the charts below need (start of the month 5 months ago)
-    y0, m0 = now.year, now.month - 5
-    while m0 <= 0:
-        y0 -= 1
-        m0 += 12
-    since = datetime(y0, m0, 1)
-    # only two columns of the recent paid orders (no full order objects)
-    paid_rows = db.session.query(Order.created_at, Order.total).filter(
-        Order.status != "Cancelled", Order.payment_status == "Paid", Order.created_at >= since).all()
-    today = [r for r in paid_rows if r.created_at >= today_start]
-    month = [r for r in paid_rows if r.created_at >= month_start]
-    daily = []
-    for days_ago in range(6, -1, -1):
-        start = datetime(now.year, now.month, now.day) - timedelta(days=days_ago)
-        end = start + timedelta(days=1)
-        daily.append({"label": start.strftime("%d %b"), "sales": round(sum(r.total for r in paid_rows if start <= r.created_at < end), 2)})
-    monthly = []
-    for months_ago in range(5, -1, -1):
-        y, m = now.year, now.month - months_ago
-        while m <= 0:
-            y -= 1
-            m += 12
-        start = datetime(y, m, 1)
-        if m == 12:
-            end = datetime(y + 1, 1, 1)
-        else:
-            end = datetime(y, m + 1, 1)
-        monthly.append({"label": start.strftime("%b %Y"), "sales": round(sum(r.total for r in paid_rows if start <= r.created_at < end), 2)})
-
-    # top products: computed inside SQLite (before: every paid order item ever sold
-    # was loaded into Python and added up). Ties keep first-sold-first order.
-    qty_sum = db.func.sum(OrderItem.quantity)
-    top_rows = (db.session.query(OrderItem.product_name, qty_sum)
-                .join(Order, Order.id == OrderItem.order_id)
-                .filter(Order.status != "Cancelled", Order.payment_status == "Paid")
-                .group_by(OrderItem.product_name)
-                .order_by(qty_sum.desc(), db.func.min(OrderItem.id))
-                .limit(8).all())
-    top = [{"name": n, "qty": int(q)} for n, q in top_rows]
-
-    return jsonify(today_sales=round(sum(r.total for r in today), 2), month_sales=round(sum(r.total for r in month), 2),
-                   today_orders=len(today), month_orders=len(month), daily=daily, monthly=monthly, top_products=top)
-
-
-@main.get("/api/admin/ledger")
-def admin_ledger():
-    if not role_ok("admin"):
-        return jsonify(error="Forbidden"), 403
-    entries = LedgerEntry.query.order_by(LedgerEntry.created_at.desc()).limit(500).all()
-    balances = {}
-    for e in entries:
-        key = e.customer_mobile
-        item = balances.setdefault(key, {"mobile": key, "name": e.customer_name, "balance": 0, "entries": []})
-        item["balance"] += e.amount if e.entry_type == "debit" else -e.amount
-        item["entries"].append(dict(id=e.id, type=e.entry_type, amount=e.amount, note=e.note or "",
-                                    order_id=e.order_id, created=e.created_at.strftime("%d-%m-%Y %H:%M")))
-    return jsonify(customers=sorted(balances.values(), key=lambda x: x["balance"], reverse=True))
-
-
-@main.post("/api/admin/ledger")
-def add_ledger_entry():
-    if not role_ok("admin"):
-        return jsonify(error="Forbidden"), 403
-    d = request.json or {}
-    mobile = "".join(c for c in str(d.get("mobile") or "") if c.isdigit())
-    name = str(d.get("name") or "").strip() or "Customer"
-    typ = str(d.get("type") or "payment").lower()
-    try:
-        amount = float(d.get("amount", 0))
-    except (TypeError, ValueError):
-        return jsonify(error="Invalid amount"), 400
-    if len(mobile) < 10 or amount <= 0 or typ not in {"debit", "payment"}:
-        return jsonify(error="Enter valid customer and amount"), 400
-    e = LedgerEntry(customer_mobile=mobile, customer_name=name, entry_type=typ, amount=amount,
-                    note=str(d.get("note") or "").strip(), order_id=d.get("order_id") or None)
-    db.session.add(e)
-    db.session.commit()
-    return jsonify(ok=True, id=e.id)
-
-
-@main.post("/api/admin/coupon")
-def create_coupon():
-    if not role_ok("admin"):
-        return jsonify(error="Forbidden"), 403
-    d = request.json or {}
-    code = str(d.get("code") or "").strip().upper()
-    typ = str(d.get("discount_type") or "percent").lower()
-    try:
-        value = float(d.get("discount_value", 0))
-        max_discount = d.get("max_discount")
-        max_discount = None if max_discount in (None, "",) else float(max_discount)
-        min_order = float(d.get("min_order", 0))
-    except (TypeError, ValueError):
-        return jsonify(error="Invalid coupon values"), 400
-    if not re.match(r"^[A-Z0-9_-]{3,40}$", code) or typ not in {"percent", "fixed"} or value <= 0 or min_order < 0:
-        return jsonify(error="Invalid coupon"), 400
-    if typ == "percent" and value > 100:
-        return jsonify(error="Percent cannot exceed 100"), 400
-    if Coupon.query.filter_by(code=code).first():
-        return jsonify(error="Coupon already exists"), 400
-    c = Coupon(code=code, discount_type=typ, discount_value=value, max_discount=max_discount, min_order=min_order, active=True)
-    db.session.add(c)
-    db.session.commit()
-    return jsonify(ok=True, coupon=coupon_dict(c))
-
-
-@main.get("/api/admin/coupons")
-def admin_coupons():
-    if not role_ok("admin"):
-        return jsonify(error="Forbidden"), 403
-    return jsonify(coupons=[coupon_dict(c) for c in Coupon.query.order_by(Coupon.id.desc()).all()])
-
-
-@main.put("/api/admin/coupon/<int:cid>")
-def update_coupon(cid):
-    if not role_ok("admin"):
-        return jsonify(error="Forbidden"), 403
-    c = db.session.get(Coupon, cid)
-    if not c:
-        return jsonify(error="Coupon not found"), 404
-    d = request.json or {}
-    try:
-        if "active" in d:
-            c.active = bool(d["active"])
-        if "discount_value" in d:
-            c.discount_value = float(d["discount_value"])
-        if "max_discount" in d:
-            c.max_discount = None if d["max_discount"] in (None, "") else float(d["max_discount"])
-        if "min_order" in d:
-            c.min_order = float(d["min_order"])
-    except (TypeError, ValueError):
-        return jsonify(error="Invalid values"), 400
-    db.session.commit()
-    return jsonify(ok=True, coupon=coupon_dict(c))
-
-
-@main.post("/api/delivery/order/<int:oid>/whatsapp")
-def delivery_whatsapp(oid):
-    """WhatsApp link for an order. body: {to: "customer" | "admin", status: optional}"""
-    if not role_ok("delivery", "admin"):
-        return jsonify(error="Forbidden"), 403
-    o = db.session.get(Order, oid)
-    if not o:
-        return jsonify(error="Order not found"), 404
-    if role_ok("delivery") and o.delivery_person_id != session.get("user_id"):
-        return jsonify(error="Order not assigned to you"), 403
-    d = request.json or {}
-    status = str(d.get("status") or o.status)
-    to = "admin" if str(d.get("to") or "customer").lower() == "admin" else "customer"
-
-    if to == "admin":
-        who = session.get("name") or "Delivery partner"
-        lines = [f"Delivery update - order {o.code}",
-                 f"Status: {status}",
-                 f"Customer: {o.customer_name} ({o.mobile})",
-                 f"Amount: Rs {o.total:.0f} | {o.payment_method or '-'} | {o.payment_status}"]
-        if o.payment_method == "COD":
-            lines.append(f"Cash collected: Rs {(o.cash_collected or 0):.0f}")
-        lines.append(f"By: {who}")
-        return jsonify(ok=True, whatsapp_url=wa_link("\n".join(lines)))
-
-    messages = {
-        "Out for Delivery": f"Hello {o.customer_name}, your Chand Enterprises order {o.code} is out for delivery. Our delivery partner is on the way.",
-        "Delivered": f"Hello {o.customer_name}, your Chand Enterprises order {o.code} has been delivered. Thank you!",
-        "Confirmed": f"Hello {o.customer_name}, your Chand Enterprises order {o.code} is confirmed."
+    if (menuLogoutButton) {
+      menuLogoutButton.hidden = false;
     }
-    text = messages.get(status, f"Hello {o.customer_name}, update for order {o.code}: {status}.")
-    mobile = "".join(c for c in o.mobile if c.isdigit())
-    mobile = mobile if len(mobile) > 10 else "91" + mobile
-    return jsonify(ok=True, whatsapp_url=f"https://wa.me/{mobile}?text=" + urllib.parse.quote(text))
-
-
-@main.post("/api/delivery/order/<int:oid>/cash")
-def delivery_cash(oid):
-    if not role_ok("delivery"):
-        return jsonify(error="Forbidden"), 403
-    o = db.session.get(Order, oid)
-    if not o or o.delivery_person_id != session.get("user_id"):
-        return jsonify(error="Order not assigned to you"), 404
-    if o.payment_method != "COD":
-        return jsonify(error="Only COD orders can record cash"), 400
-    try:
-        amount = float((request.json or {}).get("cash_collected", 0))
-    except (TypeError, ValueError):
-        return jsonify(error="Invalid cash amount"), 400
-    if amount < 0 or amount > o.total:
-        return jsonify(error="Cash amount cannot exceed order total"), 400
-    old_pay = o.payment_status
-    o.cash_collected = amount
-    if amount >= o.total:
-        o.payment_status = "Paid"
-        pay = Payment.query.filter_by(order_id=o.id).order_by(Payment.id.desc()).first()
-        if pay:
-            pay.status = "Paid"
-    db.session.commit()
-    if o.payment_status == "Paid" and old_pay != "Paid":
-        safe_notify(notify_customer_order, o, "paid")
-    return jsonify(ok=True, cash_collected=o.cash_collected, payment_status=o.payment_status)
-
-
-# ---------- order archive ----------
-
-def _archive_days():
-    try:
-        return max(1, int(setting_value("archive_days") or 7))
-    except (TypeError, ValueError):
-        return 7
-
-
-def _archive_workbook(orders, archive):
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "Orders"
-    headers = ["Order ID", "Order #", "Booking Date", "Booking Time", "Customer", "Mobile", "Address", "Total", "Payment", "Status", "Delivery", "Coupon", "Discount"]
-    ws.append(headers)
-    for cell in ws[1]:
-        cell.font = Font(bold=True)
-    for o in orders:
-        ws.append([
-            o.id, o.code, o.created_at.strftime("%d-%m-%Y"), o.created_at.strftime("%I:%M %p"),
-            o.customer_name, o.mobile, o.address, o.total, o.payment_status, o.status,
-            o.delivery_person.name if o.delivery_person else "", o.coupon_code or "", o.discount or 0
-        ])
-    items = wb.create_sheet("Order Items")
-    items.append(["Order ID", "Order #", "Product", "Size", "Category", "Quantity", "Unit Price", "Item Total"])
-    for cell in items[1]:
-        cell.font = Font(bold=True)
-    for o in orders:
-        for i in o.items:
-            product = db.session.get(Product, i.product_id)
-            items.append([o.id, o.code, i.product_name, i.product_size or "1L", product.category if product else "", i.quantity, i.unit_price, i.line_total])
-    summary = wb.create_sheet("Archive Summary")
-    summary.append(["Archive ID", "Period Start", "Period End", "Orders", "Total", "Method", "Recipient", "Status"])
-    summary.append([archive.id, display_datetime(archive.period_start), display_datetime(archive.period_end), archive.order_count, archive.total_amount, archive.delivery_method, archive.recipient, archive.status])
-    for sh in wb.worksheets:
-        sh.freeze_panes = "A2"
-        for col in sh.columns:
-            max_len = min(max(len(str(c.value or "")) for c in col) + 2, 40)
-            sh.column_dimensions[col[0].column_letter].width = max_len
-    out = io.BytesIO()
-    wb.save(out)
-    out.seek(0)
-    return out.getvalue()
-
-
-def _send_archive_email(recipient, filename, data):
-    host = os.getenv("SMTP_HOST", "")
-    user = os.getenv("SMTP_USER", "")
-    password = os.getenv("SMTP_PASSWORD", "")
-    sender = os.getenv("SMTP_FROM", user)
-    if not host or not sender or not recipient:
-        raise RuntimeError("Email is not configured. Set SMTP_HOST, SMTP_USER, SMTP_PASSWORD and SMTP_FROM in Render, and set the archive email in Developer Settings.")
-    port = int(os.getenv("SMTP_PORT", "587"))
-    msg = EmailMessage()
-    msg["Subject"] = "Chand Enterprises · Order Archive"
-    msg["From"] = sender
-    msg["To"] = recipient
-    msg.set_content("Attached is the Chand Enterprises order archive. Admin confirmation is required before archived orders are deleted from the active database.")
-    msg.add_attachment(data, maintype="application", subtype="vnd.openxmlformats-officedocument.spreadsheetml.sheet", filename=filename)
-    with smtplib.SMTP(host, port, timeout=30) as smtp:
-        if os.getenv("SMTP_USE_TLS", "1") == "1":
-            smtp.starttls()
-        if user:
-            smtp.login(user, password)
-        smtp.send_message(msg)
-
-
-def _archive_whatsapp_link(recipient, archive):
-    number = "".join(c for c in (recipient or "") if c.isdigit())
-    if len(number) == 10:
-        number = "91" + number
-    text = (f"Chand Enterprises order archive #{archive.id}\\n"
-            f"Orders: {archive.order_count}\\n"
-            f"Total: ₹{archive.total_amount:.2f}\\n"
-            f"Period: {archive.period_start.strftime('%d-%m-%Y')} to {archive.period_end.strftime('%d-%m-%Y')}\\n"
-            f"Download archive: {url_for('main.archive_download', token=archive.download_token, _external=True)}\n"
-            f"Please confirm receipt in the Admin Panel after receiving the archive.")
-    return "https://wa.me/" + number + "?text=" + urllib.parse.quote(text)
-
-
-def _create_archive(send=True):
-    days = _archive_days()
-    cutoff = datetime.utcnow() - timedelta(days=days)
-    method = (setting_value("archive_method") or "email").lower()
-    recipient = setting_value("archive_email") if method == "email" else setting_value("archive_whatsapp")
-    if not recipient:
-        raise RuntimeError("Set the archive recipient in Developer Settings first.")
-    archived_ids = {x.order_id for x in ArchivedOrder.query.all()}
-    q = Order.query.options(selectinload(Order.items), joinedload(Order.delivery_person)).filter(Order.created_at < cutoff)
-    candidates = [o for o in q.order_by(Order.created_at.asc()).all() if o.id not in archived_ids]
-    if not candidates:
-        return None
-    period_start = min(o.created_at for o in candidates)
-    period_end = max(o.created_at for o in candidates)
-    archive = OrderArchive(period_start=period_start, period_end=period_end, order_count=len(candidates), total_amount=sum(float(o.total or 0) for o in candidates), delivery_method=method, recipient=recipient, status="PREPARING", download_token=secrets.token_urlsafe(32))
-    db.session.add(archive)
-    db.session.flush()
-    for o in candidates:
-        db.session.add(ArchivedOrder(archive_id=archive.id, order_id=o.id))
-    data = _archive_workbook(candidates, archive)
-    filename = f"chand-enterprises-order-archive-{archive.id}.xlsx"
-    archive.file_name = filename
-    archive_dir = Path(current_app.instance_path) / "archives"
-    archive_dir.mkdir(parents=True, exist_ok=True)
-    archive_path = archive_dir / filename
-    archive_path.write_bytes(data)
-    try:
-        if method == "email":
-            _send_archive_email(recipient, filename, data)
-            archive.note = "Email sent successfully. Waiting for Admin confirmation."
-            archive.status = "WAITING_CONFIRMATION"
-            archive.sent_at = datetime.utcnow()
-            result = {"method": "email"}
-        elif method == "whatsapp":
-            archive.note = "WhatsApp handoff link generated. Open it and send the archive to the configured number."
-            archive.status = "WAITING_CONFIRMATION"
-            archive.sent_at = datetime.utcnow()
-            result = {"method": "whatsapp", "whatsapp_url": _archive_whatsapp_link(recipient, archive)}
-        else:
-            raise RuntimeError("Archive method must be email or whatsapp.")
-        db.session.commit()
-        return {"archive": archive, **result}
-    except Exception:
-        db.session.rollback()
-        raise
-
-
-@main.get("/archive/download/<token>")
-def archive_download(token):
-    archive = OrderArchive.query.filter_by(download_token=token).first()
-    if not archive or archive.status == "RECEIVED_AND_DELETED":
-        return "Archive not available", 404
-    path = Path(current_app.instance_path) / "archives" / archive.file_name
-    if not path.exists():
-        return "Archive file is no longer available", 404
-    return send_file(path, as_attachment=True, download_name=archive.file_name)
-
-
-@main.get("/api/developer/archive/settings")
-def developer_archive_settings():
-    if not role_ok("developer"):
-        return jsonify(error="Forbidden"), 403
-    return jsonify(ok=True, settings={"archive_days": _archive_days(), "archive_method": setting_value("archive_method") or "email", "archive_email": setting_value("archive_email"), "archive_whatsapp": setting_value("archive_whatsapp")})
-
-
-@main.put("/api/developer/archive/settings")
-def developer_save_archive_settings():
-    if not role_ok("developer"):
-        return jsonify(error="Forbidden"), 403
-    d = request.json or {}
-    try:
-        days = max(1, int(d.get("archive_days", 7)))
-    except (TypeError, ValueError):
-        return jsonify(error="Archive days must be a positive number"), 400
-    method = str(d.get("archive_method") or "email").lower()
-    if method not in {"email", "whatsapp"}:
-        return jsonify(error="Choose Email or WhatsApp"), 400
-    email = str(d.get("archive_email") or "").strip()
-    wa = str(d.get("archive_whatsapp") or "").strip()
-    if method == "email" and (not email or "@" not in email):
-        return jsonify(error="Enter a valid archive email"), 400
-    if method == "whatsapp" and len("".join(c for c in wa if c.isdigit())) < 10:
-        return jsonify(error="Enter a valid WhatsApp number"), 400
-    set_setting("archive_days", days); set_setting("archive_method", method); set_setting("archive_email", email); set_setting("archive_whatsapp", wa)
-    db.session.commit()
-    return jsonify(ok=True, settings={"archive_days": days, "archive_method": method, "archive_email": email, "archive_whatsapp": wa})
-
-
-@main.post("/api/developer/archive/check")
-def developer_archive_check():
-    if not role_ok("developer"):
-        return jsonify(error="Forbidden"), 403
-    try:
-        result = _create_archive()
-        if not result:
-            return jsonify(ok=True, created=False, message=f"No orders older than {_archive_days()} days are waiting for archive.")
-        a = result["archive"]
-        return jsonify(ok=True, created=True, archive={"id": a.id, "orders": a.order_count, "total": a.total_amount, "method": a.delivery_method, "status": a.status}, whatsapp_url=result.get("whatsapp_url", ""))
-    except Exception as e:
-        return jsonify(error=str(e)), 400
-
-
-@main.get("/api/developer/archive/history")
-def developer_archive_history():
-    if not role_ok("developer"):
-        return jsonify(error="Forbidden"), 403
-    rows = OrderArchive.query.order_by(OrderArchive.id.desc()).limit(100).all()
-    return jsonify(ok=True, archives=[{"id":a.id,"created_at":a.created_at.strftime("%d-%m-%Y %H:%M"),"period_start":a.period_start.strftime("%d-%m-%Y"),"period_end":a.period_end.strftime("%d-%m-%Y"),"orders":a.order_count,"total":a.total_amount,"method":a.delivery_method,"recipient":a.recipient,"status":a.status,"sent_at":a.sent_at.strftime("%d-%m-%Y %H:%M") if a.sent_at else "","confirmed_at":a.confirmed_at.strftime("%d-%m-%Y %H:%M") if a.confirmed_at else "","deleted_at":a.deleted_at.strftime("%d-%m-%Y %H:%M") if a.deleted_at else ""} for a in rows])
-
-
-@main.get("/api/admin/archive/pending")
-def admin_archive_pending():
-    if not role_ok("admin"):
-        return jsonify(error="Forbidden"), 403
-    rows = OrderArchive.query.filter_by(status="WAITING_CONFIRMATION").order_by(OrderArchive.id.desc()).all()
-    return jsonify(ok=True, archives=[{"id":a.id,"orders":a.order_count,"total":a.total_amount,"method":a.delivery_method,"recipient":a.recipient,"created_at":a.created_at.strftime("%d-%m-%Y %H:%M")} for a in rows])
-
-
-@main.post("/api/admin/archive/delete-all")
-def admin_archive_delete_all():
-    if not role_ok("admin"):
-        return jsonify(error="Forbidden"), 403
-
-    order_ids = [row[0] for row in db.session.query(Order.id).all()]
-    deleted = len(order_ids)
-
-    if order_ids:
-        # Remove every child record that references an order before deleting
-        # the parent Order rows.  LedgerEntry also has an order_id foreign key.
-        Payment.query.filter(Payment.order_id.in_(order_ids)).delete(synchronize_session=False)
-        OrderItem.query.filter(OrderItem.order_id.in_(order_ids)).delete(synchronize_session=False)
-        LedgerEntry.query.filter(LedgerEntry.order_id.in_(order_ids)).delete(synchronize_session=False)
-        ArchivedOrder.query.filter(ArchivedOrder.order_id.in_(order_ids)).delete(synchronize_session=False)
-        Order.query.filter(Order.id.in_(order_ids)).delete(synchronize_session=False)
-
-    # Keep archive history as an audit record; only the actual order data is deleted.
-    now = datetime.utcnow()
-    pending = OrderArchive.query.filter_by(status="WAITING_CONFIRMATION").all()
-    for archive in pending:
-        archive.status = "RECEIVED_AND_DELETED"
-        archive.confirmed_at = now
-        archive.deleted_at = now
-        archive.note = "Admin verified the Excel backup and deleted all order data."
-        # An older archive row may have an empty/NULL file_name.
-        # Never let cleanup of an already-delivered Excel file break deletion.
-        file_name = str(archive.file_name or "").strip()
-        if file_name:
-            archive_path = Path(current_app.instance_path) / "archives" / file_name
-            try:
-                if archive_path.exists():
-                    archive_path.unlink()
-            except (OSError, TypeError):
-                pass
-
-    db.session.commit()
-    return jsonify(ok=True, deleted=deleted)
-
-
-@main.post("/api/admin/archive/<int:archive_id>/confirm")
-def admin_archive_confirm(archive_id):
-    if not role_ok("admin"):
-        return jsonify(error="Forbidden"), 403
-    archive = db.session.get(OrderArchive, archive_id)
-    if not archive or archive.status != "WAITING_CONFIRMATION":
-        return jsonify(error="Archive is not awaiting confirmation"), 404
-    links = ArchivedOrder.query.filter_by(archive_id=archive.id).all()
-    order_ids = [x.order_id for x in links]
-    for link in links:
-        db.session.delete(link)
-    if order_ids:
-        payments = Payment.query.filter(Payment.order_id.in_(order_ids)).all()
-        items = OrderItem.query.filter(OrderItem.order_id.in_(order_ids)).all()
-        for p in payments: db.session.delete(p)
-        for i in items: db.session.delete(i)
-        orders = Order.query.filter(Order.id.in_(order_ids)).all()
-        for o in orders: db.session.delete(o)
-    archive.status = "RECEIVED_AND_DELETED"
-    archive.confirmed_at = datetime.utcnow()
-    archive_path = Path(current_app.instance_path) / "archives" / archive.file_name
-    try:
-        if archive_path.exists():
-            archive_path.unlink()
-    except OSError:
-        pass
-    archive.deleted_at = datetime.utcnow()
-    db.session.commit()
-    return jsonify(ok=True, deleted=len(order_ids), archive_id=archive.id)
-
-
-# ---------- developer console ----------
-
-@main.get("/api/developer/settings")
-def developer_get_settings():
-    if not role_ok("developer"):
-        return jsonify(error="Forbidden"), 403
-    return jsonify(ok=True, settings=developer_settings())
-
-
-NOTIFY_FLAGS = {"notify_customer_status", "notify_admin_orders", "notify_admin_low_stock",
-                "notify_delivery_assign", "notify_daily_summary"}
-MAP_FLAGS = {"maps_enabled", "map_customer_tracking", "map_delivery_navigation", "map_admin_view"}
-
-
-@main.put("/api/developer/settings")
-def developer_save_settings():
-    if not role_ok("developer"):
-        return jsonify(error="Forbidden"), 403
-    d = request.json or {}
-    if "social_links" in d:
-        raw_links = d.get("social_links")
-        if not isinstance(raw_links, list):
-            return jsonify(error="Social links must be a list"), 400
-        if len(raw_links) > SOCIAL_LIMIT:
-            return jsonify(error=f"You can add up to {SOCIAL_LIMIT} social links"), 400
-        clean_links = []
-        for item in raw_links:
-            name = str((item or {}).get("name") or "").strip()[:30]
-            url = str((item or {}).get("url") or "").strip()
-            if not name and not url:
-                continue                      # ignore empty rows
-            if not name:
-                return jsonify(error="Every social link needs a name"), 400
-            if not _clean_http_url(url):
-                return jsonify(error=f"{name}: link must be a valid http(s) URL"), 400
-            clean_links.append({"name": name, "url": url})
-        set_setting("social_links", json.dumps(clean_links))
-        # keep the two legacy keys in step so nothing else breaks
-        for legacy, label in (("instagram_url", "instagram"), ("facebook_url", "facebook")):
-            match = next((x["url"] for x in clean_links if x["name"].strip().lower() == label), "")
-            set_setting(legacy, match)
-    home_text_limits = {
-        "home_delivery_title": 80, "home_delivery_text": 180,
-        "home_payment_title": 80, "home_payment_text": 180,
-        "home_support_title": 80, "home_support_text": 180,
-        "home_store_eyebrow": 80, "home_products_title": 100,
-        "home_products_text": 240, "home_bulk_badge": 80,
-        "home_bulk_title": 120, "home_bulk_text": 500,
-        "home_bulk_button": 80, "home_event_button": 80,
-        "home_bulk_order_button": 80, "footer_contact_title": 80,
-        "footer_whatsapp_label": 80, "footer_copyright_prefix": 20,
+  } else {
+    if (accountButton) {
+      accountButton.textContent = "Login";
     }
-    for key, limit in home_text_limits.items():
-        if key in d:
-            value = str(d.get(key) or "").strip()
-            if len(value) > limit:
-                return jsonify(error=f"{key.replace('_', ' ').title()} must be {limit} characters or fewer"), 400
-            set_setting(key, value)
-    for key in ["about_title", "about_text", "footer_tagline"]:
-        if key in d:
-            value = str(d.get(key) or "").strip()
-            limit = {"about_title": 80, "about_text": 900, "footer_tagline": 80}[key]
-            if len(value) > limit:
-                return jsonify(error=f"{key.replace('_', ' ').title()} must be {limit} characters or fewer"), 400
-            set_setting(key, value)
-    for key in ["business_name", "business_mobile", "whatsapp", "business_location", "upi", "payment_name", "business_lat", "business_lng", "delivery_base", "delivery_per_km", "delivery_free_above", "show_prices_home", "show_prices_brochure", "ordering_enabled", "customer_login_enabled", "brochure_url", "brochure_eyebrow", "brochure_title", "brochure_subtitle", "archive_days", "archive_method", "archive_email", "archive_whatsapp", "summary_time", "eta_confirmed_min", "eta_confirmed_max", "eta_preparing_min", "eta_preparing_max", "eta_out_for_delivery_min", "eta_out_for_delivery_max"] + sorted(NOTIFY_FLAGS | MAP_FLAGS):
-        if key in d:
-            if key in {"show_prices_home", "show_prices_brochure", "ordering_enabled", "customer_login_enabled"} | NOTIFY_FLAGS | MAP_FLAGS:
-                set_setting(key, "0" if str(d.get(key)).strip().lower() in {"0", "false", "no", "off", ""} else "1")
-                continue
-            value = str(d.get(key) or "").strip()
-            if key in {"business_name", "whatsapp", "upi"} and not value:
-                return jsonify(error=f"{key.replace('_', ' ').title()} is required"), 400
-            if key in {"instagram_url", "facebook_url", "brochure_url"} and value and not _clean_http_url(value):
-                return jsonify(error=f"{key.replace('_', ' ').title()} must be a valid http(s) URL"), 400
-            if key in BROCHURE_TEXT_LIMITS and len(value) > BROCHURE_TEXT_LIMITS[key]:
-                return jsonify(error=f"{key.replace('_', ' ').title()} must be {BROCHURE_TEXT_LIMITS[key]} characters or fewer"), 400
-            if key == "archive_days":
-                try:
-                    value = str(max(1, int(value or 7)))
-                except ValueError:
-                    return jsonify(error="Archive days must be a positive number"), 400
-            if key == "archive_method" and value not in {"email", "whatsapp"}:
-                return jsonify(error="Archive method must be email or whatsapp"), 400
-            if key == "summary_time" and not TIME_RE.match(value):
-                return jsonify(error="Summary time must look like 21:30 (24-hour, India time)"), 400
-            if key.startswith("eta_"):
-                try:
-                    minutes = int(value)
-                except (TypeError, ValueError):
-                    return jsonify(error="Delivery estimate values must be whole minutes"), 400
-                if minutes < 0 or minutes > 1440:
-                    return jsonify(error="Delivery estimate must be between 0 and 1440 minutes"), 400
-                value = str(minutes)
-            set_setting(key, value)
-    for phase in ("confirmed", "preparing", "out_for_delivery"):
-        low_key, high_key = f"eta_{phase}_min", f"eta_{phase}_max"
-        if low_key in d or high_key in d:
-            try:
-                low = int(d.get(low_key, setting_value(low_key) or 0))
-                high = int(d.get(high_key, setting_value(high_key) or low))
-            except (TypeError, ValueError):
-                return jsonify(error="Delivery estimate values must be whole minutes"), 400
-            if high < low:
-                return jsonify(error=f"Maximum estimate must be at least the minimum for {phase.replace('_', ' ')}"), 400
-    if "otp_provider" in d:
-        provider = str(d.get("otp_provider") or "").strip().lower()
-        if provider not in OTP_PROVIDERS:
-            return jsonify(error="Unknown login code provider"), 400
-        if provider == "telegram" and not telegram_ready():
-            return jsonify(error="Telegram is not connected yet. Add the bot token and webhook secret in Render, then press “Connect Telegram bot” first."), 400
-        set_setting("otp_provider", provider)
-    db.session.commit()
-    return jsonify(ok=True, settings=developer_settings())
+
+    if (logoutButton) {
+      logoutButton.hidden = true;
+    }
+
+    // Logged out: show Login, hide Logout in hamburger menu
+    if (menuAccountButton) {
+      menuAccountButton.hidden = false;
+    }
+
+    if (menuLogoutButton) {
+      menuLogoutButton.hidden = true;
+    }
+  }
+
+  applyLoginUI();
+}
+
+/* =========================
+   CUSTOMER PROFILE
+   ========================= */
+
+function profile() {
+  if (!ME || !ME.authenticated) {
+    return account();
+  }
+
+  modal(`
+        <h2>My Profile</h2>
+
+        <label>
+            Name
+            <input id="pn" value="${esc(ME.name || "")}">
+        </label>
+
+        <label>
+            Mobile
+            <input value="${esc(ME.mobile || "")}" disabled>
+        </label>
+
+        <label>
+            Address
+            <textarea id="pa" rows="3">${esc(ME.address || "")}</textarea>
+        </label>
+
+        <label>
+            Landmark
+            <input id="pl" value="${esc(ME.landmark || "")}">
+        </label>
+
+        <p class="err" id="perr"></p>
+
+        <button class="primary" onclick="saveProfile()">Save</button>
+        <button onclick="closeModal()">Close</button>
+    `);
+}
+
+async function saveProfile() {
+  const result = await api("/api/profile", "PUT", {
+    name: $("#pn").value,
+
+    address: $("#pa").value,
+
+    landmark: $("#pl").value,
+  });
+
+  if (!result._ok) {
+    return ($("#perr").textContent = result.error || "Could not save profile");
+  }
+
+  ME = await api("/api/me");
+
+  closeModal();
+
+  refreshMe();
+}
+
+/* =========================
+   MY ORDERS
+   ========================= */
+
+async function orders() {
+  if (!ME || !ME.authenticated) {
+    ME = await api("/api/me");
+  }
+
+  if (!ME.authenticated) {
+    return account("Login to see your orders");
+  }
+
+  const rows = await api("/api/my-orders");
+
+  if (!Array.isArray(rows)) {
+    return alert(rows.error || "Could not load orders");
+  }
+
+  rows.forEach((order) => {
+    ORD[order.code] = Object.assign(ORD[order.code] || {}, order);
+  });
+
+  modal(`
+        <h2>My Orders</h2>
+
+        ${
+          rows.length
+            ? rows
+                .map(
+                  (order) => `
+                        <div class="ordercard">
+
+                            <div class="row">
+                                <b>${esc(order.code)}</b>
+                                <span>${esc(order.status)}</span>
+                            </div>
+
+                            <div class="row">
+                                <span>${esc(order.created)}</span>
+                                <b>${money(order.total)}</b>
+                            </div>
+
+                            <small>${order.items.map(esc).join(" · ")}</small>
+
+                            <br>
+
+                            <button class="add" onclick="bill('${esc(order.code)}')">View bill</button>
+                            ${order.map_features?.customer_tracking !== false ? `<button onclick="trackOrder('${esc(order.code)}')">📍 Track order</button>` : ""}
+                            <button onclick="reorder('${esc(order.code)}')">🔄 Reorder</button>
+
+                            ${
+                              order.payment_method === "QR" &&
+                              order.payment_status !== "Paid" &&
+                              order.status !== "Cancelled"
+                                ? `
+                                    <button class="primary" onclick="payQR('${esc(order.code)}', ${order.total})">
+                                        Pay ${money(order.total)}
+                                    </button>
+                                `
+                                : ""
+                            }
+
+                            ${
+                              order.status === "Confirmed"
+                                ? `
+                                    <button onclick="cancelMyOrder('${esc(order.code)}')">Cancel</button>
+                                `
+                                : ""
+                            }
+
+                        </div>
+                    `,
+                )
+                .join("")
+            : `<p class="muted">No orders yet.</p>`
+        }
+
+        <button onclick="closeModal()">Close</button>
+    `);
+}
+
+async function trackOrder(code) {
+  const result = await api(`/api/orders/${encodeURIComponent(code)}/tracking`);
+  if (!result || result._ok === false || !result.ok) {
+    return alert(result?.error || "Could not load order tracking");
+  }
+  const order = result.order || {};
+  const events = Array.isArray(result.events) ? result.events : [];
+  const features = result.features || {};
+  const steps = ["Confirmed", "Preparing", "Out for Delivery", "Delivered"];
+  const cancelled = order.status === "Cancelled";
+  const activeIndex = steps.indexOf(order.status);
+  const timeline = events.length ? events.map(event => `
+    <div class="ce-track-event">
+      <span class="ce-track-dot"></span>
+      <div><b>${esc(event.title || event.status || "Order updated")}</b>
+      <small>${esc(event.at || "")}</small>
+      ${event.note ? `<p>${esc(event.note)}</p>` : ""}</div>
+    </div>`).join("") : `<div class="ce-track-event"><span class="ce-track-dot"></span><div><b>${esc(order.status || "Order placed")}</b><small>Detailed history will appear as new updates happen.</small></div></div>`;
+  const mapLinks = features.customer_tracking && order.map_url ? `
+    <div class="ce-track-maplinks">
+      <a class="primary" target="_blank" rel="noopener" href="${esc(order.map_url)}">Open Google Maps ↗</a>
+      <a target="_blank" rel="noopener" href="https://www.openstreetmap.org/?mlat=${encodeURIComponent(order.latitude)}&mlon=${encodeURIComponent(order.longitude)}#map=16/${encodeURIComponent(order.latitude)}/${encodeURIComponent(order.longitude)}">Open OpenStreetMap ↗</a>
+    </div>` : `<p class="muted">${features.customer_tracking ? "A map location was not saved for this order." : "Map tracking is currently disabled by the store."}</p>`;
+  const contact = order.delivery_person ? `<div class="ce-track-assignee"><b>Delivery partner</b><span>${esc(order.delivery_person)}</span>${order.delivery_mobile ? `<a href="tel:${esc(order.delivery_mobile)}">Call delivery partner</a>` : ""}</div>` : `<p class="muted">Delivery partner has not been assigned yet.</p>`;
+  modal(`<div class="ce-track-modal">
+    <div class="ce-track-head"><div><small>ORDER TRACKING</small><h2>${esc(order.code)}</h2></div><span class="ce-track-status">${esc(order.status || "Pending")}</span></div>
+    ${cancelled ? `<p class="ce-track-cancelled">This order was cancelled.</p>` : `<div class="ce-track-steps">${steps.map((step,i)=>`<div class="ce-track-step ${activeIndex >= i ? "is-done" : ""} ${step === order.status ? "is-current" : ""}"><span>${activeIndex > i ? "✓" : i+1}</span><small>${esc(step)}</small></div>`).join("")}</div>`}
+    <div class="ce-track-section"><h3>Order history</h3><div class="ce-track-timeline">${timeline}</div></div>
+    <div class="ce-track-section"><h3>Delivery address</h3><p>${esc(order.address || "No address saved")}</p>${mapLinks}
+      ${order.location_issue ? `<p class="ce-location-warning">⚠️ ${esc(order.location_issue)}</p>` : ''}
+      ${order.can_edit_location ? `<button type="button" onclick="editOrderDeliveryLocation('${esc(order.code)}')">Edit delivery details</button>` : ''}
+    </div>
+    ${order.estimated_delivery_window ? `<div class="ce-track-section"><small>Estimated delivery window</small><b>${esc(order.estimated_delivery_window)}</b><p class="muted">Estimate only; actual timing may vary.</p></div>` : ''}
+    <div class="ce-track-section">${contact}</div>
+    <div class="ce-track-section"><small>Payment status</small><b>${esc(order.payment_status || "Pending")}</b></div>
+    <button class="primary" onclick="closeModal()">Close tracking</button>
+  </div>`);
+}
+
+async function editOrderDeliveryLocation(code) {
+  const current = await api(`/api/orders/${encodeURIComponent(code)}/tracking`);
+  if (!current || current._ok === false || !current.ok || !current.order?.can_edit_location) {
+    return alert(current?.error || 'Delivery details can no longer be changed.');
+  }
+  const saved = current.order;
+  const address = saved.address || '';
+  const latitude = saved.latitude;
+  const longitude = saved.longitude;
+  modal(`<div class="ce-track-modal">
+    <div class="ce-track-head"><div><small>DELIVERY DETAILS</small><h2>Update address</h2></div><button onclick="closeModal()" aria-label="Close">✕</button></div>
+    <p class="muted">You can change delivery details until the order is dispatched. Leave both coordinates blank if you do not have a map pin. The existing order total is not changed automatically; contact support if the new location materially changes the delivery distance.</p>
+    <label>Full address and landmark<textarea id="ceEditDeliveryAddress" rows="3" maxlength="1000">${esc(address || '')}</textarea></label>
+    <div class="ce-eta-grid">
+      <label>Latitude<input id="ceEditDeliveryLat" inputmode="decimal" type="number" min="-90" max="90" step="any" value="${latitude == null ? '' : esc(latitude)}"></label>
+      <label>Longitude<input id="ceEditDeliveryLng" inputmode="decimal" type="number" min="-180" max="180" step="any" value="${longitude == null ? '' : esc(longitude)}"></label>
+    </div>
+    <button type="button" onclick="useCurrentDeliveryLocation()">Use my current location</button>
+    <p class="muted" id="ceEditLocationMsg"></p><p class="err" id="ceEditLocationErr"></p>
+    <button class="primary" id="ceEditLocationSave" onclick="saveOrderDeliveryLocation('${esc(code)}')">Save delivery details</button>
+    <button onclick="closeModal()">Cancel</button>
+  </div>`);
+}
+
+function useCurrentDeliveryLocation() {
+  const msg = document.getElementById('ceEditLocationMsg');
+  if (!navigator.geolocation) { if (msg) msg.textContent = 'Location is not supported by this browser.'; return; }
+  if (msg) msg.textContent = 'Requesting location permission…';
+  navigator.geolocation.getCurrentPosition(pos => {
+    document.getElementById('ceEditDeliveryLat').value = pos.coords.latitude.toFixed(6);
+    document.getElementById('ceEditDeliveryLng').value = pos.coords.longitude.toFixed(6);
+    if (msg) msg.textContent = 'Location captured. Please verify the address and landmark too.';
+  }, error => { if (msg) msg.textContent = error.code === 1 ? 'Location permission was denied.' : 'Could not get your location. You can enter coordinates manually.'; }, {enableHighAccuracy:true, timeout:12000, maximumAge:60000});
+}
+
+async function saveOrderDeliveryLocation(code) {
+  const button = document.getElementById('ceEditLocationSave');
+  const error = document.getElementById('ceEditLocationErr');
+  const address = document.getElementById('ceEditDeliveryAddress')?.value.trim() || '';
+  const latText = document.getElementById('ceEditDeliveryLat')?.value.trim() || '';
+  const lngText = document.getElementById('ceEditDeliveryLng')?.value.trim() || '';
+  if (button) { button.disabled = true; button.textContent = 'Saving…'; }
+  const result = await api(`/api/orders/${encodeURIComponent(code)}/delivery-location`, 'POST', {
+    address, latitude: latText, longitude: lngText
+  });
+  if (!result || result._ok === false || !result.ok) {
+    if (error) error.textContent = result?.error || 'Could not update delivery details.';
+    if (button) { button.disabled = false; button.textContent = 'Save delivery details'; }
+    return;
+  }
+  await trackOrder(code);
+}
+
+async function cancelMyOrder(code) {
+  const result = await api(`/api/orders/${code}/cancel`, "POST");
+
+  if (!result._ok) {
+    return alert(result.error || "Could not cancel order");
+  }
+
+  orders();
+}
+
+/* =========================
+   ENQUIRY
+   ========================= */
+
+async function enquiry() {
+  modal(`
+        <h2>Contact us</h2>
+
+        <label>
+            Name
+            <input id="en">
+        </label>
+
+        <label>
+            Mobile
+            <input id="em" maxlength="10" inputmode="numeric">
+        </label>
+
+        <label>
+            Message
+            <textarea id="et" rows="4"></textarea>
+        </label>
+
+        <p class="err" id="eerr"></p>
+
+        <button class="primary" onclick="sendEnquiry()">Send enquiry</button>
+        <button onclick="closeModal()">Close</button>
+    `);
+}
+
+async function sendEnquiry() {
+  const result = await api("/api/enquiry", "POST", {
+    name: $("#en").value,
+
+    mobile: $("#em").value,
+
+    message: $("#et").value,
+  });
+
+  if (!result._ok) {
+    return ($("#eerr").textContent = result.error || "Could not send enquiry");
+  }
+
+  if (result.whatsapp_url) {
+    window.open(result.whatsapp_url, "_blank", "noopener");
+  }
+
+  closeModal();
+}
+
+/* =========================
+   WHATSAPP
+   ========================= */
+
+async function whatsappMessage() {
+  modal(`
+        <h2>WhatsApp</h2>
+
+        <label>
+            Message
+            <textarea id="wm" rows="5" placeholder="Type your message..."></textarea>
+        </label>
+
+        <p class="err" id="werr"></p>
+
+        <button class="primary" onclick="sendWhatsAppMessage()">Open WhatsApp</button>
+        <button onclick="closeModal()">Close</button>
+    `);
+}
+
+async function sendWhatsAppMessage() {
+  const result = await api("/api/whatsapp/message", "POST", {
+    message: $("#wm").value,
+  });
+
+  if (!result._ok) {
+    return ($("#werr").textContent =
+      result.error || "Could not create WhatsApp link");
+  }
+
+  if (result.whatsapp_url) {
+    window.open(result.whatsapp_url, "_blank", "noopener");
+  }
+}
+
+/* =========================
+   SEARCH
+   ========================= */
+
+function search() {
+  render(true);
+}
+
+/* =========================
+   NAVIGATION
+   ========================= */
+
+function home() {
+  closeModal();
+
+  window.scrollTo({
+    top: 0,
+    behavior: "smooth",
+  });
+}
+
+function scrollToProducts() {
+  closeModal();
+
+  const grid = $("#grid");
+
+  if (grid) {
+    grid.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  }
+}
+
+function scrollToEnquiry() {
+  closeModal();
+
+  const enquirySection = $("#enquiry");
+
+  if (enquirySection) {
+    enquirySection.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  }
+}
+
+/* =========================
+   LOGOUT
+   ========================= */
+
+async function logout() {
+  await api("/logout", "POST");
+
+  location.href = "/";
+}
+
+/* =========================
+   LOAD PRODUCTS
+   ========================= */
+
+async function refreshProducts() {
+  const products = await api("/api/products");
+
+  if (!Array.isArray(products)) {
+    return false;
+  }
+
+  window.PRODUCTS = products;
+
+  render();
+  heroArt();
+
+  return true;
+}
+
+/* Hero pictures: use the shop's own product photos instead of emoji. */
+function heroArt() {
+  const main = $("#heroMain");
+  const side = $("#heroSide");
+
+  if (!main || !side) {
+    return;
+  }
+
+  const list = window.PRODUCTS || [];
+  const withPhoto = list.filter((product) => product.image_url);
+  const pool = withPhoto.length ? withPhoto : list;
+
+  if (!pool.length) {
+    return;
+  }
+
+  /* second picture: a different product name (e.g. water next to cola) */
+  const first = pool[0];
+  const second =
+    pool.find((product) => cleanName(product.name) !== cleanName(first.name)) ||
+    pool[1] ||
+    first;
+
+  const fill = (box, product) => {
+    box.innerHTML = product.image_url
+      ? `<img src="${esc(imgSrc(product.image_url))}" alt="${esc(product.name)}" decoding="async" onerror="this.onerror=null;this.src='${esc(product.image_url)}'">`
+      : productVisual(product);
+
+    box.classList.toggle("has-photo", Boolean(product.image_url));
+  };
+
+  fill(main, first);
+  fill(side, second);
+}
+
+/* =========================
+   CONFIG
+   ========================= */
+
+async function refreshConfig() {
+  const result = await api("/api/config");
+
+  if (!result || result._ok === false) {
+    return;
+  }
+
+  const priceWas = CFG.show_prices_home;
+  const orderWas = CFG.ordering_enabled;
+
+  CFG = Object.assign(CFG, result);
+
+  if (Array.isArray(result.offers)) {
+    OFFERS = result.offers;
+  }
+
+  ticker();
+
+  applyOrderingUI();
+
+  applyLoginUI();
+
+  if (priceWas !== CFG.show_prices_home || orderWas !== CFG.ordering_enabled) render();
+
+  updateBusinessUI();
+
+  return CFG;
+}
+
+/* =========================
+   BUSINESS INFORMATION
+   ========================= */
+
+function updateBusinessUI() {
+  const name = CFG.business_name || "Chand Enterprises";
+
+  const location = CFG.business_location || "Darbhanga, Bihar";
+
+  document.querySelectorAll("[data-business-name]").forEach((element) => {
+    element.textContent = name;
+  });
+
+  document.querySelectorAll("[data-business-location]").forEach((element) => {
+    element.textContent = location;
+  });
+
+  document.querySelectorAll("[data-business-mobile]").forEach((element) => {
+    element.textContent = CFG.business_mobile || "";
+  });
+
+  document.querySelectorAll("[data-business-whatsapp]").forEach((element) => {
+    element.textContent = CFG.whatsapp || "";
+  });
+
+  renderCategories();
+  /* Social links are now rendered by the server (footer + About page) from the developer list. */
+}
+
+/* =========================
+   BUSINESS LOADER
+   ========================= */
+
+async function loadBusinessUI() {
+  await refreshConfig();
+
+  updateBusinessUI();
+}
+
+/* =========================
+   SAFE LOADERS
+   ========================= */
+
+async function safeLoadProducts() {
+  return refreshProducts();
+}
+
+async function safeLoadOrders() {
+  const rows = await api("/api/my-orders");
+
+  if (!Array.isArray(rows)) {
+    return false;
+  }
+
+  rows.forEach((order) => {
+    ORD[order.code] = Object.assign(ORD[order.code] || {}, order);
+  });
+
+  return true;
+}
+
+/* =========================
+   NUMBER / MESSAGE HELPERS
+   ========================= */
+
+function formatNumber(value) {
+  return Number(value || 0).toLocaleString("en-IN");
+}
+
+function showMessage(message) {
+  modal(`
+        <h2>Message</h2>
+
+        <p>${esc(message)}</p>
+
+        <button class="primary" onclick="closeModal()">OK</button>
+    `);
+}
+
+/* =========================
+   COMPATIBILITY HELPERS
+   ========================= */
+
+function openAccount() {
+  return account();
+}
+
+function openOrders() {
+  return orders();
+}
+
+function openProfile() {
+  return profile();
+}
+
+function openCart() {
+  return cart();
+}
+
+function openCheckout() {
+  return checkout();
+}
+
+function openEnquiry() {
+  return enquiry();
+}
+
+function openWhatsApp() {
+  return whatsappMessage();
+}
 
 
-@main.get("/api/developer/offers")
-def developer_get_offers():
-    if not role_ok("developer"):
-        return jsonify(error="Forbidden"), 403
-    return jsonify(ok=True, offers=developer_settings()["offers"])
+window.addEventListener("beforeinstallprompt", event => {
+  event.preventDefault();
+  deferredInstallPrompt = event;
+  const btn = document.getElementById("installApp");
+  if (btn) btn.hidden = false;
+});
 
+window.addEventListener("appinstalled", () => {
+  deferredInstallPrompt = null;
+  const btn = document.getElementById("installApp");
+  if (btn) btn.hidden = true;
+});
 
-@main.post("/api/developer/offers")
-def developer_add_offer():
-    if not role_ok("developer"):
-        return jsonify(error="Forbidden"), 403
-    text = str((request.json or {}).get("text") or "").strip()
-    if not text:
-        return jsonify(error="Offer text is required"), 400
-    offers = developer_settings()["offers"]
-    offers.append(text)
-    set_setting("offers", "\n".join(offers))
-    db.session.commit()
-    return jsonify(ok=True, offers=offers)
+async function installApp() {
+  // Chrome/Edge: use the native PWA install prompt when available.
+  if (deferredInstallPrompt) {
+    deferredInstallPrompt.prompt();
+    await deferredInstallPrompt.userChoice;
+    deferredInstallPrompt = null;
+    const btn = document.getElementById("installApp");
+    if (btn) btn.hidden = true;
+    return;
+  }
 
+  // If the app is already running as an installed PWA, there is nothing to install.
+  const standalone = window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+  if (standalone) return;
 
-@main.put("/api/developer/offers/<int:index>")
-def developer_update_offer(index):
-    if not role_ok("developer"):
-        return jsonify(error="Forbidden"), 403
-    text = str((request.json or {}).get("text") or "").strip()
-    offers = developer_settings()["offers"]
-    if index < 0 or index >= len(offers):
-        return jsonify(error="Offer not found"), 404
-    if not text:
-        return jsonify(error="Offer text is required"), 400
-    offers[index] = text
-    set_setting("offers", "\n".join(offers))
-    db.session.commit()
-    return jsonify(ok=True, offers=offers)
+  // Some browsers do not expose beforeinstallprompt. Give the user a useful fallback.
+  alert("To install Chand Enterprises, use your browser menu and choose 'Install app' or 'Add to Home screen'.");
+}
 
+window.installApp = installApp;
 
-@main.delete("/api/developer/offers/<int:index>")
-def developer_delete_offer(index):
-    if not role_ok("developer"):
-        return jsonify(error="Forbidden"), 403
-    offers = developer_settings()["offers"]
-    if index < 0 or index >= len(offers):
-        return jsonify(error="Offer not found"), 404
-    offers.pop(index)
-    set_setting("offers", "\n".join(offers))
-    db.session.commit()
-    return jsonify(ok=True, offers=offers)
+/* =========================
+   INITIALIZATION
+   ========================= */
 
+document.addEventListener("DOMContentLoaded", async () => {
+  /* Customer/storefront */
 
-@main.get("/api/developer/products")
-def developer_products():
-    if not role_ok("developer"):
-        return jsonify(error="Forbidden"), 403
-    return jsonify(ok=True, products=[developer_product_dict(p) for p in Product.query.order_by(Product.id).all()])
+  if ($("#grid")) {
+    const searchInput = $("#search");
+    if (searchInput) {
+      let searchTimer;
+      searchInput.addEventListener("input", () => {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(() => render(true), 180);
+      });
+    }
+    const heroEm = document.querySelector(".premium-hero h1 em");
+    if (heroEm) {
+      const words = ["delivered to your door.", "ready for your order.", "freshly delivered."];
+      let wi = 0;
+      setInterval(() => { wi = (wi + 1) % words.length; heroEm.animate([{opacity:.25},{opacity:1}], {duration:300}); heroEm.textContent = words[wi]; }, 3500);
+    }
+    save(true);
 
+    initShopTools();
+    initNetworkStatus();
 
-@main.post("/api/developer/product")
-def developer_create_product():
-    if not role_ok("developer"):
-        return jsonify(error="Forbidden"), 403
-    d = request.json or {}
-    try:
-        p = Product(name=str(d.get("name") or "").strip(), category=str(d.get("category") or "Cold Drinks").strip(), price=float(d.get("price", 0)), stock=int(d.get("stock", 0)), low_stock_threshold=int(d.get("low_stock_threshold", 10)), icon=str(d.get("icon") or "🥤"), image_url=_clean_http_url(d.get("image_url") or ""), size=str(d.get("size") or "1L").strip() or "1L", active=bool(d.get("active", True)))
-    except (TypeError, ValueError):
-        return jsonify(error="Invalid product data"), 400
-    if not p.name or not p.category or p.price < 0 or p.stock < 0:
-        return jsonify(error="Invalid product data"), 400
-    cat = Category.query.filter(db.func.lower(Category.name) == p.category.lower(), Category.active == True).first()
-    if not cat:
-        return jsonify(error="Choose an active category"), 400
-    p.category = cat.name
-    db.session.add(p)
-    db.session.commit()
-    return jsonify(ok=True, product=developer_product_dict(p))
+    ticker();
 
+    // The page already contains the product list, so draw it straight away
+    // instead of waiting for another /api/products round trip.
+    const haveProducts = Array.isArray(window.PRODUCTS) && window.PRODUCTS.length > 0;
+    if (haveProducts) {
+      render();
+      heroArt();
+    }
+    await Promise.all([refreshMe(), refreshConfig(), haveProducts ? Promise.resolve() : refreshProducts()]);
+    populateSizes();
+  }
 
-@main.put("/api/developer/product/<int:pid>")
-def developer_update_product(pid):
-    if not role_ok("developer"):
-        return jsonify(error="Forbidden"), 403
-    p = db.session.get(Product, pid)
-    if not p:
-        return jsonify(error="Product not found"), 404
-    previous_image_url = p.image_url
-    d = request.json or {}
-    try:
-        if "name" in d:
-            p.name = str(d["name"] or "").strip()
-        if "category" in d:
-            p.category = str(d["category"] or "").strip()
-        if "price" in d:
-            p.price = float(d["price"])
-        if "stock" in d:
-            p.stock = int(d["stock"])
-        if "low_stock_threshold" in d:
-            p.low_stock_threshold = int(d["low_stock_threshold"])
-        if "icon" in d:
-            p.icon = str(d["icon"] or "🥤")
-        if "size" in d:
-            p.size = str(d["size"] or "1L").strip() or "1L"
-        if "image_url" in d:
-            raw_image_url = str(d.get("image_url") or "").strip()
-            if raw_image_url and not _clean_http_url(raw_image_url):
-                return jsonify(error="Image URL must start with https:// or http://"), 400
-            p.image_url = raw_image_url
-        if "active" in d:
-            p.active = bool(d["active"])
-    except (TypeError, ValueError):
-        db.session.rollback()
-        return jsonify(error="Invalid product data"), 400
-    if not p.name or not p.category or p.price < 0 or p.stock < 0 or p.low_stock_threshold < 0:
-        db.session.rollback()
-        return jsonify(error="Invalid product data"), 400
-    cat = Category.query.filter(db.func.lower(Category.name) == p.category.lower(), Category.active == True).first()
-    if not cat:
-        db.session.rollback()
-        return jsonify(error="Choose an active category"), 400
-    p.category = cat.name
-    db.session.commit()
-    return jsonify(ok=True, product=developer_product_dict(p))
+  /* Other public pages that share the header (e.g. brochure): wire up
+     login state, cart count and business settings. */
+  if (!$("#grid") && $("#ceMobileMenu")) {
+    persistCart();
 
+    // brochure already ships the product list inside the page
+    const haveProducts = Array.isArray(window.PRODUCTS) && window.PRODUCTS.length > 0;
+    await Promise.all([refreshMe(), refreshConfig(), haveProducts ? Promise.resolve() : refreshProducts()]);
+  }
 
-@main.delete("/api/developer/product/<int:pid>")
-def developer_delete_product(pid):
-    if not role_ok("developer"):
-        return jsonify(error="Forbidden"), 403
-    p = db.session.get(Product, pid)
-    if not p:
-        return jsonify(error="Product not found"), 404
-    p.active = False
-    db.session.commit()
-    return jsonify(ok=True)
+  /*
+   * IMPORTANT:
+   * Admin, delivery and developer
+   * are now handled by their own
+   * JavaScript files.
+   */
+});
 
+/* =========================================================
+   EXTRA STOREFRONT FEATURES
+   free-delivery progress · wishlist · sort & filters · reorder
+   online status · function / bulk quote (sent to WhatsApp)
+   ========================================================= */
 
-# ---------- Telegram bot: webhook, linking, developer tools ----------
+/* ---------- free delivery + coupon hint (cart) ---------- */
 
-def _telegram_handle(update):
-    msg = update.get("message") or {}
-    chat = msg.get("chat") or {}
-    chat_id = chat.get("id")
-    if not chat_id or chat.get("type") != "private":
-        return
-    now = datetime.utcnow()
-    business = _business_name()
+function freeDeliveryAbove() {
+  const n = Number(CFG.free_delivery_above);
+  return Number.isFinite(n) ? n : 500;
+}
 
-    def say(text, keyboard=None):
-        payload = {"chat_id": chat_id, "text": text}
-        if keyboard:
-            payload["reply_markup"] = keyboard
-        tg_call("sendMessage", payload)
+function freeDeliveryProgress(t) {
+  const above = freeDeliveryAbove();
+  if (above <= 0) return "";
 
-    text = (msg.get("text") or "").strip()
-    contact = msg.get("contact")
+  const amount = t.sub - t.disc;
 
-    if text.startswith("/stop"):
-        TelegramLink.query.filter_by(chat_id=chat_id).delete()
-        StaffTelegramLink.query.filter_by(chat_id=chat_id).delete()
-        db.session.commit()
-        return say("Done. This chat will no longer receive alerts or login codes. Send /start from the website link to connect again.")
+  if (amount >= above) {
+    return `<div class="fd-progress done">🎉 You get FREE delivery on this order!</div>`;
+  }
 
-    if text.startswith("/start"):
-        parts = text.split(None, 1)
-        token = parts[1].strip() if len(parts) > 1 else ""
-        row = TelegramToken.query.filter_by(token=token, used=False).first() if token else None
-        if row and row.expires_at > now:
-            if row.mobile.startswith("staff:"):
-                # Staff alert link created by the developer: the staff account is already known.
-                try:
-                    uid = int(row.mobile.split(":", 1)[1])
-                except ValueError:
-                    return say("This link is not valid. Please ask for a new one.")
-                u = db.session.get(User, uid)
-                if not u or not u.active or u.role not in ("admin", "delivery", "developer"):
-                    return say("This staff account is not active. Please ask for a new link.")
-                StaffTelegramLink.query.filter_by(user_id=uid).delete()
-                db.session.add(StaffTelegramLink(user_id=uid, chat_id=chat_id))
-                row.used = True
-                db.session.commit()
-                return say(f"Connected ✅ {u.name}, you will get {business} alerts here.\nSend /stop to turn them off.")
-            row.chat_id = chat_id
-            db.session.commit()
-            return say(f"Welcome to {business}! 👋\nTap the button below to verify your mobile number.",
-                       {"keyboard": [[{"text": "📱 Share my number", "request_contact": True}]],
-                        "resize_keyboard": True, "one_time_keyboard": True})
-        if TelegramLink.query.filter_by(chat_id=chat_id).first() or StaffTelegramLink.query.filter_by(chat_id=chat_id).first():
-            return say("You're already connected ✅\nSend /stop to turn alerts off.")
-        return say("Please open the website, enter your mobile number and tap “Open Telegram” to connect.")
+  const left = Math.ceil(above - amount);
+  const pct = Math.max(0, Math.min(100, Math.round((amount / above) * 100)));
 
-    if contact:
-        # must be the sender's OWN contact, not a forwarded contact card
-        if contact.get("user_id") != (msg.get("from") or {}).get("id"):
-            return say("Please share your own number using the button.")
-        phone = "".join(c for c in str(contact.get("phone_number") or "") if c.isdigit())[-10:]
-        row = (TelegramToken.query.filter_by(chat_id=chat_id, used=False)
-               .order_by(TelegramToken.id.desc()).first())
-        if not row or row.expires_at <= now or row.mobile.startswith("staff:"):
-            return say("This link has expired. Please go back to the website and try again.",
-                       {"remove_keyboard": True})
-        if row.mobile[-10:] != phone:
-            return say("This Telegram number does not match the mobile number you entered on the website.",
-                       {"remove_keyboard": True})
-        TelegramLink.query.filter_by(mobile=row.mobile).delete()
-        db.session.add(TelegramLink(mobile=row.mobile, chat_id=chat_id))
-        row.used = True
-        db.session.commit()
-        say("Connected ✅\nGo back to the website. Your login code is on its way, and you will get order updates here too.\nSend /stop to turn this off.",
-            {"remove_keyboard": True})
+  return `<div class="fd-progress">
+    <span>🚚 Add ${money(left)} more for FREE delivery!</span>
+    <div class="fd-bar"><i style="width:${pct}%"></i></div>
+  </div>`;
+}
 
+function couponHint() {
+  const above = freeDeliveryAbove();
+  const codes = (CFG.coupons || []).filter((c) => c.active).map((c) => c.code);
+  const parts = [];
 
-@main.post("/telegram/webhook")
-def telegram_webhook():
-    secret = os.getenv("TELEGRAM_WEBHOOK_SECRET", "")
-    got = request.headers.get("X-Telegram-Bot-Api-Secret-Token", "")
-    if not secret or not secrets.compare_digest(got.encode("utf-8"), secret.encode("utf-8")):
-        return "", 403
-    try:
-        _telegram_handle(request.get_json(silent=True) or {})
-    except Exception:
-        db.session.rollback()
-        current_app.logger.exception("Telegram webhook error")
-    return "ok"            # always 200 so Telegram does not keep retrying
+  if (above > 0) parts.push(`Free delivery above ${money(above)}`);
+  if (codes.length) parts.push(`coupons: ${codes.map(esc).join(", ")}`);
 
+  return parts.join(" · ");
+}
 
-@main.get("/api/telegram/link-status")
-def telegram_link_status():
-    """The login popup polls this until the customer has pressed Start + Share number in Telegram."""
-    token = str(request.args.get("token") or "")
-    row = TelegramToken.query.filter_by(token=token).first() if token else None
-    mobile = session.get("otp_mobile")                       # token only works for the browser that asked for it
-    return jsonify(ok=True, linked=bool(row and mobile and row.mobile == mobile and row.used))
+/* ---------- wishlist ---------- */
 
+function updateWishUI() {
+  const el = $("#wishCount");
+  if (el) el.textContent = WISH.size ? `(${WISH.size})` : "";
+}
 
-@main.get("/api/developer/telegram/status")
-def developer_telegram_status():
-    if not role_ok("developer"):
-        return jsonify(error="Forbidden"), 403
-    token_set = bool(os.getenv("TELEGRAM_BOT_TOKEN"))
-    info = tg_call("getWebhookInfo") if token_set else None
-    result = (info or {}).get("result") or {}
-    return jsonify(ok=True, token_set=token_set, secret_set=bool(os.getenv("TELEGRAM_WEBHOOK_SECRET")),
-                   bot_username=setting_value("telegram_bot_username"),
-                   webhook_url=result.get("url") or "", last_error=result.get("last_error_message") or "",
-                   linked_count=TelegramLink.query.count(),
-                   staff_linked_count=StaffTelegramLink.query.count(),
-                   cron_secret_set=bool(os.getenv("CRON_SECRET")),
-                   provider=setting_value("otp_provider") or "demo")
+function toggleWish(id) {
+  id = Number(id);
 
+  if (WISH.has(id)) WISH.delete(id);
+  else WISH.add(id);
 
-@main.post("/api/developer/telegram/setup")
-def developer_telegram_setup():
-    if not role_ok("developer"):
-        return jsonify(error="Forbidden"), 403
-    if not os.getenv("TELEGRAM_BOT_TOKEN"):
-        return jsonify(error="TELEGRAM_BOT_TOKEN is not set in the Render environment"), 400
-    secret = (os.getenv("TELEGRAM_WEBHOOK_SECRET") or "").strip()
-    if not re.fullmatch(r"[A-Za-z0-9_-]{16,256}", secret):
-        return jsonify(error="TELEGRAM_WEBHOOK_SECRET must be 16+ characters: letters, numbers, _ and - only"), 400
-    me_info = tg_call("getMe")
-    if not me_info or not me_info.get("ok"):
-        return jsonify(error="Telegram rejected the bot token. Check TELEGRAM_BOT_TOKEN."), 400
-    base = (os.getenv("PUBLIC_BASE_URL") or request.url_root).rstrip("/")
-    if base.startswith("http://") and "localhost" not in base and "127.0.0.1" not in base:
-        base = "https://" + base[len("http://"):]            # Render terminates TLS; Telegram needs https
-    r = tg_call("setWebhook", {"url": base + url_for("main.telegram_webhook"), "secret_token": secret,
-                               "allowed_updates": ["message"], "drop_pending_updates": True})
-    if not r or not r.get("ok"):
-        return jsonify(error=(r or {}).get("description") or "Telegram could not set the webhook"), 400
-    set_setting("telegram_bot_username", me_info["result"].get("username") or "")
-    db.session.commit()
-    return jsonify(ok=True, bot=me_info["result"].get("username"))
+  try {
+    localStorage.setItem("wishlist", JSON.stringify([...WISH]));
+  } catch (e) {
+    /* private mode: wishlist just lasts for this visit */
+  }
 
+  updateWishUI();
 
-@main.get("/api/developer/telegram/staff")
-def developer_telegram_staff():
-    if not role_ok("developer"):
-        return jsonify(error="Forbidden"), 403
-    linked = {r.user_id for r in StaffTelegramLink.query.all()}
-    users = User.query.filter(User.role.in_(["admin", "delivery"])).order_by(User.role, User.id).all()
-    return jsonify(ok=True, bot_ready=telegram_bot_ready(),
-                   users=[dict(id=u.id, name=u.name, username=u.username or "", role=u.role,
-                               active=bool(u.active), mobile=u.mobile or "", linked=u.id in linked) for u in users])
+  if (WISH_ONLY) return render();
 
+  updateCard(id);
+}
 
-@main.post("/api/developer/telegram/staff/<int:uid>/link")
-def developer_telegram_staff_link(uid):
-    if not role_ok("developer"):
-        return jsonify(error="Forbidden"), 403
-    u = db.session.get(User, uid)
-    if not u or u.role not in ("admin", "delivery") or not u.active:
-        return jsonify(error="Staff account not found"), 404
-    payload, error = _staff_link_payload(u)
-    if error:
-        return jsonify(error=error), 400
-    return jsonify(ok=True, **payload)
+/* ---------- sort & filters ---------- */
 
+function sizeValue(label) {
+  const m = String(label).trim().toLowerCase().match(/([\d.]+)\s*(ml|ltr|litre|liter|l|kg|g)?/);
+  if (!m) return Infinity;
+  let n = parseFloat(m[1]);
+  if (["l", "ltr", "litre", "liter", "kg"].includes(m[2])) n *= 1000;
+  return n;
+}
 
-@main.delete("/api/developer/telegram/staff/<int:uid>")
-def developer_telegram_staff_unlink(uid):
-    if not role_ok("developer"):
-        return jsonify(error="Forbidden"), 403
-    StaffTelegramLink.query.filter_by(user_id=uid).delete()
-    db.session.commit()
-    return jsonify(ok=True)
+function populateSizes() {
+  const select = $("#sizeFilter");
+  if (!select) return;
 
+  const sizes = [...new Set((window.PRODUCTS || []).map((p) => p.size).filter(Boolean))]
+    .sort((a, b) => sizeValue(a) - sizeValue(b));
 
-@main.route("/api/staff/telegram", methods=["GET", "POST", "DELETE"])
-def staff_telegram_self():
-    """For a logged-in admin / delivery person to connect their own Telegram (a button can call this later)."""
-    u = current_user()
-    if not u or u.role not in ("admin", "delivery", "developer"):
-        return jsonify(error="Forbidden"), 403
-    if request.method == "DELETE":
-        StaffTelegramLink.query.filter_by(user_id=u.id).delete()
-        db.session.commit()
-        return jsonify(ok=True)
-    if request.method == "POST":
-        payload, error = _staff_link_payload(u)
-        if error:
-            return jsonify(error=error), 400
-        return jsonify(ok=True, **payload)
-    return jsonify(ok=True, bot_ready=telegram_bot_ready(),
-                   linked=bool(StaffTelegramLink.query.filter_by(user_id=u.id).first()))
+  if (!sizes.includes(SIZE)) SIZE = "";
 
+  select.innerHTML =
+    `<option value="">All sizes</option>` +
+    sizes.map((z) => `<option value="${esc(z)}">${esc(z)}</option>`).join("");
 
-@main.post("/api/developer/telegram/test")
-def developer_telegram_test():
-    if not role_ok("developer"):
-        return jsonify(error="Forbidden"), 403
-    if not telegram_bot_ready():
-        return jsonify(error="Telegram bot is not connected yet"), 400
-    chats = admin_chat_ids()
-    if not chats:
-        return jsonify(error="No admin has linked Telegram yet"), 400
-    tg_send_async(chats, f"✅ Test alert from {_business_name()}. Telegram alerts are working.")
-    return jsonify(ok=True, sent_to=len(chats))
+  select.value = SIZE;
+}
 
+function initShopTools() {
+  const sort = $("#sortBy");
+  const size = $("#sizeFilter");
+  const stock = $("#inStockOnly");
+  const wish = $("#wishFilter");
 
-@main.post("/api/developer/telegram/summary-now")
-def developer_telegram_summary_now():
-    if not role_ok("developer"):
-        return jsonify(error="Forbidden"), 403
-    result = send_daily_summary(force=True)
-    return jsonify(result), (200 if result.get("ok") else 400)
+  if (sort) sort.addEventListener("change", () => { SORT = sort.value; render(true); });
+  if (size) size.addEventListener("change", () => { SIZE = size.value; render(true); });
+  if (stock) stock.addEventListener("change", () => { INSTOCK = stock.checked; render(true); });
 
+  if (wish) {
+    wish.addEventListener("click", () => {
+      WISH_ONLY = !WISH_ONLY;
+      wish.classList.toggle("on", WISH_ONLY);
+      wish.setAttribute("aria-pressed", String(WISH_ONLY));
+      render(true);
+    });
+  }
 
-def _cron_authorised():
-    secret = os.getenv("CRON_SECRET", "")
-    got = request.headers.get("X-Cron-Key") or request.args.get("key") or ""
-    return bool(secret) and secrets.compare_digest(got.encode("utf-8"), secret.encode("utf-8"))
+  populateSizes();
+  updateWishUI();
+}
 
+/* ---------- reorder ---------- */
 
-@main.route("/api/cron/tick", methods=["GET", "POST"])
-@main.route("/api/cron/daily-summary", methods=["GET", "POST"])        # old address keeps working
-def cron_tick():
-    """Call every 5-15 minutes from a free scheduler (cron-job.org). Needs env CRON_SECRET,
-    sent as header X-Cron-Key (or ?key=). Keeps the free Render service awake as a bonus."""
-    if not _cron_authorised():
-        return "", 403
-    return jsonify(cron_run())
+function reorder(code) {
+  if (CFG.ordering_enabled === false) return orderingPausedModal();
 
+  const lines = (ORD[code] && ORD[code].lines) || [];
 
-@main.get("/api/developer/scheduler/status")
-def developer_scheduler_status():
-    if not role_ok("developer"):
-        return jsonify(error="Forbidden"), 403
-    last = setting_value("last_cron_tick")
-    ago = None
-    if last:
-        try:
-            ago = max(0, int((datetime.utcnow() - datetime.strptime(last, "%Y-%m-%d %H:%M:%S")).total_seconds()))
-        except ValueError:
-            ago = None
-    return jsonify(ok=True, cron_secret_set=bool(os.getenv("CRON_SECRET")), last_tick_seconds_ago=ago,
-                   summary_enabled=_flag("notify_daily_summary"),
-                   summary_time=setting_value("summary_time") or "21:30",
-                   last_summary_date=setting_value("last_summary_date"), today=_ist_today(),
-                   ist_now=(datetime.utcnow() + timedelta(hours=5, minutes=30)).strftime("%d %b %Y %I:%M %p"),
-                   bot_ready=telegram_bot_ready(), admins_linked=len(admin_chat_ids()))
+  if (!lines.length) return showMessage("Could not find the items of this order.");
 
+  const all = window.PRODUCTS || [];
+  let added = 0;
+  const notes = [];
 
-@main.post("/api/developer/scheduler/run")
-def developer_scheduler_run():
-    """Same pass the pinger makes, for testing from the Developer panel."""
-    if not role_ok("developer"):
-        return jsonify(error="Forbidden"), 403
-    return jsonify(cron_run())
+  lines.forEach((line) => {
+    const label = `${line.name}${line.size ? " (" + line.size + ")" : ""}`;
+
+    let product = line.product_id != null ? find(line.product_id) : null;
+
+    if (!product) {
+      product = all.find((p) => p.name === line.name && p.size === line.size);
+    }
+
+    if (!product || product.stock < 1) {
+      notes.push(`${label}: not available right now`);
+      return;
+    }
+
+    const current = CART[product.id] || 0;
+    const qty = Math.min(current + line.qty, product.stock);
+
+    if (qty - current < line.qty) {
+      notes.push(`${label}: only ${product.stock} in stock`);
+    }
+
+    if (qty > current) {
+      CART[product.id] = qty;
+      added++;
+    }
+  });
+
+  persistCart();
+  render();
+
+  modal(`
+    <h2>Reorder</h2>
+    <p>${added ? `${added} item${added === 1 ? "" : "s"} added to your cart.` : "None of these items could be added."}</p>
+    ${notes.length ? `<p class="muted">${notes.map(esc).join("<br>")}</p>` : ""}
+    ${added ? `<button class="primary" onclick="cart()">View cart</button>` : ""}
+    <button onclick="closeModal()">Close</button>
+  `);
+}
+
+/* ---------- online / offline banner ---------- */
+
+function initNetworkStatus() {
+  let bar = document.getElementById("netBanner");
+
+  if (!bar) {
+    bar = document.createElement("div");
+    bar.id = "netBanner";
+    bar.setAttribute("role", "status");
+    bar.hidden = true;
+    document.body.appendChild(bar);
+  }
+
+  let timer;
+
+  const show = (online) => {
+    clearTimeout(timer);
+    bar.className = "net-banner " + (online ? "online" : "offline");
+    bar.textContent = online
+      ? "🟢 Back online"
+      : "🔴 You're offline. You can browse, but ordering needs internet.";
+    bar.hidden = false;
+    if (online) timer = setTimeout(() => { bar.hidden = true; }, 2500);
+  };
+
+  window.addEventListener("offline", () => show(false));
+  window.addEventListener("online", () => show(true));
+
+  if (!navigator.onLine) show(false);
+}
+
+/* ---------- function planner + bulk order (WhatsApp quote) ---------- */
+
+/* Drinks needed PER GUEST for a 5-hour function. Change these numbers to match your experience. */
+const EVENT_PROFILES = {
+  "Wedding": { water: 1.2, cold: 0.7, energy: 0.2 },
+  "Birthday / Party": { water: 1.0, cold: 1.0, energy: 0.1 },
+  "Corporate event": { water: 1.5, cold: 0.6, energy: 0.3 },
+  "Puja / Religious": { water: 1.5, cold: 0.3, energy: 0 },
+  "Other": { water: 1.2, cold: 0.7, energy: 0.2 },
+};
+
+function eventEstimate(type, guests, hours) {
+  const profile = EVENT_PROFILES[type] || EVENT_PROFILES.Other;
+  const factor = Math.max(0.4, hours / 5);
+  const count = (rate) => Math.ceil(Math.round(guests * rate * factor * 100) / 100);
+
+  return {
+    water: count(profile.water),
+    cold: count(profile.cold),
+    energy: count(profile.energy),
+  };
+}
+
+function todayISO() {
+  const d = new Date();
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  return d.toISOString().slice(0, 10);
+}
+
+function prettyDate(iso) {
+  const [y, m, d] = String(iso).split("-").map(Number);
+  if (!y || !m || !d) return "";
+  return new Date(y, m - 1, d).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+}
+
+function quoteContactFields() {
+  return `
+    <label>Your name <input id="qn" autocomplete="name"></label>
+    <label>Mobile <input id="qm" maxlength="10" inputmode="numeric" autocomplete="tel"></label>
+    <p class="err" id="qerr"></p>
+  `;
+}
+
+async function sendQuote(message) {
+  const err = $("#qerr");
+  const name = ($("#qn")?.value || "").trim();
+  const mobile = ($("#qm")?.value || "").replace(/\D/g, "");
+
+  if (!name) return (err.textContent = "Please enter your name");
+  if (mobile.length !== 10) return (err.textContent = "Please enter a 10 digit mobile number");
+
+  err.textContent = "";
+
+  const result = await api("/api/enquiry", "POST", { name, mobile, message });
+
+  if (!result._ok) return (err.textContent = result.error || "Could not send the request");
+
+  if (result.whatsapp_url) window.open(result.whatsapp_url, "_blank", "noopener");
+
+  closeModal();
+}
+
+function eventPlanner() {
+  modal(`
+    <h2>🎉 Plan your function</h2>
+    <p class="muted">Tell us about the function and we will estimate the drinks you need.</p>
+
+    <label>Function type
+      <select id="evType" onchange="updateEventEstimate()">
+        ${Object.keys(EVENT_PROFILES).map((t) => `<option>${esc(t)}</option>`).join("")}
+      </select>
+    </label>
+
+    <label>Number of guests
+      <input id="evGuests" type="number" min="1" max="100000" inputmode="numeric" value="100" oninput="updateEventEstimate()">
+    </label>
+
+    <label>Duration (hours)
+      <input id="evHours" type="number" min="1" max="48" step="0.5" inputmode="decimal" value="5" oninput="updateEventEstimate()">
+    </label>
+
+    <label>Function date (optional)
+      <input id="evDate" type="date" min="${todayISO()}">
+    </label>
+
+    <div class="event-est" id="evResult"></div>
+
+    ${quoteContactFields()}
+
+    <button class="primary" onclick="sendEventQuote()">Request bulk quote on WhatsApp</button>
+    <button onclick="closeModal()">Close</button>
+  `);
+
+  updateEventEstimate();
+}
+
+function readEvent() {
+  const guests = Math.floor(Number($("#evGuests")?.value));
+  const hours = Number($("#evHours")?.value);
+
+  if (!(guests >= 1) || !(hours > 0)) return null;
+
+  const type = $("#evType").value;
+
+  return { type, guests, hours, date: $("#evDate")?.value || "", est: eventEstimate(type, guests, hours) };
+}
+
+function updateEventEstimate() {
+  const box = $("#evResult");
+  if (!box) return;
+
+  const ev = readEvent();
+
+  box.innerHTML = ev
+    ? `<b>Estimated requirement</b>
+       <div class="row"><span>💧 Water bottles</span><b>${formatNumber(ev.est.water)}</b></div>
+       <div class="row"><span>🥤 Cold drinks</span><b>${formatNumber(ev.est.cold)}</b></div>
+       ${ev.est.energy ? `<div class="row"><span>⚡ Energy drinks</span><b>${formatNumber(ev.est.energy)}</b></div>` : ""}
+       <small class="muted">This is only an estimate. We will confirm the final quantity with you.</small>`
+    : `<small class="muted">Enter the number of guests and hours.</small>`;
+}
+
+function sendEventQuote() {
+  const ev = readEvent();
+
+  if (!ev) return ($("#qerr").textContent = "Please enter guests and duration");
+
+  const lines = [
+    "🎉 Function bulk quote request",
+    "",
+    `Function: ${ev.type}`,
+    `Guests: ${ev.guests}`,
+    `Duration: ${ev.hours} hours`,
+  ];
+
+  if (ev.date) lines.push(`Date: ${prettyDate(ev.date)}`);
+
+  lines.push(
+    "",
+    "Estimated requirement:",
+    `💧 Water bottles: ${ev.est.water}`,
+    `🥤 Cold drinks: ${ev.est.cold}`,
+  );
+
+  if (ev.est.energy) lines.push(`⚡ Energy drinks: ${ev.est.energy}`);
+
+  lines.push("", "Please share your best bulk price.");
+
+  return sendQuote(lines.join("\n"));
+}
+
+function bulkOrder() {
+  const products = (window.PRODUCTS || []).slice().sort((a, b) =>
+    cleanName(a.name).localeCompare(cleanName(b.name)));
+
+  modal(`
+    <h2>📦 Bulk order</h2>
+    <p class="muted">Ordering a large quantity? Send us the details and we will reply with the best price.</p>
+
+    <label>Product
+      <select id="bkProduct">
+        ${products.map((p) => `<option value="${p.id}">${esc(cleanName(p.name))}${p.size ? " (" + esc(p.size) + ")" : ""}</option>`).join("")}
+      </select>
+    </label>
+
+    <label>Quantity
+      <input id="bkQty" type="number" min="1" max="100000" inputmode="numeric" value="100">
+    </label>
+
+    <label>Delivery date
+      <input id="bkDate" type="date" min="${todayISO()}">
+    </label>
+
+    <label>Function (optional)
+      <input id="bkFn" placeholder="e.g. Wedding, Office party">
+    </label>
+
+    ${quoteContactFields()}
+
+    <button class="primary" onclick="sendBulkQuote()">Request bulk quote on WhatsApp</button>
+    <button onclick="closeModal()">Close</button>
+  `);
+}
+
+function sendBulkQuote() {
+  const product = find($("#bkProduct")?.value);
+  const qty = Math.floor(Number($("#bkQty")?.value));
+
+  if (!product) return ($("#qerr").textContent = "Please choose a product");
+  if (!(qty >= 1)) return ($("#qerr").textContent = "Please enter a quantity");
+
+  const date = $("#bkDate")?.value || "";
+  const fn = ($("#bkFn")?.value || "").trim();
+
+  const lines = [
+    "📦 Bulk order request",
+    "",
+    `Product: ${cleanName(product.name)}${product.size ? " (" + product.size + ")" : ""}`,
+    `Quantity: ${qty}`,
+  ];
+
+  if (date) lines.push(`Delivery date: ${prettyDate(date)}`);
+  if (fn) lines.push(`Function: ${fn}`);
+
+  lines.push("", "Please share your best bulk price and availability.");
+
+  return sendQuote(lines.join("\n"));
+}
+
+/* =========================
+   GLOBAL FUNCTIONS
+   ========================= */
+
+window.category = category;
+
+window.render = render;
+
+window.chg = chg;
+
+window.cart = cart;
+
+window.checkout = checkout;
+
+window.cTot = cTot;
+
+window.placeOrder = placeOrder;
+
+window.payQR = payQR;
+
+window.paid = paid;
+
+window.done = done;
+
+window.bill = bill;
+
+window.account = account;
+
+window.sendOTP = sendOTP;
+
+window.resendOTP = resendOTP;
+
+window.verifyOTP = verifyOTP;
+
+window.tgCheckLink = tgCheckLink;
+
+window.profile = profile;
+
+window.saveProfile = saveProfile;
+
+window.orders = orders;
+
+window.cancelMyOrder = cancelMyOrder;
+window.trackOrder = trackOrder;
+window.editOrderDeliveryLocation = editOrderDeliveryLocation;
+window.useCurrentDeliveryLocation = useCurrentDeliveryLocation;
+window.saveOrderDeliveryLocation = saveOrderDeliveryLocation;
+
+window.enquiry = enquiry;
+
+window.sendEnquiry = sendEnquiry;
+
+window.whatsappMessage = whatsappMessage;
+
+window.sendWhatsAppMessage = sendWhatsAppMessage;
+
+window.search = search;
+
+window.home = home;
+
+window.scrollToProducts = scrollToProducts;
+
+window.scrollToEnquiry = scrollToEnquiry;
+
+window.logout = logout;
+
+window.closeModal = closeModal;
+
+window.refreshProducts = refreshProducts;
+
+window.refreshConfig = refreshConfig;
+
+window.loadBusinessUI = loadBusinessUI;
+
+window.updateBusinessUI = updateBusinessUI;
+
+window.safeLoadProducts = safeLoadProducts;
+
+window.safeLoadOrders = safeLoadOrders;
+
+window.formatNumber = formatNumber;
+
+window.showMessage = showMessage;
+
+window.toggleWish = toggleWish;
+
+window.reorder = reorder;
+
+window.eventPlanner = eventPlanner;
+
+window.updateEventEstimate = updateEventEstimate;
+
+window.sendEventQuote = sendEventQuote;
+
+window.bulkOrder = bulkOrder;
+
+window.sendBulkQuote = sendBulkQuote;
+
+/* Compatibility */
+
+window.openAccount = openAccount;
+
+window.openOrders = openOrders;
+
+window.openProfile = openProfile;
+
+window.openCart = openCart;
+
+window.openCheckout = openCheckout;
+
+window.openEnquiry = openEnquiry;
+
+window.openWhatsApp = openWhatsApp;
