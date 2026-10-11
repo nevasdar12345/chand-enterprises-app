@@ -534,6 +534,11 @@ function deliveryAction(order) {
         step = `<button type="button" class="dlv-btn dlv-main" onclick="deliveryStatus(${order.id}, 'Out for Delivery')">🚚 Out for Delivery</button>`;
     }
 
+    let liveTracking = '';
+    if (status === 'Out for Delivery') {
+        liveTracking = `<button type="button" class="dlv-btn dlv-main" onclick="startLiveTracking(${order.id})">📡 Start live location</button><button type="button" class="dlv-btn" onclick="stopLiveTracking(${order.id})">Stop sharing</button>`;
+    }
+
     let cash = '';
     if (order.payment === 'COD') {
         cash = `<div class="dlv-cash">
@@ -542,7 +547,7 @@ function deliveryAction(order) {
         </div>`;
     }
 
-    return `<div class="dlv-actions">${step}${contact}</div>${cash}`;
+    return `<div class="dlv-actions">${step}${liveTracking}${contact}</div>${cash}`;
 }
 
 
@@ -652,3 +657,32 @@ document.addEventListener(
 
     }
 );
+
+
+let LIVE_TRACK_WATCHES = new Map();
+async function startLiveTracking(orderId) {
+    if (!navigator.geolocation) return alert('This browser does not support location sharing.');
+    if (!confirm('Share your live location for this active delivery? It stops when delivery ends or you stop sharing.')) return;
+    const started = await api(`/api/delivery/live-tracking/${orderId}/start`, 'POST', {});
+    if (!started || started._ok === false || !started.ok) return alert(started?.error || 'Could not start live tracking.');
+    if (LIVE_TRACK_WATCHES.has(orderId)) return;
+    const watchId = navigator.geolocation.watchPosition(async pos => {
+        const result = await api(`/api/delivery/live-tracking/${orderId}/location`, 'POST', {
+            latitude: pos.coords.latitude, longitude: pos.coords.longitude, accuracy: pos.coords.accuracy
+        });
+        if (!result || result._ok === false) console.warn('Live location update failed', result?.error);
+    }, error => {
+        console.warn('Geolocation error', error.message);
+        alert('Location update paused: ' + (error.code === 1 ? 'permission denied' : 'location unavailable') + '. Keep this page open and check location permission.');
+    }, { enableHighAccuracy: true, maximumAge: 10000, timeout: 20000 });
+    LIVE_TRACK_WATCHES.set(orderId, watchId);
+    alert('Live location sharing started. Keep this page open; phone/browser power settings may pause updates.');
+}
+async function stopLiveTracking(orderId) {
+    const watchId = LIVE_TRACK_WATCHES.get(orderId);
+    if (watchId !== undefined) navigator.geolocation.clearWatch(watchId);
+    LIVE_TRACK_WATCHES.delete(orderId);
+    await api(`/api/delivery/live-tracking/${orderId}/stop`, 'POST', {});
+}
+window.startLiveTracking = startLiveTracking;
+window.stopLiveTracking = stopLiveTracking;
