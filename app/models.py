@@ -637,3 +637,16 @@ class StaffTelegramLink(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), unique=True, nullable=False, index=True)
     chat_id = db.Column(db.BigInteger, nullable=False, index=True)
     linked_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class LiveDeliveryLocation(db.Model):
+    """Latest opt-in courier location for an active delivery; one row per order."""
+    id = db.Column(db.Integer, primary_key=True)
+    order_id = db.Column(db.Integer, db.ForeignKey("order.id"), unique=True, nullable=False, index=True)
+    delivery_person_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
+    latitude = db.Column(db.Float, nullable=False)
+    longitude = db.Column(db.Float, nullable=False)
+    accuracy_m = db.Column(db.Float, nullable=True)
+    tracking_active = db.Column(db.Boolean, default=True, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    order = db.relationship("Order", backref=db.backref("live_delivery_location", uselist=False))
