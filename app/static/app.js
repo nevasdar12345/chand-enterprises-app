@@ -1494,11 +1494,68 @@ async function trackOrder(code) {
     <div class="ce-track-head"><div><small>ORDER TRACKING</small><h2>${esc(order.code)}</h2></div><span class="ce-track-status">${esc(order.status || "Pending")}</span></div>
     ${cancelled ? `<p class="ce-track-cancelled">This order was cancelled.</p>` : `<div class="ce-track-steps">${steps.map((step,i)=>`<div class="ce-track-step ${activeIndex >= i ? "is-done" : ""} ${step === order.status ? "is-current" : ""}"><span>${activeIndex > i ? "✓" : i+1}</span><small>${esc(step)}</small></div>`).join("")}</div>`}
     <div class="ce-track-section"><h3>Order history</h3><div class="ce-track-timeline">${timeline}</div></div>
-    <div class="ce-track-section"><h3>Delivery address</h3><p>${esc(order.address || "No address saved")}</p>${mapLinks}</div>
+    <div class="ce-track-section"><h3>Delivery address</h3><p>${esc(order.address || "No address saved")}</p>${mapLinks}
+      ${order.location_issue ? `<p class="ce-location-warning">⚠️ ${esc(order.location_issue)}</p>` : ''}
+      ${order.can_edit_location ? `<button type="button" onclick="editOrderDeliveryLocation('${esc(order.code)}')">Edit delivery details</button>` : ''}
+    </div>
+    ${order.estimated_delivery_window ? `<div class="ce-track-section"><small>Estimated delivery window</small><b>${esc(order.estimated_delivery_window)}</b><p class="muted">Estimate only; actual timing may vary.</p></div>` : ''}
     <div class="ce-track-section">${contact}</div>
     <div class="ce-track-section"><small>Payment status</small><b>${esc(order.payment_status || "Pending")}</b></div>
     <button class="primary" onclick="closeModal()">Close tracking</button>
   </div>`);
+}
+
+async function editOrderDeliveryLocation(code) {
+  const current = await api(`/api/orders/${encodeURIComponent(code)}/tracking`);
+  if (!current || current._ok === false || !current.ok || !current.order?.can_edit_location) {
+    return alert(current?.error || 'Delivery details can no longer be changed.');
+  }
+  const saved = current.order;
+  const address = saved.address || '';
+  const latitude = saved.latitude;
+  const longitude = saved.longitude;
+  modal(`<div class="ce-track-modal">
+    <div class="ce-track-head"><div><small>DELIVERY DETAILS</small><h2>Update address</h2></div><button onclick="closeModal()" aria-label="Close">✕</button></div>
+    <p class="muted">You can change delivery details until the order is dispatched. Leave both coordinates blank if you do not have a map pin. The existing order total is not changed automatically; contact support if the new location materially changes the delivery distance.</p>
+    <label>Full address and landmark<textarea id="ceEditDeliveryAddress" rows="3" maxlength="1000">${esc(address || '')}</textarea></label>
+    <div class="ce-eta-grid">
+      <label>Latitude<input id="ceEditDeliveryLat" inputmode="decimal" type="number" min="-90" max="90" step="any" value="${latitude == null ? '' : esc(latitude)}"></label>
+      <label>Longitude<input id="ceEditDeliveryLng" inputmode="decimal" type="number" min="-180" max="180" step="any" value="${longitude == null ? '' : esc(longitude)}"></label>
+    </div>
+    <button type="button" onclick="useCurrentDeliveryLocation()">Use my current location</button>
+    <p class="muted" id="ceEditLocationMsg"></p><p class="err" id="ceEditLocationErr"></p>
+    <button class="primary" id="ceEditLocationSave" onclick="saveOrderDeliveryLocation('${esc(code)}')">Save delivery details</button>
+    <button onclick="closeModal()">Cancel</button>
+  </div>`);
+}
+
+function useCurrentDeliveryLocation() {
+  const msg = document.getElementById('ceEditLocationMsg');
+  if (!navigator.geolocation) { if (msg) msg.textContent = 'Location is not supported by this browser.'; return; }
+  if (msg) msg.textContent = 'Requesting location permission…';
+  navigator.geolocation.getCurrentPosition(pos => {
+    document.getElementById('ceEditDeliveryLat').value = pos.coords.latitude.toFixed(6);
+    document.getElementById('ceEditDeliveryLng').value = pos.coords.longitude.toFixed(6);
+    if (msg) msg.textContent = 'Location captured. Please verify the address and landmark too.';
+  }, error => { if (msg) msg.textContent = error.code === 1 ? 'Location permission was denied.' : 'Could not get your location. You can enter coordinates manually.'; }, {enableHighAccuracy:true, timeout:12000, maximumAge:60000});
+}
+
+async function saveOrderDeliveryLocation(code) {
+  const button = document.getElementById('ceEditLocationSave');
+  const error = document.getElementById('ceEditLocationErr');
+  const address = document.getElementById('ceEditDeliveryAddress')?.value.trim() || '';
+  const latText = document.getElementById('ceEditDeliveryLat')?.value.trim() || '';
+  const lngText = document.getElementById('ceEditDeliveryLng')?.value.trim() || '';
+  if (button) { button.disabled = true; button.textContent = 'Saving…'; }
+  const result = await api(`/api/orders/${encodeURIComponent(code)}/delivery-location`, 'POST', {
+    address, latitude: latText, longitude: lngText
+  });
+  if (!result || result._ok === false || !result.ok) {
+    if (error) error.textContent = result?.error || 'Could not update delivery details.';
+    if (button) { button.disabled = false; button.textContent = 'Save delivery details'; }
+    return;
+  }
+  await trackOrder(code);
 }
 
 async function cancelMyOrder(code) {
@@ -2398,6 +2455,10 @@ window.saveProfile = saveProfile;
 window.orders = orders;
 
 window.cancelMyOrder = cancelMyOrder;
+window.trackOrder = trackOrder;
+window.editOrderDeliveryLocation = editOrderDeliveryLocation;
+window.useCurrentDeliveryLocation = useCurrentDeliveryLocation;
+window.saveOrderDeliveryLocation = saveOrderDeliveryLocation;
 
 window.enquiry = enquiry;
 
