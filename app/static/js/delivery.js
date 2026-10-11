@@ -499,6 +499,7 @@ function deliveryCard(order) {
 
         </div>
 
+        ${order.status === 'Out for Delivery' && order.latitude != null && order.longitude != null ? `<div class="ce-driver-route-card"><b>🗺️ Route to customer</b><p class="dlv-note">Open turn-by-turn road directions using the saved customer pin.</p><a class="dlv-btn dlv-main" target="_blank" rel="noopener" href="https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(order.latitude)},${encodeURIComponent(order.longitude)}&travelmode=driving">Open navigation ↗</a></div>` : ''}
         ${deliveryAction(order)}
 
     </article>`;
