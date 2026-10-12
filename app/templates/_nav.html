@@ -1,4 +1,4 @@
-<!-- ================= NAVIGATION ================= -->
+<!-- ================= STORE HEADER ================= -->
 
 <header class="nav store-nav">
 
@@ -88,7 +88,7 @@
     >
         🛒
         <span class="cart-label">Cart</span>
-        <b id="count">0</b>
+        <b id="count" aria-live="polite">0</b>
     </button>
 
     <!-- Hamburger is outside the collapsible action group so it remains visible on mobile -->
@@ -97,6 +97,7 @@
         class="nav-hamburger"
         id="mobileMenuButton"
         aria-label="Open menu"
+        aria-controls="ceMobileMenu"
         aria-expanded="false"
     >
         <span></span>
@@ -111,7 +112,7 @@
 
 <div class="ce-menu-backdrop" id="ceMenuBackdrop" aria-hidden="true"></div>
 
-<aside class="ce-menu" id="ceMobileMenu" aria-hidden="true">
+<aside class="ce-menu" id="ceMobileMenu" role="dialog" aria-modal="true" aria-label="Site menu" aria-hidden="true">
 
     <div class="ce-menu-head">
         <div>
@@ -132,44 +133,44 @@
             id="menuInstallApp"
             onclick="installApp(); closeMobileMenu();"
         >
-            <span>📲</span>
+            <span aria-hidden="true">📲</span>
             <span>Install App</span>
         </button>
         <a href="/" class="ce-menu-link">
-            <span>🏠</span>
+            <span aria-hidden="true">🏠</span>
             <span>Home</span>
         </a>
 
         <a href="/#shop" class="ce-menu-link">
-            <span>🛒</span>
+            <span aria-hidden="true">🛒</span>
             <span>Products</span>
         </a>
 
         <a href="/about" class="ce-menu-link">
-            <span>ℹ️</span>
+            <span aria-hidden="true">ℹ️</span>
             <span>About Us</span>
         </a>
 
         {% if site.mobile %}
         <a href="tel:{{ site.tel }}" class="ce-menu-link">
-            <span>📞</span>
+            <span aria-hidden="true">📞</span>
             <span>Call {{ site.mobile }}</span>
         </a>
         {% endif %}
 
         <a href="/brochure" class="ce-menu-link ce-menu-featured">
-            <span>📖</span>
+            <span aria-hidden="true">📖</span>
             <span>Brochure</span>
             <small>Premium product catalogue</small>
         </a>
 
         <button type="button" class="ce-menu-link ce-menu-button" onclick="orders(); closeMobileMenu();">
-            <span>📦</span>
+            <span aria-hidden="true">📦</span>
             <span>My Orders</span>
         </button>
 
         <button type="button" class="ce-menu-link ce-menu-button" onclick="enquiry(); closeMobileMenu();">
-            <span>💬</span>
+            <span aria-hidden="true">💬</span>
             <span>WhatsApp Enquiry</span>
         </button>
 
@@ -181,7 +182,7 @@
             onclick="account(); closeMobileMenu();"
             {% if not login_on and session.get('role') != 'customer' %}hidden{% endif %}
         >
-            <span>🔐</span>
+            <span aria-hidden="true">🔐</span>
             <span>Login</span>
         </button>
 
@@ -192,13 +193,13 @@
             onclick="logout(); closeMobileMenu();"
             hidden
         >
-            <span>🚪</span>
+            <span aria-hidden="true">🚪</span>
             <span>Logout</span>
         </button>
     </nav>
 
     <div class="ce-menu-footer">
-        <span>📍</span> {{ site.location }}
+        <span aria-hidden="true">📍</span> {{ site.location }}
     </div>
 
 </aside>
