@@ -2,36 +2,18 @@
 <html lang="en" data-ordering="{{ 'on' if ordering_on else 'off' }}" data-login="{{ 'on' if login_on else 'off' }}">
 
 <head>
-
     <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#0f2233">
+    <meta name="description" content="Chand Enterprises - Drinks, premium water and local delivery in Darbhanga, Bihar">
 
     <link rel="manifest" href="{{ url_for('static', filename='manifest.webmanifest') }}">
     <link rel="icon" href="{{ url_for('static', filename='icons/icon.svg') }}">
 
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1"
-    >
-
-    <meta
-        name="theme-color"
-        content="#0f2233"
-    >
-
-    <meta
-        name="description"
-        content="Chand Enterprises - Drinks, premium water and local delivery in Darbhanga, Bihar"
-    >
-
-    <title>
-        {% block title %}
-            Chand Enterprises · Darbhanga
-        {% endblock %}
-    </title>
+    <title>{% block title %}Chand Enterprises · Darbhanga{% endblock %}</title>
 
 
-    <!-- Theme: apply saved choice before first paint -->
-
+    <!-- Theme: apply saved choice before first paint (keep this FIRST, before any CSS) -->
     <script>
         (function () {
             var theme = 'light';
@@ -46,222 +28,139 @@
     </script>
 
 
-    <!-- Premium font -->
-
-    <link
-        rel="preconnect"
-        href="https://fonts.googleapis.com"
-    >
-
-    <link
-        rel="preconnect"
-        href="https://fonts.gstatic.com"
-        crossorigin
-    >
-
-    <link
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
-        rel="stylesheet"
-    >
-
-
-    <!-- Main stylesheet -->
-
+    <!-- Font: loads without blocking the first paint.
+         Text shows instantly in the system font, then swaps to Inter. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link
         rel="stylesheet"
-        href="{{ url_for('static', filename='style.css') }}"
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400..800&display=swap"
+        media="print"
+        onload="this.media='all'"
     >
+    <noscript>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400..800&display=swap">
+    </noscript>
 
-    <link
-        rel="stylesheet"
-        href="{{ url_for('static', filename='responsive.css') }}"
-    >
 
-    <!-- NEW: premium product cards -->
-    <link
-        rel="stylesheet"
-        href="{{ url_for('static', filename='product-cards.css') }}"
-    >
-
-    <!-- NEW: cart + checkout animations -->
-    <link
-        rel="stylesheet"
-        href="{{ url_for('static', filename='cart-checkout.css') }}"
-    >
-
+    <!-- Stylesheets (order matters - later files override earlier ones) -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='responsive.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='product-cards.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='cart-checkout.css') }}">
 
 
     <!-- Base styling -->
-
     <style>
 
+        :root[data-theme="dark"] { color-scheme: dark; }
+        :root[data-theme="light"] { color-scheme: light; }
+
         html {
-            scroll-behavior: smooth;
+            -webkit-text-size-adjust: 100%;
+            text-size-adjust: 100%;
         }
 
+        @media (prefers-reduced-motion: no-preference) {
+            html { scroll-behavior: smooth; }
+        }
 
         body {
-            font-family:
-                Inter,
-                system-ui,
-                -apple-system,
-                BlinkMacSystemFont,
-                "Segoe UI",
-                sans-serif;
-
+            font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans", sans-serif;
             -webkit-font-smoothing: antialiased;
-
+            -moz-osx-font-smoothing: grayscale;
             text-rendering: optimizeLegibility;
         }
 
-
-        body {
-            animation:
-                pageIn .35s ease both;
+        /* Snappier taps on phones: no grey flash, no double-tap delay */
+        a, button, [onclick], label, select, summary {
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
         }
-
-
-        @keyframes pageIn {
-
-            from {
-                opacity: 0;
-            }
-
-            to {
-                opacity: 1;
-            }
-
-        }
-
 
         /* Scrollbar */
-
-        ::-webkit-scrollbar {
-            width: 9px;
-            height: 9px;
-        }
-
-
-        ::-webkit-scrollbar-track {
-            background: var(--bg);
-        }
-
-
+        ::-webkit-scrollbar { width: 9px; height: 9px; }
+        ::-webkit-scrollbar-track { background: var(--bg); }
         ::-webkit-scrollbar-thumb {
             background: #b9c7d3;
             border-radius: 99px;
             border: 2px solid var(--bg);
         }
-
-
-        ::-webkit-scrollbar-thumb:hover {
-            background: #8296a7;
-        }
-
+        ::-webkit-scrollbar-thumb:hover { background: #8296a7; }
 
         /* Selection */
-
-        ::selection {
-            background: #0a7cff;
-            color: #fff;
-        }
-
+        ::selection { background: #0a7cff; color: #fff; }
 
         /* Focus */
-
         input:focus,
         select:focus,
         textarea:focus {
-
             outline: none;
-
             border-color: var(--pri);
-
-            box-shadow:
-                0 0 0 3px #0a7cff18;
+            box-shadow: 0 0 0 3px #0a7cff18;
         }
-
 
         button:focus-visible,
         a:focus-visible {
-
-            outline:
-                3px solid #0a7cff55;
-
+            outline: 3px solid #0a7cff55;
             outline-offset: 2px;
         }
 
-
         /* Page loader */
-
         #page-loader {
-
             position: fixed;
-
             top: 0;
             left: 0;
             right: 0;
-
             height: 3px;
-
             z-index: 9999;
-
             pointer-events: none;
-
-            background:
-                linear-gradient(
-                    90deg,
-                    #0a7cff,
-                    #00c2d1,
-                    #0a7cff
-                );
-
-            background-size:
-                200% 100%;
-
-            animation:
-                loaderMove 1.2s linear infinite;
-
-            transition:
-                opacity .3s ease;
+            background: linear-gradient(90deg, #0a7cff, #00c2d1, #0a7cff);
+            background-size: 200% 100%;
+            animation: loaderMove 1.2s linear infinite;
+            transition: opacity .3s ease, visibility 0s linear .3s;
         }
 
-
+        /* Once done, stop the animation completely so it costs nothing */
         #page-loader.done {
             opacity: 0;
+            visibility: hidden;
+            animation-play-state: paused;
         }
-
 
         @keyframes loaderMove {
-
-            from {
-                background-position: 0 0;
-            }
-
-            to {
-                background-position: 200% 0;
-            }
-
+            from { background-position: 0 0; }
+            to   { background-position: 200% 0; }
         }
 
+        /* Modal blur only while the modal is open (not while hidden) */
+        #modal.open { backdrop-filter: blur(5px); }
 
-        /* Modal */
-
-        #modal {
-            backdrop-filter: blur(5px);
+        /* Footer sits below the fold: the browser skips drawing it until needed */
+        .site-footer {
+            content-visibility: auto;
+            contain-intrinsic-size: auto 420px;
         }
 
+        /* Prevent sideways scroll (clip keeps sticky headers working) */
+        html, body { max-width: 100%; }
+        body { overflow-x: hidden; }
 
-        /* Prevent overflow */
+        @supports (overflow: clip) {
+            body { overflow-x: clip; }
+        }
 
-        html,
-        body {
-            max-width: 100%;
-            overflow-x: hidden;
+        /* Respect "reduce motion" system setting */
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: .01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: .01ms !important;
+            }
+            #page-loader { animation: none; }
         }
 
     </style>
-
 
     {% block head %}{% endblock %}
 
@@ -270,121 +169,66 @@
 
 <body>
 
-
     <!-- Page loader -->
-
     <div id="page-loader"></div>
 
-
     <!-- Page -->
-
     {% block body %}{% endblock %}
 
-
     <!-- Global modal -->
-
     <div id="modal"></div>
 
 
-    <!-- =================================================
-         JAVASCRIPT
-         ================================================= -->
-
+    <!-- ================= JAVASCRIPT ================= -->
 
     {% if request.path == '/staff' %}
 
-    <!-- Staff Login -->
+    <script src="{{ url_for('static', filename='js/staff.js') }}"></script>
 
-    <script
-        src="{{ url_for('static', filename='js/staff.js') }}"
-    ></script>
+    {% elif session.get('role') == 'admin' %}
 
+    <script src="{{ url_for('static', filename='js/admin.js') }}"></script>
 
-{% elif session.get('role') == 'admin' %}
+    {% elif session.get('role') == 'developer' %}
 
-    <!-- Admin -->
+    <script src="{{ url_for('static', filename='js/developer.js') }}"></script>
 
-    <script
-        src="{{ url_for('static', filename='js/admin.js') }}"
-    ></script>
+    {% elif session.get('role') == 'delivery' %}
 
+    <script src="{{ url_for('static', filename='js/delivery.js') }}"></script>
 
-{% elif session.get('role') == 'developer' %}
-
-    <!-- Developer -->
-
-    <script
-        src="{{ url_for('static', filename='js/developer.js') }}"
-    ></script>
-
-
-{% elif session.get('role') == 'delivery' %}
-
-    <!-- Delivery -->
-
-    <script
-        src="{{ url_for('static', filename='js/delivery.js') }}"
-    ></script>
-
-
-{% else %}
-
-    <!-- Customer / Public -->
+    {% else %}
 
     <script src="{{ url_for('static', filename='location.js') }}"></script>
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
 
-    <script
-        src="{{ url_for('static', filename='app.js') }}"
-    ></script>
-
-{% endif %}
+    {% endif %}
 
 
     <!-- Page-specific scripts -->
-
     {% block scripts %}{% endblock %}
 
 
     <!-- Page loader completion -->
-
     <script>
-
-        window.addEventListener(
-            'load',
-            function () {
-
-                const loader =
-                    document.getElementById(
-                        'page-loader'
-                    );
-
-
-                if (loader) {
-
-                    setTimeout(
-                        function () {
-
-                            loader.classList.add(
-                                'done'
-                            );
-
-                        },
-                        150
-                    );
-
-                }
-
+        window.addEventListener('load', function () {
+            var loader = document.getElementById('page-loader');
+            if (loader) {
+                setTimeout(function () { loader.classList.add('done'); }, 150);
             }
-        );
-
+        });
     </script>
 
-<script src="{{ url_for('static', filename='js/responsive.js') }}"></script>
-<script>
-if ("serviceWorker" in navigator) {
-  window.addEventListener("load", () => navigator.serviceWorker.register("/static/sw.js").catch(console.error));
-}
-</script>
+    <script src="{{ url_for('static', filename='js/responsive.js') }}"></script>
+
+    <script>
+        if ("serviceWorker" in navigator) {
+            window.addEventListener("load", function () {
+                navigator.serviceWorker.register("/static/sw.js").catch(console.error);
+            });
+        }
+    </script>
+
 </body>
 
 </html>
