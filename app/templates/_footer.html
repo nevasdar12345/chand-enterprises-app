@@ -35,7 +35,7 @@
             <a class="sf-contact" href="tel:{{ site.tel }}"><span aria-hidden="true">📞</span> {{ site.mobile }}</a>
             {% endif %}
             {% if site.whatsapp_url %}
-            <a class="sf-contact" href="{{ site.whatsapp_url }}" target="_blank" rel="noopener"><span aria-hidden="true">💬</span> {{ site.footer_whatsapp_label }}</a>
+            <a class="sf-contact" href="{{ site.whatsapp_url }}" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">💬</span> {{ site.footer_whatsapp_label }}</a>
             {% endif %}
             <span class="sf-contact"><span aria-hidden="true">📍</span> {{ site.location }}</span>
         </div>
@@ -57,6 +57,6 @@
         <a href="/staff" class="footer-staff">Staff login</a>
     </div>
 
-    <script>document.getElementById('sfYear').textContent = new Date().getFullYear();</script>
+    <script>(function(){var y=document.getElementById('sfYear');if(y){y.textContent=new Date().getFullYear();}})();</script>
 
 </footer>
