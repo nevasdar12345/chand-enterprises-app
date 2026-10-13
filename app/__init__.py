@@ -5,11 +5,13 @@ from pathlib import Path
 
 from flask import Flask, request, jsonify, redirect, url_for
 from flask_sqlalchemy import SQLAlchemy
+from flask_caching import Cache
 from sqlalchemy import event, inspect, text
 from sqlalchemy.engine import Engine
 
 
 db = SQLAlchemy()
+cache = Cache()
 
 
 # ============================================================
@@ -71,7 +73,17 @@ def create_app():
             Path(app.instance_path) / "chand.db"
         )
 
+    # Redis is an optional shared cache. Local development works without it;
+    # production uses REDIS_URL when configured (for example, a managed Redis).
+    redis_url = os.getenv("REDIS_URL", "").strip()
+
     app.config.update(
+        CACHE_TYPE="RedisCache" if redis_url else "SimpleCache",
+        CACHE_REDIS_URL=redis_url or None,
+        CACHE_DEFAULT_TIMEOUT=60,
+        CACHE_KEY_PREFIX="chand-enterprises:",
+        CACHE_OPTIONS={"socket_connect_timeout": 2, "socket_timeout": 2},
+
         SECRET_KEY=os.getenv(
             "SECRET_KEY",
             "change-this-in-production"
@@ -116,6 +128,7 @@ def create_app():
         }
 
     db.init_app(app)
+    cache.init_app(app)
 
     # ============================================================
     # ROUTES
