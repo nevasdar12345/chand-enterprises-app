@@ -17,7 +17,7 @@ from flask import (Blueprint, render_template, request, redirect, url_for,
 
 from werkzeug.security import generate_password_hash, check_password_hash
 
-from . import db
+from . import db, cache
 
 from .models import User, Product, Category, Order, OrderItem, Enquiry, Payment, OtpChallenge, SiteSetting, Coupon, LedgerEntry, OrderArchive, ArchivedOrder, OrderTrackingEvent, TelegramLink, TelegramToken, StaffTelegramLink, LiveDeliveryLocation
 
@@ -1527,17 +1527,20 @@ def delivery_quote():
 
 
 @main.get("/api/config")
+@cache.cached(timeout=30, key_prefix="public-api-config-v1")
 def config():
     cfg = developer_settings()
     return jsonify(_ok=True, whatsapp=wa_number(), upi=cfg["upi"] or current_app.config["UPI_ID"], business_name=cfg["business_name"], business_mobile=cfg["business_mobile"], business_location=cfg["business_location"], payment_name=cfg["payment_name"], offers=cfg["offers"], show_prices_home=cfg["show_prices_home"], show_prices_brochure=cfg["show_prices_brochure"], ordering_enabled=cfg["ordering_enabled"], customer_login_enabled=cfg["customer_login_enabled"], maps_enabled=cfg["maps_enabled"], map_customer_tracking=cfg["map_customer_tracking"], map_delivery_navigation=cfg["map_delivery_navigation"], map_admin_view=cfg["map_admin_view"], business_lat=cfg["business_lat"], business_lng=cfg["business_lng"], eta_confirmed_min=cfg["eta_confirmed_min"], eta_confirmed_max=cfg["eta_confirmed_max"], eta_preparing_min=cfg["eta_preparing_min"], eta_preparing_max=cfg["eta_preparing_max"], eta_out_for_delivery_min=cfg["eta_out_for_delivery_min"], eta_out_for_delivery_max=cfg["eta_out_for_delivery_max"], free_delivery_above=float_setting("delivery_free_above", 500), instagram_url=cfg["instagram_url"], facebook_url=cfg["facebook_url"], social_links=cfg["social_links"], about_title=cfg["about_title"], about_text=cfg["about_text"], footer_tagline=cfg["footer_tagline"], brochure_url=cfg["brochure_url"], categories=[category_dict(c) for c in active_categories()], coupons=[coupon_dict(c) for c in Coupon.query.filter_by(active=True).order_by(Coupon.code).all()])
 
 
 @main.get("/api/categories")
+@cache.cached(timeout=60, key_prefix="public-api-categories-v1")
 def api_categories():
     return jsonify([category_dict(c) for c in active_categories()])
 
 
 @main.get("/api/products")
+@cache.cached(timeout=30, key_prefix="public-api-products-v1")
 def api_products():
     return jsonify([product_dict(p) for p in Product.query.filter_by(active=True)])
 
