@@ -57,11 +57,16 @@ def create_app():
     database_url = os.getenv("DATABASE_URL")
 
     if database_url:
-        # Render PostgreSQL
+        # Normalize hosted PostgreSQL URLs to the installed psycopg 3 driver.
+        # Neon connection strings commonly start with postgresql://; without
+        # this explicit dialect, SQLAlchemy may try to import psycopg2.
         if database_url.startswith("postgres://"):
+            database_url = database_url.replace("postgres://", "postgresql://", 1)
+
+        if database_url.startswith("postgresql://"):
             database_url = database_url.replace(
-                "postgres://",
                 "postgresql://",
+                "postgresql+psycopg://",
                 1
             )
 
@@ -125,6 +130,9 @@ def create_app():
         app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
             "pool_pre_ping": True,
             "pool_recycle": 280,
+            "pool_size": 5,
+            "max_overflow": 2,
+            "pool_timeout": 30,
         }
 
     db.init_app(app)
