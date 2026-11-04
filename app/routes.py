@@ -3114,7 +3114,7 @@ def developer_app_health():
 
     # Deployment/runtime metadata, with no environment secrets exposed.
     db_url = str(current_app.config.get("SQLALCHEMY_DATABASE_URI", ""))
-    backend = "PostgreSQL" if db_url.startswith(("postgres://", "postgresql://")) else ("SQLite" if db_url.startswith("sqlite:") else "Configured database")
+    backend = "PostgreSQL" if db_url.startswith(("postgres://", "postgresql://", "postgresql+psycopg://")) else ("SQLite" if db_url.startswith("sqlite:") else "Configured database")
     add_check("Database backend", "healthy", backend + " is configured.")
 
     warnings = sum(1 for item in checks if item["status"] == "warning")
