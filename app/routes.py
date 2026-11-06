@@ -1526,11 +1526,60 @@ def delivery_quote():
                    coupon_ok=coupon_ok, coupon_message=coupon_msg)
 
 
+@main.get("/api/developer/appearance")
+def developer_get_appearance():
+    if not role_ok("developer"):
+        return jsonify(error="Forbidden"), 403
+    return jsonify(ok=True, appearance={
+        "theme": setting_value("appearance_theme") or "light",
+        "preset": setting_value("appearance_preset") or "brand",
+        "accent": setting_value("appearance_accent") or "#0a7cff",
+        "contrast": int(setting_value("appearance_contrast") or 70),
+    })
+
+
+@main.put("/api/developer/appearance")
+def developer_save_appearance():
+    if not role_ok("developer"):
+        return jsonify(error="Forbidden"), 403
+    data = request.get_json(silent=True) or {}
+    theme = str(data.get("theme", "light")).lower()
+    preset = str(data.get("preset", "brand")).lower()
+    accent = str(data.get("accent", "#0a7cff")).strip()
+    try:
+        contrast = int(data.get("contrast", 70))
+    except (TypeError, ValueError):
+        return jsonify(error="Contrast must be a number"), 400
+    if theme not in {"light", "dark", "auto"}:
+        return jsonify(error="Invalid theme"), 400
+    if preset not in {"brand", "ocean", "forest", "sunset", "mono", "high"}:
+        return jsonify(error="Invalid appearance preset"), 400
+    if not re.fullmatch(r"#[0-9a-fA-F]{6}", accent):
+        return jsonify(error="Choose a valid six-digit accent colour"), 400
+    if not 0 <= contrast <= 100:
+        return jsonify(error="Contrast must be between 0 and 100"), 400
+    set_setting("appearance_theme", theme)
+    set_setting("appearance_preset", preset)
+    set_setting("appearance_accent", accent.lower())
+    set_setting("appearance_contrast", str(contrast))
+    db.session.commit()
+    cache.delete("public-api-config-v1")
+    return jsonify(ok=True, message="Website appearance saved", appearance={
+        "theme": theme, "preset": preset, "accent": accent.lower(), "contrast": contrast
+    })
+
+
 @main.get("/api/config")
 @cache.cached(timeout=30, key_prefix="public-api-config-v1")
 def config():
     cfg = developer_settings()
-    return jsonify(_ok=True, whatsapp=wa_number(), upi=cfg["upi"] or current_app.config["UPI_ID"], business_name=cfg["business_name"], business_mobile=cfg["business_mobile"], business_location=cfg["business_location"], payment_name=cfg["payment_name"], offers=cfg["offers"], show_prices_home=cfg["show_prices_home"], show_prices_brochure=cfg["show_prices_brochure"], ordering_enabled=cfg["ordering_enabled"], customer_login_enabled=cfg["customer_login_enabled"], maps_enabled=cfg["maps_enabled"], map_customer_tracking=cfg["map_customer_tracking"], map_delivery_navigation=cfg["map_delivery_navigation"], map_admin_view=cfg["map_admin_view"], business_lat=cfg["business_lat"], business_lng=cfg["business_lng"], eta_confirmed_min=cfg["eta_confirmed_min"], eta_confirmed_max=cfg["eta_confirmed_max"], eta_preparing_min=cfg["eta_preparing_min"], eta_preparing_max=cfg["eta_preparing_max"], eta_out_for_delivery_min=cfg["eta_out_for_delivery_min"], eta_out_for_delivery_max=cfg["eta_out_for_delivery_max"], free_delivery_above=float_setting("delivery_free_above", 500), instagram_url=cfg["instagram_url"], facebook_url=cfg["facebook_url"], social_links=cfg["social_links"], about_title=cfg["about_title"], about_text=cfg["about_text"], footer_tagline=cfg["footer_tagline"], brochure_url=cfg["brochure_url"], categories=[category_dict(c) for c in active_categories()], coupons=[coupon_dict(c) for c in Coupon.query.filter_by(active=True).order_by(Coupon.code).all()])
+    appearance = {
+        "theme": setting_value("appearance_theme") or "light",
+        "preset": setting_value("appearance_preset") or "brand",
+        "accent": setting_value("appearance_accent") or "#0a7cff",
+        "contrast": int(setting_value("appearance_contrast") or 70),
+    }
+    return jsonify(_ok=True, appearance=appearance, whatsapp=wa_number(), upi=cfg["upi"] or current_app.config["UPI_ID"], business_name=cfg["business_name"], business_mobile=cfg["business_mobile"], business_location=cfg["business_location"], payment_name=cfg["payment_name"], offers=cfg["offers"], show_prices_home=cfg["show_prices_home"], show_prices_brochure=cfg["show_prices_brochure"], ordering_enabled=cfg["ordering_enabled"], customer_login_enabled=cfg["customer_login_enabled"], maps_enabled=cfg["maps_enabled"], map_customer_tracking=cfg["map_customer_tracking"], map_delivery_navigation=cfg["map_delivery_navigation"], map_admin_view=cfg["map_admin_view"], business_lat=cfg["business_lat"], business_lng=cfg["business_lng"], eta_confirmed_min=cfg["eta_confirmed_min"], eta_confirmed_max=cfg["eta_confirmed_max"], eta_preparing_min=cfg["eta_preparing_min"], eta_preparing_max=cfg["eta_preparing_max"], eta_out_for_delivery_min=cfg["eta_out_for_delivery_min"], eta_out_for_delivery_max=cfg["eta_out_for_delivery_max"], free_delivery_above=float_setting("delivery_free_above", 500), instagram_url=cfg["instagram_url"], facebook_url=cfg["facebook_url"], social_links=cfg["social_links"], about_title=cfg["about_title"], about_text=cfg["about_text"], footer_tagline=cfg["footer_tagline"], brochure_url=cfg["brochure_url"], categories=[category_dict(c) for c in active_categories()], coupons=[coupon_dict(c) for c in Coupon.query.filter_by(active=True).order_by(Coupon.code).all()])
 
 
 @main.get("/api/categories")
