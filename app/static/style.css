@@ -7,6 +7,7 @@
 
 /* ---------- design tokens ---------- */
 :root{
+  --ce-contrast:.7;
   --bg:#f6f9fc; --card:#fff; --ink:#0f2233; --mut:#667a8c; --muted:var(--mut);
   --pri:#0a7cff; --pri-2:#2f9bff; --accent:#00c2d1;
   --ok:#12a150; --bad:#e5484d; --line:#e3eaf1;
@@ -20,6 +21,22 @@
   --shadow-sm:0 2px 4px rgb(0 0 0 / 25%),0 8px 20px rgb(0 0 0 / 28%);
   --shadow-md:0 4px 10px rgb(0 0 0 / 30%),0 18px 40px rgb(0 0 0 / 40%);
   color-scheme:dark;
+}
+
+/* ---------- developer-managed storefront appearance ---------- */
+:root {
+  --ce-border-mix: 16%;
+}
+.panel, .card, .product-card, .premium-grid .card {
+  border-color: var(--line);
+}
+button, input, select, textarea {
+  border-color: var(--line);
+}
+:root[data-theme="dark"] .panel,
+:root[data-theme="dark"] .card,
+:root[data-theme="dark"] .product-card {
+  border-color: color-mix(in srgb, var(--ink) var(--ce-border-mix), transparent);
 }
 
 /* ---------- base ---------- */
