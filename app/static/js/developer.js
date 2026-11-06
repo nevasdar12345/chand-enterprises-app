@@ -577,11 +577,137 @@ async function tgSummaryNow() {
     if (msg) msg.textContent = r._ok ? `✅ Summary sent to ${r.sent_to} admin(s).` : '❌ ' + (r.error || 'Could not send');
 }
 
+/* =========================================================
+   WEBSITE APPEARANCE MANAGER
+   ========================================================= */
+const APPEARANCE_PRESETS = {
+    brand:  { label: 'Chand Blue', accent: '#0a7cff', bg: '#f6f9fc', card: '#ffffff', ink: '#0f2233', muted: '#667a8c' },
+    ocean:  { label: 'Ocean', accent: '#087eaa', bg: '#eff8fb', card: '#ffffff', ink: '#102d3a', muted: '#55717e' },
+    forest: { label: 'Forest', accent: '#16834a', bg: '#f1f8f3', card: '#ffffff', ink: '#183326', muted: '#607568' },
+    sunset: { label: 'Sunset', accent: '#e45b35', bg: '#fff6f1', card: '#ffffff', ink: '#38231d', muted: '#80665d' },
+    mono:   { label: 'Minimal', accent: '#334155', bg: '#f5f6f7', card: '#ffffff', ink: '#17202a', muted: '#66717c' },
+    high:   { label: 'High contrast', accent: '#0047ab', bg: '#ffffff', card: '#ffffff', ink: '#080808', muted: '#303030' }
+};
+
+function applyAppearanceLocally(a) {
+    if (!a) return;
+    const root = document.documentElement;
+    const preset = APPEARANCE_PRESETS[a.preset] || APPEARANCE_PRESETS.brand;
+    const dark = a.theme === 'dark' ||
+        (a.theme === 'auto' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    root.setAttribute('data-theme', dark ? 'dark' : 'light');
+    root.style.setProperty('--pri', a.accent || preset.accent);
+    root.style.setProperty('--pri-2', a.accent || preset.accent);
+    root.style.setProperty('--ce-contrast', String(Math.max(0, Math.min(100, Number(a.contrast ?? 70))) / 100));
+    root.style.setProperty('--ce-border-mix', Math.round(8 + Number(a.contrast ?? 70) * .12) + '%');
+    if (!dark) {
+        root.style.setProperty('--bg', preset.bg);
+        root.style.setProperty('--card', preset.card);
+        root.style.setProperty('--ink', preset.ink);
+        root.style.setProperty('--mut', preset.muted);
+    } else {
+        root.style.setProperty('--bg', '#0b141d');
+        root.style.setProperty('--card', '#14212e');
+        root.style.setProperty('--ink', '#e8f0f7');
+        root.style.setProperty('--mut', '#a8bac9');
+    }
+    root.style.setProperty('--line', dark ? '#34495b' : `color-mix(in srgb, ${preset.ink} ${Math.round(8 + Number(a.contrast || 70) * .12)}%, transparent)`);
+}
+
+async function openAppearanceManager() {
+    const result = await api('/api/developer/appearance');
+    if (!result._ok) return alert(result.error || 'Unable to load appearance settings');
+    const a = result.appearance || {};
+    const preset = a.preset || 'brand';
+    modal(`
+        <div style="max-width:620px">
+            <h2 style="margin-top:0">🎨 Website Appearance & Contrast</h2>
+            <p class="muted">Changes apply to the entire customer-facing website. Admin and Developer panel controls remain unchanged.</p>
+            <label>Theme
+                <select id="appearanceTheme">
+                    <option value="light" ${a.theme === 'light' ? 'selected' : ''}>Light</option>
+                    <option value="dark" ${a.theme === 'dark' ? 'selected' : ''}>Dark</option>
+                    <option value="auto" ${a.theme === 'auto' ? 'selected' : ''}>Follow device</option>
+                </select>
+            </label>
+            <label style="margin-top:12px">Colour preset
+                <select id="appearancePreset">
+                    ${Object.entries(APPEARANCE_PRESETS).map(([key, item]) => `<option value="${key}" ${preset === key ? 'selected' : ''}>${item.label}</option>`).join('')}
+                </select>
+            </label>
+            <label style="margin-top:12px">Brand accent colour
+                <input id="appearanceAccent" type="color" value="${esc(a.accent || APPEARANCE_PRESETS[preset].accent)}" style="height:48px;padding:4px">
+            </label>
+            <label style="display:block;margin-top:12px">Contrast strength: <b id="appearanceContrastValue">${Number(a.contrast ?? 70)}%</b>
+                <input id="appearanceContrast" type="range" min="0" max="100" value="${Number(a.contrast ?? 70)}" style="width:100%">
+            </label>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;margin:14px 0">
+                <button type="button" onclick="previewAppearance()">Preview changes</button>
+                <button type="button" onclick="resetAppearancePreview()">Reset preview</button>
+            </div>
+            <div id="appearancePreview" style="padding:16px;border:1px solid var(--line);border-radius:14px;background:var(--card)">
+                <b>Chand Enterprises</b>
+                <p class="muted" style="margin:6px 0 12px">Cold Drinks · Energy Drinks · Premium Water</p>
+                <button class="primary" type="button">Shop Now</button>
+            </div>
+            <p class="muted" style="font-size:12px">Contrast control adjusts surface/border separation; text colours retain readable defaults. Always check the live site after saving.</p>
+            <p class="err" id="appearanceError"></p>
+            <button class="primary" type="button" onclick="saveAppearanceSettings()" style="width:100%">Save appearance settings</button>
+            <button type="button" onclick="closeModal()" style="width:100%;margin-top:8px">Close</button>
+        </div>
+    `);
+    const slider = $('#appearanceContrast');
+    slider?.addEventListener('input', () => {
+        $('#appearanceContrastValue').textContent = slider.value + '%';
+    });
+    $('#appearancePreset')?.addEventListener('change', () => {
+        const p = APPEARANCE_PRESETS[$('#appearancePreset').value];
+        if (p) $('#appearanceAccent').value = p.accent;
+    });
+}
+
+function previewAppearance() {
+    const a = {
+        theme: $('#appearanceTheme')?.value || 'light',
+        preset: $('#appearancePreset')?.value || 'brand',
+        accent: $('#appearanceAccent')?.value || '#0a7cff',
+        contrast: Number($('#appearanceContrast')?.value || 70)
+    };
+    applyAppearanceLocally(a);
+}
+
+function resetAppearancePreview() {
+    api('/api/config').then(result => {
+        if (result && result._ok && result.appearance) applyAppearanceLocally(result.appearance);
+    });
+}
+
+async function saveAppearanceSettings() {
+    const payload = {
+        theme: $('#appearanceTheme')?.value || 'light',
+        preset: $('#appearancePreset')?.value || 'brand',
+        accent: $('#appearanceAccent')?.value || '#0a7cff',
+        contrast: Number($('#appearanceContrast')?.value || 70)
+    };
+    const result = await api('/api/developer/appearance', 'PUT', payload);
+    if (!result._ok) {
+        $('#appearanceError').textContent = result.error || 'Could not save settings';
+        return;
+    }
+    applyAppearanceLocally(result.appearance);
+    alert('Website appearance saved successfully.');
+    closeModal();
+}
+
 function settingsPicker() {
     modal(`
         <h2>Settings</h2>
         <p class="muted">Choose what you want to change.</p>
         <div style="display:grid;gap:10px;margin:12px 0">
+            <button type="button" onclick="openAppearanceManager()" style="display:flex;align-items:center;gap:12px;text-align:left;padding:12px 14px;border:1px solid var(--pri)">
+                <span style="font-size:22px">🎨</span>
+                <span><b>Website Appearance & Contrast</b><br><small class="muted">Themes, colour presets, accent and contrast controls.</small></span>
+            </button>
             ${Object.entries(SETTINGS_SECTIONS).map(([key, sec]) => `
                 <button type="button" onclick="developerSettings('${key}')"
                         style="display:flex;align-items:center;gap:12px;text-align:left;padding:12px 14px">
@@ -1749,94 +1875,7 @@ window.developerTeam=developerTeam; window.developerAddTeam=developerAddTeam; wi
 
 /* =========================================================
    PRODUCT IMAGE MANAGER — FREE GITHUB HOSTING
-   Includes automatic image dimensions, quality guidance and
-   a product-card image-area preview. Existing upload/API flows
-   remain unchanged.
    ========================================================= */
-
-function productImageGcd(a, b) {
-    while (b) { const remainder = a % b; a = b; b = remainder; }
-    return a || 1;
-}
-
-function inspectProductImage(src, fileSizeLabel = 'Public URL image') {
-    const preview = document.getElementById('imageCardPreview');
-    const info = document.getElementById('imageSizeInfo');
-    if (!preview || !info || !src) return;
-    info.textContent = 'Reading image dimensions…';
-    preview.innerHTML = '<div style="padding:34px 12px;color:#cbd5e1">Loading image preview…</div>';
-
-    const image = new Image();
-    image.onload = function () {
-        const width = image.naturalWidth;
-        const height = image.naturalHeight;
-        if (!width || !height) { image.onerror(); return; }
-        const gcd = productImageGcd(width, height);
-        const ratioW = Math.round(width / gcd);
-        const ratioH = Math.round(height / gcd);
-        const ratioIsCorrect = Math.abs((width / height) - 0.75) <= 0.015;
-        const resolutionIsGood = Math.max(width, height) >= 800 && Math.min(width, height) >= 600;
-        const ratioStatus = ratioIsCorrect ? 'Matches the 3:4 card ratio' : 'Different from the recommended 3:4 ratio';
-        const qualityStatus = resolutionIsGood ? 'Resolution is suitable' : 'Low resolution — aim for at least 600 × 800 px';
-        const statusColor = ratioIsCorrect && resolutionIsGood ? '#16834a' : '#b7791f';
-
-        info.innerHTML = `
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-                <div><span style="color:#64748b">Original size</span><br><b>${width} × ${height} px</b></div>
-                <div><span style="color:#64748b">Aspect ratio</span><br><b>${ratioW}:${ratioH}</b></div>
-                <div><span style="color:#64748b">File size</span><br><b>${fileSizeLabel}</b></div>
-                <div><span style="color:#64748b">Card target</span><br><b>3:4 portrait</b></div>
-            </div>
-            <div style="margin-top:10px;color:${statusColor};font-weight:650">
-                ${ratioIsCorrect && resolutionIsGood ? '✓ Good to use' : '⚠ Review recommended'}
-            </div>
-            <div style="font-size:12px;color:#64748b;margin-top:4px">
-                ${ratioStatus}. ${qualityStatus}. Upload is still allowed; these are recommendations.
-            </div>`;
-
-        // Mirrors the live product card image area in product-cards.css.
-        const safeSrc = esc(src);
-        preview.innerHTML = `
-            <div style="position:relative;width:100%;max-width:270px;margin:0 auto;aspect-ratio:3 / 4;overflow:hidden;display:flex;align-items:center;justify-content:center;background:#0d1822;border-radius:12px">
-                <img src="${safeSrc}" alt="" aria-hidden="true" style="position:absolute;inset:-12%;width:124%;height:124%;object-fit:cover;filter:blur(26px) saturate(1.15) brightness(.85)">
-                <img src="${safeSrc}" alt="Product card image preview" style="position:relative;z-index:1;width:100%;height:100%;object-fit:contain">
-            </div>
-            <small style="display:block;margin-top:7px;color:#64748b">Preview of the store's 3:4 product image area</small>`;
-    };
-    image.onerror = function () {
-        info.textContent = 'Unable to read this image. Check the file or public URL.';
-        preview.innerHTML = '<div style="padding:34px 12px;color:#b42318">Image could not be loaded</div>';
-    };
-    image.src = src;
-}
-
-function previewSelectedProductImage(input) {
-    const file = input && input.files && input.files[0];
-    if (!file) return;
-    if (file.size > 5 * 1024 * 1024) {
-        const info = document.getElementById('imageSizeInfo');
-        if (info) info.textContent = 'Image exceeds the existing 5 MB upload limit.';
-        return;
-    }
-    if (window.productImagePreviewObjectUrl) URL.revokeObjectURL(window.productImagePreviewObjectUrl);
-    window.productImagePreviewObjectUrl = URL.createObjectURL(file);
-    const sizeLabel = file.size >= 1024 * 1024
-        ? (file.size / (1024 * 1024)).toFixed(2) + ' MB'
-        : (file.size / 1024).toFixed(1) + ' KB';
-    inspectProductImage(window.productImagePreviewObjectUrl, sizeLabel);
-}
-
-function previewProductImageUrl() {
-    const input = document.getElementById('productImageUrl');
-    const url = input ? input.value.trim() : '';
-    const info = document.getElementById('imageSizeInfo');
-    if (!url) { if (info) info.textContent = 'Paste a public image URL first.'; return; }
-    if (!/^https?:\/\//i.test(url)) {
-        if (info) info.textContent = 'Please use a public HTTP or HTTPS image URL.';
-        return;
-    }
-    inspectProductImage(url, 'Public URL image');
-}
 
 async function openProductImageManager(id, currentUrl = '') {
     const config = await api('/api/product-image-config');
@@ -1845,28 +1884,18 @@ async function openProductImageManager(id, currentUrl = '') {
         <div style="max-width:620px">
             <h2 style="margin-top:0">📷 Product Image</h2>
             <p class="muted">Upload to your public GitHub repository for free, or paste a public image URL.</p>
-            <h3 style="margin:14px 0 8px">Image size & quality</h3>
-            <div id="imageSizeInfo" style="padding:13px;background:#f4f8fa;border:1px solid #e4e9ed;border-radius:12px;line-height:1.55;font-size:13px">
-                ${currentUrl ? 'Reading current image…' : 'Choose an image or paste a public URL to inspect its dimensions.'}
-            </div>
-            <h3 style="margin:16px 0 8px">Live product card preview</h3>
-            <div id="imageCardPreview" style="padding:12px;background:#f4f8fa;border-radius:12px;text-align:center">
-                ${currentUrl ? 'Loading current image…' : 'No image selected yet'}
-            </div>
-            <hr style="margin:18px 0;border:0;border-top:1px solid #e4e9ed">
-            <label><b>Upload image to GitHub</b><input id="productImageFile" type="file" accept="image/jpeg,image/png,image/webp,image/gif" onchange="previewSelectedProductImage(this)" style="width:100%;margin-top:8px"></label>
+            <div style="margin:14px 0;text-align:center">${currentUrl ? `<img src="${esc(currentUrl)}" alt="Current product image" style="max-width:220px;max-height:220px;object-fit:contain;border-radius:14px;border:1px solid #dbe4ea">` : '<div style="padding:36px;background:#f4f8fa;border-radius:14px">No image added yet</div>'}</div>
+            <label><b>Upload image to GitHub</b><input id="productImageFile" type="file" accept="image/jpeg,image/png,image/webp,image/gif" style="width:100%;margin-top:8px"></label>
             <small class="muted">JPG, PNG, WEBP or GIF · maximum 5 MB</small>
             <button class="primary" type="button" onclick="uploadProductImage(${id})" style="width:100%;margin-top:14px" ${githubReady ? '' : 'disabled'}>☁️ Upload to GitHub</button>
             ${githubReady ? `<small class="muted">GitHub: ${esc(config.repository)} / ${esc(config.folder)}</small>` : `<div class="err" style="margin-top:10px">GitHub upload is not configured yet. Add GITHUB_TOKEN and GITHUB_REPO in Render Environment Variables.</div>`}
             <hr style="margin:20px 0;border:0;border-top:1px solid #e4e9ed">
             <label><b>Or paste a public image URL</b><input id="productImageUrl" type="url" value="${esc(currentUrl)}" placeholder="https://.../product.webp" style="width:100%;margin-top:8px;box-sizing:border-box"></label>
-            <button type="button" onclick="previewProductImageUrl()" style="width:100%;margin-top:10px">🔍 Check image dimensions</button>
             <button type="button" onclick="saveProductImageUrl(${id})" style="width:100%;margin-top:10px">🔗 Save image URL</button>
             ${currentUrl ? `<button type="button" class="danger" onclick="removeProductImage(${id})" style="width:100%;margin-top:10px">Remove image</button>` : ''}
             <button type="button" onclick="closeModal()" style="width:100%;margin-top:10px">Close</button>
             <p id="productImageMsg" class="err"></p>
         </div>`);
-    if (currentUrl) inspectProductImage(currentUrl, 'Existing public image');
 }
 
 async function uploadProductImage(id) {
@@ -1910,8 +1939,6 @@ window.openProductImageManager = openProductImageManager;
 window.uploadProductImage = uploadProductImage;
 window.saveProductImageUrl = saveProductImageUrl;
 window.removeProductImage = removeProductImage;
-window.previewSelectedProductImage = previewSelectedProductImage;
-window.previewProductImageUrl = previewProductImageUrl;
 
 
 /* =========================================================
