@@ -229,6 +229,43 @@
         }
     </script>
 
+    <!-- Developer-managed storefront appearance settings -->
+    <script>
+        (function () {
+            function applyStoreAppearance(a) {
+                if (!a) return;
+                var root = document.documentElement;
+                var presets = {
+                    brand:  { accent:'#0a7cff', bg:'#f6f9fc', card:'#ffffff', ink:'#0f2233', muted:'#667a8c' },
+                    ocean:  { accent:'#087eaa', bg:'#eff8fb', card:'#ffffff', ink:'#102d3a', muted:'#55717e' },
+                    forest: { accent:'#16834a', bg:'#f1f8f3', card:'#ffffff', ink:'#183326', muted:'#607568' },
+                    sunset: { accent:'#e45b35', bg:'#fff6f1', card:'#ffffff', ink:'#38231d', muted:'#80665d' },
+                    mono:   { accent:'#334155', bg:'#f5f6f7', card:'#ffffff', ink:'#17202a', muted:'#66717c' },
+                    high:   { accent:'#0047ab', bg:'#ffffff', card:'#ffffff', ink:'#080808', muted:'#303030' }
+                };
+                var p = presets[a.preset] || presets.brand;
+                var dark = a.theme === 'dark' ||
+                    (a.theme === 'auto' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+                root.setAttribute('data-theme', dark ? 'dark' : 'light');
+                root.style.setProperty('--pri', a.accent || p.accent);
+                root.style.setProperty('--pri-2', a.accent || p.accent);
+                root.style.setProperty('--ce-contrast', String(Math.max(0, Math.min(100, Number(a.contrast || 70))) / 100));
+                root.style.setProperty('--ce-border-mix', Math.round(8 + Number(a.contrast || 70) * .12) + '%');
+                root.style.setProperty('--bg', dark ? '#0b141d' : p.bg);
+                root.style.setProperty('--card', dark ? '#14212e' : p.card);
+                root.style.setProperty('--ink', dark ? '#e8f0f7' : p.ink);
+                root.style.setProperty('--mut', dark ? '#a8bac9' : p.muted);
+                root.style.setProperty('--line', dark ? '#34495b' : 'color-mix(in srgb, ' + p.ink + ' ' + Math.round(8 + Number(a.contrast || 70) * .12) + '%, transparent)');
+                var meta = document.querySelector('meta[name="theme-color"]');
+                if (meta) meta.setAttribute('content', dark ? '#0b141d' : p.bg);
+            }
+            fetch('/api/config', { credentials: 'same-origin' })
+                .then(function (r) { return r.ok ? r.json() : null; })
+                .then(function (data) { if (data && data.appearance) applyStoreAppearance(data.appearance); })
+                .catch(function () {});
+        })();
+    </script>
+
 </body>
 
 </html>
