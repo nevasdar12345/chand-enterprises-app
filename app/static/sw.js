@@ -7,7 +7,7 @@
 //    used only when the phone is offline.
 //  - /api/, /admin/, /dashboard, /staff, /logout, /health are never touched.
 
-const CACHE = "chand-enterprises-v18";
+const CACHE = "chand-enterprises-v19";
 
 // Only the things that never carry a ?v= version number. The CSS/JS files are requested as
 // /static/x.js?v=123, so pre-downloading "/static/x.js" here only wasted ~250 KB on every
