@@ -298,7 +298,19 @@
     <div
         class="grid premium-grid"
         id="grid"
-    ></div>
+        aria-busy="true"
+    >
+        {# Placeholder cards: shown instantly, replaced by app.js as soon as it runs.
+           Gives slow phones something to look at instead of an empty gap. #}
+        {% for _ in range([products|length, 8]|min or 4) %}
+        <div class="card sk-card" aria-hidden="true">
+            <div class="sk-img"></div>
+            <div class="sk-line sk-w70"></div>
+            <div class="sk-line sk-w40"></div>
+            <div class="sk-row"><span class="sk-line sk-w30"></span><span class="sk-dot"></span></div>
+        </div>
+        {% endfor %}
+    </div>
 
 </section>
 
