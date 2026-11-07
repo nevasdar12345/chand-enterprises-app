@@ -164,9 +164,6 @@
 
     {% block head %}{% endblock %}
 
-    <!-- Premium visual layer: loaded last so it can refine every panel safely. -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='premium.css') }}">
-
 </head>
 
 
@@ -223,6 +220,7 @@
     </script>
 
     <script src="{{ url_for('static', filename='js/responsive.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/ce-enhancements.js') }}" defer></script>
 
     <script>
         if ("serviceWorker" in navigator) {
