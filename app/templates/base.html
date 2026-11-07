@@ -164,6 +164,9 @@
 
     {% block head %}{% endblock %}
 
+    <!-- Premium visual layer: loaded last so it can refine every panel safely. -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='premium.css') }}">
+
 </head>
 
 
