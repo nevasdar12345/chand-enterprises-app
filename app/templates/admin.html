@@ -681,9 +681,9 @@
 
                         <td>
                             {% if p.image_url %}
-                                <img src="https://wsrv.nl/?url={{ p.image_url|urlencode }}&w=128&h=128&fit=cover&output=webp&q=85" alt="{{ p.name|e }}" loading="lazy" decoding="async" onerror="this.onerror=null;this.src='{{ p.image_url|e }}'" style="width:54px;height:54px;object-fit:cover;border-radius:10px;border:1px solid #dbe4ea;display:block;margin-bottom:6px">
+                                <img src="https://wsrv.nl/?url={{ p.image_url|urlencode }}&w=128&h=128&fit=cover&output=webp&q=85" alt="{{ p.name|e }}" loading="lazy" decoding="async" onerror="this.onerror=null;this.src='{{ p.image_url|e }}'" style="width:54px;height:54px;object-fit:cover;border-radius:10px;border:1px solid var(--line,#dbe4ea);display:block;margin-bottom:6px">
                             {% else %}
-                                <span style="display:inline-flex;width:54px;height:54px;align-items:center;justify-content:center;border-radius:10px;background:#eef5f8;font-size:24px">{{ p.icon }}</span>
+                                <span style="display:inline-flex;width:54px;height:54px;align-items:center;justify-content:center;border-radius:10px;background:var(--surface-2,#eef5f8);font-size:24px">{{ p.icon }}</span>
                             {% endif %}
                             <button
     type="button"
