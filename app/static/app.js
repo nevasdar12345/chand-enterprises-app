@@ -205,6 +205,51 @@ function persistCart() {
     count.textContent = total;
     count.dataset.zero = total ? "" : "1";
   }
+
+  updateCartBar();
+}
+
+/* Floating "View cart" bar for phones: shows items + total on the shop page so the
+   shopper never has to scroll back to the header to check out. */
+function updateCartBar() {
+  if (!$("#grid")) return;
+
+  let items = 0;
+  let amount = 0;
+
+  for (const id in CART) {
+    const product = find(id);
+
+    if (!product) continue;
+
+    items += CART[id];
+    amount += CART[id] * product.price;
+  }
+
+  let bar = $("#cartBar");
+
+  if (!items || CFG.ordering_enabled === false) {
+    if (bar) bar.hidden = true;
+    document.body.classList.remove("has-cart-bar");
+    return;
+  }
+
+  if (!bar) {
+    bar = document.createElement("button");
+    bar.type = "button";
+    bar.id = "cartBar";
+    bar.className = "cart-bar";
+    bar.setAttribute("aria-label", "View cart");
+    bar.onclick = () => cart();
+    document.body.appendChild(bar);
+  }
+
+  bar.innerHTML =
+    `<span class="cb-info"><b>${items} item${items === 1 ? "" : "s"}</b><small>${money(amount)}</small></span>` +
+    `<span class="cb-cta">View cart →</span>`;
+
+  bar.hidden = false;
+  document.body.classList.add("has-cart-bar");
 }
 
 function save(anim = false) {
@@ -327,29 +372,43 @@ function productArt(product) {
    Set to false to load the original image links directly. */
 const USE_IMAGE_CDN = true;
 
-function imgSrc(url) {
+function imgSrc(url, width = 640) {
   if (!USE_IMAGE_CDN || !/^https?:\/\//i.test(url)) return url;
 
   return (
     "https://wsrv.nl/?url=" +
     encodeURIComponent(url) +
-    "&w=640&output=webp&q=85"
+    "&w=" + width + "&output=webp&q=" + (width <= 80 ? 60 : 85)
   );
 }
+
+/* Photos that have already loaded once. A card is redrawn on every + / - tap; for those
+   photos the fade-in is skipped so the picture does not flicker. */
+const IMG_SEEN = new Set();
+function imgSeen(url) { IMG_SEEN.add(url); }
 
 /* The bottle/can drawings are built once per product, then reused. */
 const ART_CACHE = new Map();
 
-function productVisual(product) {
+function productVisual(product, index = 99) {
   if (product.image_url) {
     const original = product.image_url;
 
     const src = esc(imgSrc(original));
 
-    /* The first image is a blurred copy that fills the frame; the second is
-       the poster itself, shown whole and never cropped. */
-    return `<img class="ph-bg" src="${src}" alt="" aria-hidden="true" loading="lazy" decoding="async">` +
-      `<img class="ph" src="${src}" alt="${esc(product.name)}" loading="lazy" decoding="async" onerror="this.onerror=null;this.src='${esc(original)}'">`;
+    /* Blurred backdrop: a 40px copy (~1 KB) stretched over the frame. The browser's own
+       smoothing blurs it, so no expensive CSS blur() filter is needed on every card. */
+    const tiny = esc(imgSrc(original, 40));
+
+    /* The first row is "above the fold": load it right away (the first two with top
+       priority). Everything further down waits until the shopper scrolls near it. */
+    const eager = index < 4;
+    const loadAttrs = eager
+      ? `decoding="async"${index < 2 ? ' fetchpriority="high"' : ""}`
+      : `loading="lazy" decoding="async"`;
+
+    return `<img class="ph-bg" src="${tiny}" alt="" aria-hidden="true" ${eager ? 'decoding="async"' : 'loading="lazy" decoding="async"'}>` +
+      `<img class="ph${IMG_SEEN.has(original) ? " is-loaded" : ""}" src="${src}" alt="${esc(product.name)}" ${loadAttrs} onload="this.classList.add('is-loaded');imgSeen('${esc(original)}')" onerror="this.onerror=null;this.src='${esc(original)}'">`;
   }
 
   const key = [product.id, product.name, product.size, product.category].join("|");
@@ -388,7 +447,7 @@ function cardHtml(product, index, anim) {
   return `<div class="card${anim ? " pop" : ""}${soldOut ? " oos" : ""}" data-pid="${product.id}" style="--i:${index}">
     ${badge}
     <button type="button" class="wish-btn${liked ? " on" : ""}" aria-pressed="${liked}" aria-label="${liked ? "Remove from" : "Add to"} wishlist" onclick="toggleWish(${product.id})">${liked ? "♥" : "♡"}</button>
-    <div class="ic product-image-box kind-${artKind(product)}">${productVisual(product)}</div>
+    <div class="ic product-image-box kind-${artKind(product)}">${productVisual(product, index)}</div>
     <div class="p-info">
       <b class="p-name">${esc(cleanName(product.name))}</b>
       <div class="p-sub">
@@ -428,6 +487,8 @@ function render(anim = false) {
   if (SORT === "price-asc") list.sort((a, b) => a.price - b.price);
   else if (SORT === "price-desc") list.sort((a, b) => b.price - a.price);
   else if (SORT === "name") list.sort((a, b) => cleanName(a.name).localeCompare(cleanName(b.name)));
+
+  grid.removeAttribute("aria-busy");
 
   grid.innerHTML =
     list.map((product, index) => cardHtml(product, index, anim)).join("") ||
