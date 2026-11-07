@@ -1,0 +1,139 @@
+/* Chand Enterprises — premium visual layer
+   CSS-only enhancement. No selectors or behaviours are removed. */
+:root{
+  --ce-premium-radius:18px;
+  --ce-premium-radius-sm:12px;
+  --ce-premium-shadow:0 12px 34px rgba(20,43,67,.075);
+  --ce-premium-shadow-hover:0 18px 42px rgba(20,43,67,.13);
+  --ce-premium-accent:color-mix(in srgb,var(--pri) 12%,transparent);
+}
+html{scroll-padding-top:88px}
+body{letter-spacing:-.012em}
+h1,h2,h3,h4{letter-spacing:-.035em}
+p{line-height:1.65}
+a{transition:colora.18s ease,opacity .18s ease}
+button,.primary,.secondary-btn,.primary-btn,.nav-action,.add,.soft,.danger{
+  transition:transform .18s ease,box-shadow .18s ease,background .18s ease,border-color .18s ease,filter .18s ease;
+}
+button:hover,.primary:hover,.secondary-btn:hover,.primary-btn:hover{
+  filter:saturate(1.08);box-shadow:0 8px 20px rgba(10,124,255,.14)
+}
+button:active,.primary:active{transform:translateY(1px) scale(.99)}
+:where(button,a,input,select,textarea,[tabindex]):focus-visible{
+  outline:3px solid color-mix(in srgb,var(--pri) 40%,transparent);outline-offset:3px
+}
+input,select,textarea{
+  min-height:44px;border-radius:12px;padding:10px 13px;
+  transition:border-color .18s ease,box-shadow .18s ease,background .18s ease
+}
+textarea{min-height:110px}
+input:hover,select:hover,textarea:hover{border-color:color-mix(in srgb,var(--pri) 35%,var(--line))}
+button,.primary{min-height:40px;border-radius:12px;font-weight:650}
+.primary{box-shadow:0 7px 18px color-mix(in srgb,var(--pri) 22%,transparent)}
+.primary:hover{transform:translateY(-1px);box-shadow:0 11px 24px color-mix(in srgb,var(--pri) 27%,transparent)}
+.panel,.card,.product-card,.hero-card,.trust-card,.about-card,.brochure-product-card,
+.staff-metric,.metric-card,.admin-table,.table-wrap,.staff-login-card{
+  border-radius:var(--ce-premium-radius);border:1px solid var(--line);
+  box-shadow:var(--ce-premium-shadow)
+}
+.panel,.card,.about-card,.trust-card,.staff-metric,.metric-card{
+  transition:transform .2s ease,box-shadow .2s ease,border-color .2s ease
+}
+.panel:hover,.about-card:hover,.trust-card:hover{box-shadow:var(--ce-premium-shadow-hover)}
+.nav{
+  min-height:68px;padding:12px clamp(14px,3vw,30px);
+  backdrop-filter:saturate(150%) blur(16px);
+  background:color-mix(in srgb,var(--card) 90%,transparent);
+  border-bottom:1px solid color-mix(in srgb,var(--line) 75%,transparent)
+}
+.logo,.store-logo,.staff-logo{letter-spacing:-.025em}
+.logo-mark,.staff-logo-mark,.sf-logo-mark{border-radius:14px;box-shadow:0 8px 20px color-mix(in srgb,var(--pri) 18%,transparent)}
+.store-actions,.nav-actions,.admin-nav-right,.staff-nav-actions{gap:8px}
+.store-actions a,.nav-actions a,.admin-nav-right a,.staff-nav-actions a{border-radius:11px}
+.hero,.premium-hero,.staff-hero,.about-hero,.brochure-hero{
+  border-radius:26px;overflow:hidden;isolation:isolate
+}
+.premium-hero{box-shadow:0 22px 55px rgba(10,65,120,.15)}
+.hero-eyebrow,.hero-pill,.pill,.section-kicker,.hero-note{letter-spacing:.04em}
+.hero-content{max-width:650px}
+.hero h1,.premium-hero h1{line-height:1.04;letter-spacing:-.055em}
+.hero-shop-btn,.hero-secondary{border-radius:14px}
+.section,.category-section{padding-top:clamp(28px,5vw,54px);padding-bottom:clamp(24px,4vw,42px)}
+.section h2,.premium-section-head h2,.brochure-section-head h2{letter-spacing:-.045em}
+.product-card,.brochure-product-card{
+  overflow:hidden;background:var(--card);
+  transition:transform .22s ease,box-shadow .22s ease,border-color .22s ease
+}
+.product-card:hover,.brochure-product-card:hover{
+  transform:translateY(-4px);box-shadow:var(--ce-premium-shadow-hover);
+  border-color:color-mix(in srgb,var(--pri) 30%,var(--line))
+}
+.product-card img,.brochure-product-image img{transition:transform .35s ease}
+.product-card:hover img,.brochure-product-card:hover img{transform:scale(1.035)}
+.add,.product-card button{border-radius:11px;font-weight:750}
+.premium-cart,.cart-bar,.cart-dock{border-radius:16px}
+#cart,.cart-panel,.checkout-panel,.modal-card,.modal-content{
+  border-radius:20px;box-shadow:0 24px 70px rgba(10,25,45,.2)
+}
+#modal.open{backdrop-filter:blur(8px);background:rgba(8,20,35,.48)}
+.table-header,.panel-head,.table-wrap>header{
+  border-radius:14px 14px 0 0
+}
+.admin-table,.table-wrap{overflow:hidden}
+.admin-table table,.table-wrap table{border-collapse:separate;border-spacing:0}
+.admin-table th,.table-wrap th{
+  font-size:11px;text-transform:uppercase;letter-spacing:.075em;
+  font-weight:800;color:var(--mut);background:color-mix(in srgb,var(--bg) 75%,var(--card))
+}
+.admin-table td,.table-wrap td{vertical-align:middle}
+.admin-table tbody tr,.table-wrap tbody tr{transition:background .15s ease}
+.admin-table tbody tr:hover,.table-wrap tbody tr:hover{background:color-mix(in srgb,var(--pri) 4%,var(--card))}
+.metric-card{padding:18px;gap:12px}
+.metric-icon{border-radius:14px}
+.admin-tabs{gap:7px;padding:7px;border-radius:15px;background:color-mix(in srgb,var(--bg) 75%,var(--card))}
+.admin-tabs button,.admin-tabs a{border-radius:11px}
+.staff-panel,.admin-panel{border-radius:22px}
+.staff-title-row,.premium-section-head{gap:14px}
+.staff-role-badge,.staff-live{border-radius:999px}
+.staff-metric{padding:17px}
+.staff-login-shell{border-radius:26px;overflow:hidden;box-shadow:0 24px 70px rgba(15,35,55,.15)}
+.staff-login-card{border-radius:22px}
+.staff-login-button{width:100%;min-height:50px;border-radius:13px}
+.site-footer{margin-top:64px;padding-top:42px}
+.site-footer-grid{gap:clamp(18px,3vw,38px)}
+.social-pill{border-radius:999px}
+.toast,.notification,.alert{border-radius:13px}
+.badge,.status-badge,.size-chip{border-radius:999px}
+hr,.divider{border-color:var(--line)}
+:root[data-theme="dark"]{
+  --ce-premium-shadow:0 12px 34px rgba(0,0,0,.2);
+  --ce-premium-shadow-hover:0 18px 42px rgba(0,0,0,.3)
+}
+:root[data-theme="dark"] .nav{background:color-mix(in srgb,var(--card) 88%,transparent)}
+:root[data-theme="dark"] .admin-table th,
+:root[data-theme="dark"] .table-wrap th{background:#192b3b;color:#a9bfd0}
+:root[data-theme="dark"] .product-card,
+:root[data-theme="dark"] .panel,
+:root[data-theme="dark"] .card{box-shadow:0 10px 28px rgba(0,0,0,.16)}
+@media(max-width:900px){
+  .nav{min-height:62px;padding:9px 13px}
+  .hero,.premium-hero,.staff-hero,.about-hero,.brochure-hero{border-radius:20px}
+  .section,.category-section{padding-top:30px;padding-bottom:26px}
+  .admin-table,.table-wrap{border-radius:15px}
+  .metric-card{padding:14px}
+  .site-footer{padding:30px 16px 20px;margin-top:42px}
+}
+@media(max-width:600px){
+  body{font-size:14px}
+  h1{font-size:clamp(1.8rem,8vw,2.5rem)}
+  h2{font-size:clamp(1.35rem,6vw,1.8rem)}
+  input,select,textarea{font-size:16px} /* prevents iOS input zoom */
+  button,.primary{min-height:44px}
+  .product-card{border-radius:15px}
+  .metric-card{border-radius:15px}
+  .staff-login-shell{border-radius:19px}
+  .site-footer-grid{grid-template-columns:1fr 1fr}
+}
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;transition-duration:.01ms!important}
+}
