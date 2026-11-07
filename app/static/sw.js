@@ -7,15 +7,13 @@
 //    used only when the phone is offline.
 //  - /api/, /admin/, /dashboard, /staff, /logout, /health are never touched.
 
-const CACHE = "chand-enterprises-v17";
+const CACHE = "chand-enterprises-v18";
 
+// Only the things that never carry a ?v= version number. The CSS/JS files are requested as
+// /static/x.js?v=123, so pre-downloading "/static/x.js" here only wasted ~250 KB on every
+// install (the cache-first rule below stores the real versioned files on first use).
 const APP_SHELL = [
   "/",
-  "/static/style.css",
-  "/static/responsive.css",
-  "/static/app.js",
-  "/static/location.js",
-  "/static/js/responsive.js",
   "/static/manifest.webmanifest",
   "/static/icons/icon.svg",
 ];
