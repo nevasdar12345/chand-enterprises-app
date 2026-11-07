@@ -2006,15 +2006,15 @@ function inspectProductImage(src, fileSizeLabel = 'Public URL image') {
 
         info.innerHTML = `
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-                <div><span style="color:#64748b">Original size</span><br><b>${width} × ${height} px</b></div>
-                <div><span style="color:#64748b">Aspect ratio</span><br><b>${ratioW}:${ratioH}</b></div>
-                <div><span style="color:#64748b">File size</span><br><b>${fileSizeLabel}</b></div>
-                <div><span style="color:#64748b">Card target</span><br><b>3:4 portrait</b></div>
+                <div><span style="color:var(--mut,#64748b)">Original size</span><br><b>${width} × ${height} px</b></div>
+                <div><span style="color:var(--mut,#64748b)">Aspect ratio</span><br><b>${ratioW}:${ratioH}</b></div>
+                <div><span style="color:var(--mut,#64748b)">File size</span><br><b>${fileSizeLabel}</b></div>
+                <div><span style="color:var(--mut,#64748b)">Card target</span><br><b>3:4 portrait</b></div>
             </div>
             <div style="margin-top:10px;color:${statusColor};font-weight:650">
                 ${ratioIsCorrect && resolutionIsGood ? '✓ Good to use' : '⚠ Review recommended'}
             </div>
-            <div style="font-size:12px;color:#64748b;margin-top:4px">
+            <div style="font-size:12px;color:var(--mut,#64748b);margin-top:4px">
                 ${ratioStatus}. ${qualityStatus}. Upload is still allowed; these are recommendations.
             </div>`;
 
@@ -2025,7 +2025,7 @@ function inspectProductImage(src, fileSizeLabel = 'Public URL image') {
                 <img src="${safeSrc}" alt="" aria-hidden="true" style="position:absolute;inset:-12%;width:124%;height:124%;object-fit:cover;filter:blur(26px) saturate(1.15) brightness(.85)">
                 <img src="${safeSrc}" alt="Product card image preview" style="position:relative;z-index:1;width:100%;height:100%;object-fit:contain">
             </div>
-            <small style="display:block;margin-top:7px;color:#64748b">Preview of the store's 3:4 product image area</small>`;
+            <small style="display:block;margin-top:7px;color:var(--mut,#64748b)">Preview of the store's 3:4 product image area</small>`;
     };
     image.onerror = function () {
         info.textContent = 'Unable to read this image. Check the file or public URL.';
@@ -2070,19 +2070,19 @@ async function openProductImageManager(id, currentUrl = '') {
             <h2 style="margin-top:0">📷 Product Image</h2>
             <p class="muted">Upload to your public GitHub repository for free, or paste a public image URL.</p>
             <h3 style="margin:14px 0 8px">Image size & quality</h3>
-            <div id="imageSizeInfo" style="padding:13px;background:#f4f8fa;border:1px solid #e4e9ed;border-radius:12px;line-height:1.55;font-size:13px">
+            <div id="imageSizeInfo" style="padding:13px;background:var(--surface,#f4f8fa);border:1px solid var(--line,#e4e9ed);border-radius:12px;line-height:1.55;font-size:13px">
                 ${currentUrl ? 'Reading current image…' : 'Choose an image or paste a public URL to inspect its dimensions.'}
             </div>
             <h3 style="margin:16px 0 8px">Live product card preview</h3>
-            <div id="imageCardPreview" style="padding:12px;background:#f4f8fa;border-radius:12px;text-align:center">
+            <div id="imageCardPreview" style="padding:12px;background:var(--surface,#f4f8fa);border-radius:12px;text-align:center">
                 ${currentUrl ? 'Loading current image…' : 'No image selected yet'}
             </div>
-            <hr style="margin:18px 0;border:0;border-top:1px solid #e4e9ed">
+            <hr style="margin:18px 0;border:0;border-top:1px solid var(--line,#e4e9ed)">
             <label><b>Upload image to GitHub</b><input id="productImageFile" type="file" accept="image/jpeg,image/png,image/webp,image/gif" onchange="previewSelectedProductImage(this)" style="width:100%;margin-top:8px"></label>
             <small class="muted">JPG, PNG, WEBP or GIF · maximum 5 MB</small>
             <button class="primary" type="button" onclick="uploadProductImage(${id})" style="width:100%;margin-top:14px" ${githubReady ? '' : 'disabled'}>☁️ Upload to GitHub</button>
             ${githubReady ? `<small class="muted">GitHub: ${esc(config.repository)} / ${esc(config.folder)}</small>` : `<div class="err" style="margin-top:10px">GitHub upload is not configured yet. Add GITHUB_TOKEN and GITHUB_REPO in Render Environment Variables.</div>`}
-            <hr style="margin:20px 0;border:0;border-top:1px solid #e4e9ed">
+            <hr style="margin:20px 0;border:0;border-top:1px solid var(--line,#e4e9ed)">
             <label><b>Or paste a public image URL</b><input id="productImageUrl" type="url" value="${esc(currentUrl)}" placeholder="https://.../product.webp" style="width:100%;margin-top:8px;box-sizing:border-box"></label>
             <button type="button" onclick="previewProductImageUrl()" style="width:100%;margin-top:10px">🔍 Check image dimensions</button>
             <button type="button" onclick="saveProductImageUrl(${id})" style="width:100%;margin-top:10px">🔗 Save image URL</button>
@@ -2260,8 +2260,12 @@ window.sendOrderBill=sendOrderBill;
 
 function applyAdminTheme(theme) {
     const selected = theme === 'dark' ? 'dark' : 'light';
-    document.documentElement.setAttribute('data-theme', selected);
-    localStorage.setItem('ce_theme', selected);
+    if (typeof window.ceApplyTheme === 'function') {
+        window.ceApplyTheme(selected, true);
+    } else {
+        document.documentElement.setAttribute('data-theme', selected);
+        try { localStorage.setItem('ce_theme', selected); } catch (e) {}
+    }
 
     const button = document.getElementById('adminThemeToggle');
     if (button) {
@@ -2317,12 +2321,13 @@ if (typeof originalShowTab === 'function') {
 }
 
 function initAdminThemeAndMenu() {
-    let saved = 'light';
-    try {
-        saved = localStorage.getItem('ce_theme') || localStorage.getItem('admin-theme') || 'light';
-    } catch (e) {}
-
-    applyAdminTheme(saved);
+    /* Keep whatever theme the page already resolved (saved choice or developer default) */
+    const current = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+    if (typeof window.ceApplyTheme === 'function') {
+        window.ceApplyTheme(current, false);
+    } else {
+        applyAdminTheme(current);
+    }
     toggleAdminMenu(false);
 }
 
