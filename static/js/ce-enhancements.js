@@ -8,7 +8,7 @@
   if (window.CEEnhancements) return;
 
   var CE = window.CEEnhancements = {
-    version: "1.0.0",
+    version: "1.1.0",
     toast: function (message, type, timeout) {
       var region = document.querySelector(".cex-toast-region");
       if (!region) {
@@ -44,10 +44,7 @@
     .cex-reveal{opacity:0;transform:translateY(15px);transition:opacity .48s cubic-bezier(.2,.75,.25,1),transform .48s cubic-bezier(.2,.75,.25,1)}
     .cex-reveal.cex-shown{opacity:1;transform:none}
     .cex-reveal[data-cex-delay="1"]{transition-delay:60ms}.cex-reveal[data-cex-delay="2"]{transition-delay:120ms}.cex-reveal[data-cex-delay="3"]{transition-delay:180ms}
-    .product-card,.brochure-product-card{transition:transform .22s ease,box-shadow .22s ease,border-color .22s ease}
-    .product-card img,.brochure-product-card img{transition:transform .35s ease}
-    @media(hover:hover){.product-card:hover,.brochure-product-card:hover{transform:translateY(-4px);box-shadow:0 16px 38px #10243a20;border-color:color-mix(in srgb,var(--pri,#087cff) 35%,var(--line,#ddd))}.product-card:hover img,.brochure-product-card:hover img{transform:scale(1.035)}}
-    button,.primary,.add,.soft,.danger{transition:transform .16s ease,box-shadow .18s ease,filter .18s ease}
+        button,.primary,.add,.soft,.danger{transition:transform .16s ease,box-shadow .18s ease,filter .18s ease}
     button:active,.primary:active,.add:active{transform:scale(.985)}
     :where(button,a,input,select,textarea,[tabindex]):focus-visible{outline:3px solid color-mix(in srgb,var(--pri,#087cff) 45%,transparent);outline-offset:3px}
     img[loading=lazy]{background:linear-gradient(110deg,var(--bg,#f5f7fa) 8%,var(--card,#fff) 18%,var(--bg,#f5f7fa) 33%);background-size:200% 100%}
@@ -65,7 +62,7 @@
   function images() {
     var list = Array.prototype.slice.call(document.images || []);
     list.forEach(function (img, i) {
-      if (img.hasAttribute("data-no-lazy") || img.loading === "eager") return;
+      if (img.hasAttribute("data-no-lazy") || img.hasAttribute("loading")) return;
       if (i > 1) img.loading = "lazy";
       if ("decoding" in img) img.decoding = "async";
     });
@@ -73,7 +70,7 @@
   function reveal() {
     if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     if (!("IntersectionObserver" in window)) return;
-    var selectors = ".product-card,.brochure-product-card,.trust-card,.metric-card,.staff-metric,.about-card,.panel,.section > h2,.category-card";
+    var selectors = ".trust-card,.metric-card,.staff-metric,.about-card,.panel,.section > h2";
     var nodes = document.querySelectorAll(selectors);
     var observer = new IntersectionObserver(function (entries, obs) {
       entries.forEach(function (entry) {
@@ -124,9 +121,9 @@
       var mo = new MutationObserver(function (records) {
         records.forEach(function (r) { r.addedNodes.forEach(function (n) {
           if (n.nodeType !== 1) return;
-          if (n.tagName === "IMG") { if (!n.hasAttribute("data-no-lazy")) n.loading = "lazy"; n.decoding = "async"; }
+          if (n.tagName === "IMG") { if (!n.hasAttribute("data-no-lazy") && !n.hasAttribute("loading")) n.loading = "lazy"; n.decoding = "async"; }
           if (n.querySelectorAll) n.querySelectorAll("img").forEach(function (img) {
-            if (!img.hasAttribute("data-no-lazy") && img.loading !== "eager") img.loading = "lazy";
+            if (!img.hasAttribute("data-no-lazy") && !img.hasAttribute("loading")) img.loading = "lazy";
             img.decoding = "async";
           });
         }); });
