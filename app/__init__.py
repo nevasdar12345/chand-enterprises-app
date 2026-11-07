@@ -87,7 +87,11 @@ def create_app():
         CACHE_REDIS_URL=redis_url or None,
         CACHE_DEFAULT_TIMEOUT=60,
         CACHE_KEY_PREFIX="chand-enterprises:",
-        CACHE_OPTIONS={"socket_connect_timeout": 2, "socket_timeout": 2},
+        # socket timeouts only exist for Redis; passing them to SimpleCache crashes start-up
+        # on a normal local run (no REDIS_URL).
+        CACHE_OPTIONS=(
+            {"socket_connect_timeout": 2, "socket_timeout": 2} if redis_url else {}
+        ),
 
         SECRET_KEY=os.getenv(
             "SECRET_KEY",
@@ -222,7 +226,9 @@ def create_app():
                     packed = static_gzip_cache.get(cache_key) if cache_key else None
 
                     if packed is None:
-                        packed = gzip.compress(data, compresslevel=6)
+                        # static files are compressed once and cached -> best ratio;
+                        # dynamic pages are compressed on every request -> cheaper level
+                        packed = gzip.compress(data, compresslevel=9 if is_static else 5)
 
                         if cache_key:
                             static_gzip_cache[cache_key] = packed
@@ -265,6 +271,11 @@ def create_app():
 
     @app.errorhandler(404)
     def not_found(_e):
+
+        # A missing CSS/JS/image must be a real 404. Redirecting it to the home
+        # page makes the browser download the whole home page as a "script".
+        if request.path.startswith("/static/"):
+            return "Not found", 404
 
         return _fallback(
             404,
@@ -439,6 +450,8 @@ def create_app():
             'CREATE INDEX IF NOT EXISTS ix_product_active ON product(active)',
 
             'CREATE INDEX IF NOT EXISTS ix_product_size ON product(size)',
+
+            'CREATE INDEX IF NOT EXISTS ix_product_active_category ON product(active, category)',
 
             'CREATE INDEX IF NOT EXISTS ix_order_created_at ON "order"(created_at)',
 
