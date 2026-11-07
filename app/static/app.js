@@ -136,7 +136,7 @@ function renderCategories() {
   const wrap = $("#cats");
   if (!wrap) return;
   const cats = Array.isArray(CFG.categories) ? CFG.categories : [];
-  wrap.innerHTML = `<button type="button" class="on category-card" onclick="category('All',this)"><span>🛍️</span><b>All</b></button>` + cats.map(c => `<button type="button" class="category-card" onclick="category(${JSON.stringify(c.name)},this)"><span>${esc(c.icon || "🛍️")}</span><b>${esc(c.name)}</b></button>`).join("");
+  wrap.innerHTML = `<button type="button" class="on category-card" onclick="category('All',this)"><span>🛍️</span><b>All</b></button>` + cats.map(c => `<button type="button" class="category-card" data-cat="${esc(c.name)}" onclick="category(this.dataset.cat,this)"><span>${esc(c.icon || "🛍️")}</span><b>${esc(c.name)}</b></button>`).join("");
 }
 
 function ticker() {
