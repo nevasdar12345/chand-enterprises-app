@@ -1,0 +1,137 @@
+/* =========================================================
+   CHAND ENTERPRISES - UI POLISH + SPEED CSS
+   Loaded AFTER the other stylesheets (see base.html), so it
+   can safely override them. Delete this file + its <link> to
+   go back to the old look.
+   ========================================================= */
+
+/* ---------- 1. Faster scrolling on phones ---------- */
+
+/* The blurred backdrop used a 26px CSS blur on EVERY product card (very heavy for
+   phone GPUs). The backdrop image is now a tiny 40px picture that the browser
+   smooths by itself, so the expensive filter is not needed. */
+.premium-grid .card .ph-bg {
+  filter: brightness(.85) saturate(1.15);
+  image-rendering: auto;
+}
+
+/* Cards far below the screen are not drawn until the shopper scrolls close. */
+.premium-grid .card {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 380px;
+}
+
+/* Product photo fades in when it has loaded (no sudden pop). */
+.premium-grid .card .ph {
+  opacity: 0;
+  transition: opacity .28s ease;
+}
+.premium-grid .card .ph.is-loaded { opacity: 1; }
+
+/* ---------- 2. Skeleton (placeholder) cards ---------- */
+
+.sk-card { pointer-events: none; padding-bottom: 18px; }
+.sk-img,
+.sk-line,
+.sk-dot {
+  position: relative;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--mut, #7a8a99) 16%, var(--card, #fff));
+}
+.sk-img { width: 100%; aspect-ratio: 3 / 4; }
+.sk-line { height: 13px; border-radius: 8px; margin: 14px 20px 0; }
+.sk-w70 { width: 70%; }
+.sk-w40 { width: 40%; }
+.sk-w30 { width: 30%; margin: 0; }
+.sk-row { display: flex; align-items: center; justify-content: space-between; margin: 18px 20px 0; }
+.sk-dot { width: 44px; height: 44px; border-radius: 50%; }
+.sk-img::after,
+.sk-line::after,
+.sk-dot::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 38%), transparent);
+  animation: ce-shimmer 1.3s infinite;
+}
+@keyframes ce-shimmer { to { transform: translateX(100%); } }
+
+/* ---------- 3. Sticky category bar ---------- */
+
+@media (max-width: 900px) {
+  .premium-cats {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    margin-inline: -4px;
+    padding: 8px 4px;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    scrollbar-width: none;
+    background: color-mix(in srgb, var(--bg, #f6f9fc) 92%, transparent);
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+  }
+  .premium-cats::-webkit-scrollbar { display: none; }
+  .premium-cats .category-card { flex: 0 0 auto; }
+}
+
+/* ---------- 4. Floating "View cart" bar (phones) ---------- */
+
+.cart-bar {
+  display: none;
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  z-index: 15;                       /* below the pop-up window (z-index 20) */
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 54px;
+  padding: 8px 10px 8px 18px;
+  border: 0;
+  border-radius: 18px;
+  color: #fff;
+  background: linear-gradient(135deg, var(--pri, #0a7cff), color-mix(in srgb, var(--pri, #0a7cff) 70%, #00c2d1));
+  box-shadow: 0 14px 32px -8px color-mix(in srgb, var(--pri, #0a7cff) 65%, transparent);
+  font: inherit;
+  cursor: pointer;
+  animation: ce-bar-in .28s cubic-bezier(.2, .85, .3, 1.1) both;
+}
+.cart-bar[hidden] { display: none !important; }
+.cart-bar .cb-info { display: flex; flex-direction: column; text-align: left; line-height: 1.2; }
+.cart-bar .cb-info b { font-size: 15px; }
+.cart-bar .cb-info small { font-size: 13px; opacity: .9; font-variant-numeric: tabular-nums; }
+.cart-bar .cb-cta {
+  padding: 11px 16px;
+  border-radius: 13px;
+  font-weight: 800;
+  font-size: 14px;
+  color: var(--pri, #0a7cff);
+  background: #fff;
+}
+.cart-bar:active { transform: scale(.985); }
+@keyframes ce-bar-in { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
+
+@media (max-width: 820px) {
+  .cart-bar { display: flex; }
+  /* keep the page content and the "back to top" button clear of the bar */
+  body.has-cart-bar { padding-bottom: 82px; }
+  body.has-cart-bar .cex-top { bottom: calc(82px + env(safe-area-inset-bottom, 0px)); }
+}
+
+/* ---------- 5. Nicer empty / no-result state ---------- */
+
+#grid > p.muted {
+  grid-column: 1 / -1;
+  padding: 40px 16px;
+  text-align: center;
+  font-size: 15px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sk-img::after, .sk-line::after, .sk-dot::after, .cart-bar { animation: none; }
+  .premium-grid .card .ph { transition: none; }
+}
