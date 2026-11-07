@@ -235,15 +235,81 @@ def site_info():
     }
 
 
+# ---------- public catalogue cache ----------
+# The home page, /api/products, /api/categories and /api/config are read by every visitor
+# but change only when staff edit something. They are cached for a short time and the
+# cache is cleared the moment any staff/order write succeeds (see _bust_public_cache).
+# Without REDIS_URL each gunicorn worker has its own cache, so other workers can be up to
+# CATALOG_CACHE_SECONDS behind. Set REDIS_URL to share one cache between all workers.
+CATALOG_CACHE_SECONDS = int(os.getenv("CATALOG_CACHE_SECONDS", "30") or 30)
+CATALOG_CACHE_KEYS = (
+    "public-products-data-v1",
+    "public-api-config-v1",
+    "public-api-categories-v1",
+)
+
+# Writes that can change what customers see (products, stock, categories, settings, orders).
+# Live-location pings and Telegram/cron calls are deliberately NOT here: they are frequent
+# and never change the catalogue, so they must not throw the cache away.
+_CATALOG_WRITE_PREFIXES = (
+    "/api/admin/", "/api/developer/", "/api/product/", "/api/team",
+    "/api/orders", "/api/delivery/order/",
+)
+
+
+def catalog_products():
+    """Active products as dicts - one DB query per CATALOG_CACHE_SECONDS instead of one per visitor."""
+    data = cache.get("public-products-data-v1")
+    if data is None:
+        data = [product_dict(p) for p in Product.query.filter_by(active=True).all()]
+        cache.set("public-products-data-v1", data, timeout=CATALOG_CACHE_SECONDS)
+    return data
+
+
+def clear_public_cache():
+    try:
+        cache.delete_many(*CATALOG_CACHE_KEYS)
+    except Exception:
+        pass
+
+
+@main.after_request
+def _bust_public_cache(response):
+    if (request.method in ("POST", "PUT", "PATCH", "DELETE")
+            and response.status_code < 400
+            and request.path.startswith(_CATALOG_WRITE_PREFIXES)
+            and "/live-tracking/" not in request.path):
+        clear_public_cache()
+    return response
+
+
+def appearance_settings():
+    try:
+        contrast = int(setting_value("appearance_contrast") or 70)
+    except (TypeError, ValueError):
+        contrast = 70
+    return {
+        "theme": setting_value("appearance_theme") or "light",
+        "preset": setting_value("appearance_preset") or "brand",
+        "accent": setting_value("appearance_accent") or "#0a7cff",
+        "contrast": contrast,
+    }
+
+
 @main.app_context_processor
 def inject_site_flags():
+    # "appearance" is written straight into the page <head>, so the storefront no longer
+    # needs a separate /api/config request just to pick its colours (and no colour flash).
     try:
-        return {"ordering_on": ordering_enabled(), "login_on": customer_login_enabled(), "site": site_info()}
+        return {"ordering_on": ordering_enabled(), "login_on": customer_login_enabled(), "site": site_info(),
+                "appearance": appearance_settings()}
     except Exception:
-        return {"ordering_on": True, "login_on": True, "site": {
-            "name": "Chand Enterprises", "mobile": "", "tel": "", "location": "Darbhanga, Bihar",
-            "whatsapp_url": "", "tagline": "Drinks & premium water",
-            "about_title": "About Chand Enterprises", "about_text": "", "social": []}}
+        return {"ordering_on": True, "login_on": True,
+                "appearance": {"theme": "light", "preset": "brand", "accent": "#0a7cff", "contrast": 70},
+                "site": {
+                    "name": "Chand Enterprises", "mobile": "", "tel": "", "location": "Darbhanga, Bihar",
+                    "whatsapp_url": "", "tagline": "Drinks & premium water",
+                    "about_title": "About Chand Enterprises", "about_text": "", "social": []}}
 
 
 def offers_list():
@@ -772,7 +838,7 @@ def new_otp(mobile):
 
 @main.route("/")
 def home():
-    prods = [product_dict(p) for p in Product.query.filter_by(active=True)]
+    prods = catalog_products()
     home_keys = ["home_delivery_title", "home_delivery_text", "home_payment_title", "home_payment_text",
                  "home_support_title", "home_support_text", "home_store_eyebrow", "home_products_title",
                  "home_products_text", "home_bulk_badge", "home_bulk_title", "home_bulk_text",
@@ -1005,6 +1071,31 @@ def delete_replaced_image(old_url, new_url=""):
         return False
 
 
+PRODUCT_IMAGE_MAX_SIDE = 1000      # px - cards show ~640px, the zoom view a little more
+
+
+def optimize_product_image(content, ext, content_type):
+    """Return (bytes, ext, content_type) of a smaller WebP copy, or the originals unchanged.
+    Animated GIFs are left alone. Needs Pillow (in requirements.txt)."""
+    if ext == ".gif":
+        return content, ext, content_type
+    try:
+        from PIL import Image, ImageOps
+        img = Image.open(io.BytesIO(content))
+        img = ImageOps.exif_transpose(img)          # phone photos: honour the rotation flag
+        img.thumbnail((PRODUCT_IMAGE_MAX_SIDE, PRODUCT_IMAGE_MAX_SIDE), Image.LANCZOS)
+        if img.mode not in ("RGB", "RGBA"):
+            img = img.convert("RGBA" if "transparency" in img.info or img.mode in ("LA", "P") else "RGB")
+        out = io.BytesIO()
+        img.save(out, "WEBP", quality=82, method=4)
+        data = out.getvalue()
+        if len(data) < len(content):
+            return data, ".webp", "image/webp"
+    except Exception:
+        pass
+    return content, ext, content_type
+
+
 @main.post("/api/product/<int:pid>/image")
 def product_image(pid):
     if not role_ok("admin", "developer"):
@@ -1037,6 +1128,10 @@ def product_image(pid):
     content = uploaded.read(MAX_PRODUCT_IMAGE_BYTES + 1)
     if len(content) > MAX_PRODUCT_IMAGE_BYTES:
         return jsonify(error="Image is too large. Maximum size is 5 MB."), 400
+
+    # Phone photos / PNG exports are often 2-5 MB. Resize + convert to WebP first
+    # (falls back to the original bytes if Pillow is missing or the file is odd).
+    content, ext, content_type = optimize_product_image(content, ext, content_type)
 
     # Unique name means changing an image never requires deleting an old Git blob.
     base = re.sub(r"[^A-Za-z0-9]+", "-", p.name.lower()).strip("-") or "product"
@@ -1573,12 +1668,7 @@ def developer_save_appearance():
 @cache.cached(timeout=30, key_prefix="public-api-config-v1")
 def config():
     cfg = developer_settings()
-    appearance = {
-        "theme": setting_value("appearance_theme") or "light",
-        "preset": setting_value("appearance_preset") or "brand",
-        "accent": setting_value("appearance_accent") or "#0a7cff",
-        "contrast": int(setting_value("appearance_contrast") or 70),
-    }
+    appearance = appearance_settings()
     return jsonify(_ok=True, appearance=appearance, whatsapp=wa_number(), upi=cfg["upi"] or current_app.config["UPI_ID"], business_name=cfg["business_name"], business_mobile=cfg["business_mobile"], business_location=cfg["business_location"], payment_name=cfg["payment_name"], offers=cfg["offers"], show_prices_home=cfg["show_prices_home"], show_prices_brochure=cfg["show_prices_brochure"], ordering_enabled=cfg["ordering_enabled"], customer_login_enabled=cfg["customer_login_enabled"], maps_enabled=cfg["maps_enabled"], map_customer_tracking=cfg["map_customer_tracking"], map_delivery_navigation=cfg["map_delivery_navigation"], map_admin_view=cfg["map_admin_view"], business_lat=cfg["business_lat"], business_lng=cfg["business_lng"], eta_confirmed_min=cfg["eta_confirmed_min"], eta_confirmed_max=cfg["eta_confirmed_max"], eta_preparing_min=cfg["eta_preparing_min"], eta_preparing_max=cfg["eta_preparing_max"], eta_out_for_delivery_min=cfg["eta_out_for_delivery_min"], eta_out_for_delivery_max=cfg["eta_out_for_delivery_max"], free_delivery_above=float_setting("delivery_free_above", 500), instagram_url=cfg["instagram_url"], facebook_url=cfg["facebook_url"], social_links=cfg["social_links"], about_title=cfg["about_title"], about_text=cfg["about_text"], footer_tagline=cfg["footer_tagline"], brochure_url=cfg["brochure_url"], categories=[category_dict(c) for c in active_categories()], coupons=[coupon_dict(c) for c in Coupon.query.filter_by(active=True).order_by(Coupon.code).all()])
 
 
@@ -1589,9 +1679,8 @@ def api_categories():
 
 
 @main.get("/api/products")
-@cache.cached(timeout=30, key_prefix="public-api-products-v1")
 def api_products():
-    return jsonify([product_dict(p) for p in Product.query.filter_by(active=True)])
+    return jsonify(catalog_products())
 
 
 @main.post("/api/orders")
@@ -2105,6 +2194,18 @@ def admin_orders():
                  low=Product.query.filter(Product.active == True, Product.stock <= Product.low_stock_threshold).count())
 
     return jsonify(orders=[order_dict(o) for o in rows], stats=stats)
+
+
+@main.get("/api/admin/orders/pulse")
+def admin_orders_pulse():
+    """Tiny, index-only answer used by the admin dashboard to notice new orders
+    without downloading the whole order list every time."""
+    if not role_ok("admin"):
+        return jsonify(error="Forbidden"), 403
+    latest_id, = db.session.query(db.func.max(Order.id)).one()
+    latest = db.session.get(Order, latest_id) if latest_id else None
+    return jsonify(latest_id=latest_id or 0, latest_code=latest.code if latest else "",
+                   latest_customer=latest.customer_name if latest else "")
 
 
 @main.post("/api/admin/order/<int:oid>")
