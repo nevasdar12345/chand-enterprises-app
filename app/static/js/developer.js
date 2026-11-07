@@ -550,7 +550,7 @@ async function tgStaffLink(id) {
     }
 
     out.innerHTML = `
-        <div style="margin-top:10px;padding:10px;border:1px solid #dbe4ea;border-radius:10px">
+        <div style="margin-top:10px;padding:10px;border:1px solid var(--line,#dbe4ea);border-radius:10px">
             <small class="muted">Open on the staff member's phone. Valid 10 minutes, works once.</small>
             <input readonly value="${esc(r.link)}" onclick="this.select()" style="width:100%;box-sizing:border-box;margin:6px 0">
             <a class="primary" target="_blank" rel="noopener" href="${esc(r.link)}">Open Telegram</a>
@@ -591,27 +591,8 @@ const APPEARANCE_PRESETS = {
 
 function applyAppearanceLocally(a) {
     if (!a) return;
-    const root = document.documentElement;
-    const preset = APPEARANCE_PRESETS[a.preset] || APPEARANCE_PRESETS.brand;
-    const dark = a.theme === 'dark' ||
-        (a.theme === 'auto' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
-    root.setAttribute('data-theme', dark ? 'dark' : 'light');
-    root.style.setProperty('--pri', a.accent || preset.accent);
-    root.style.setProperty('--pri-2', a.accent || preset.accent);
-    root.style.setProperty('--ce-contrast', String(Math.max(0, Math.min(100, Number(a.contrast ?? 70))) / 100));
-    root.style.setProperty('--ce-border-mix', Math.round(8 + Number(a.contrast ?? 70) * .12) + '%');
-    if (!dark) {
-        root.style.setProperty('--bg', preset.bg);
-        root.style.setProperty('--card', preset.card);
-        root.style.setProperty('--ink', preset.ink);
-        root.style.setProperty('--mut', preset.muted);
-    } else {
-        root.style.setProperty('--bg', '#0b141d');
-        root.style.setProperty('--card', '#14212e');
-        root.style.setProperty('--ink', '#e8f0f7');
-        root.style.setProperty('--mut', '#a8bac9');
-    }
-    root.style.setProperty('--line', dark ? '#34495b' : `color-mix(in srgb, ${preset.ink} ${Math.round(8 + Number(a.contrast || 70) * .12)}%, transparent)`);
+    /* force = the developer is choosing the site default, so it replaces their own saved choice */
+    if (typeof window.applyStoreAppearance === 'function') window.applyStoreAppearance(a, true);
 }
 
 async function openAppearanceManager() {
@@ -1884,12 +1865,12 @@ async function openProductImageManager(id, currentUrl = '') {
         <div style="max-width:620px">
             <h2 style="margin-top:0">📷 Product Image</h2>
             <p class="muted">Upload to your public GitHub repository for free, or paste a public image URL.</p>
-            <div style="margin:14px 0;text-align:center">${currentUrl ? `<img src="${esc(currentUrl)}" alt="Current product image" style="max-width:220px;max-height:220px;object-fit:contain;border-radius:14px;border:1px solid #dbe4ea">` : '<div style="padding:36px;background:#f4f8fa;border-radius:14px">No image added yet</div>'}</div>
+            <div style="margin:14px 0;text-align:center">${currentUrl ? `<img src="${esc(currentUrl)}" alt="Current product image" style="max-width:220px;max-height:220px;object-fit:contain;border-radius:14px;border:1px solid var(--line,#dbe4ea)">` : '<div style="padding:36px;background:var(--surface,#f4f8fa);border-radius:14px">No image added yet</div>'}</div>
             <label><b>Upload image to GitHub</b><input id="productImageFile" type="file" accept="image/jpeg,image/png,image/webp,image/gif" style="width:100%;margin-top:8px"></label>
             <small class="muted">JPG, PNG, WEBP or GIF · maximum 5 MB</small>
             <button class="primary" type="button" onclick="uploadProductImage(${id})" style="width:100%;margin-top:14px" ${githubReady ? '' : 'disabled'}>☁️ Upload to GitHub</button>
             ${githubReady ? `<small class="muted">GitHub: ${esc(config.repository)} / ${esc(config.folder)}</small>` : `<div class="err" style="margin-top:10px">GitHub upload is not configured yet. Add GITHUB_TOKEN and GITHUB_REPO in Render Environment Variables.</div>`}
-            <hr style="margin:20px 0;border:0;border-top:1px solid #e4e9ed">
+            <hr style="margin:20px 0;border:0;border-top:1px solid var(--line,#e4e9ed)">
             <label><b>Or paste a public image URL</b><input id="productImageUrl" type="url" value="${esc(currentUrl)}" placeholder="https://.../product.webp" style="width:100%;margin-top:8px;box-sizing:border-box"></label>
             <button type="button" onclick="saveProductImageUrl(${id})" style="width:100%;margin-top:10px">🔗 Save image URL</button>
             ${currentUrl ? `<button type="button" class="danger" onclick="removeProductImage(${id})" style="width:100%;margin-top:10px">Remove image</button>` : ''}
