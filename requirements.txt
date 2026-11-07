@@ -8,3 +8,4 @@ google-api-python-client>=2.150.0
 google-auth>=2.35.0
 Flask-Caching>=2.3
 redis>=5.0,<7
+Pillow>=10.4
