@@ -1834,11 +1834,14 @@ async function adminStartup() {
 
     try {
 
-        await loadAdminOrders();
-        await loadAdminDeliveryMap();
-        await loadDeliveryOperations();
-
-        await loadAdminProducts();
+        // These four requests do not depend on each other, so they run AT THE SAME TIME
+        // (before, they ran one after another and the dashboard waited for all four).
+        await Promise.all([
+            loadAdminOrders(),
+            loadAdminDeliveryMap(),
+            loadDeliveryOperations(),
+            loadAdminProducts()
+        ]);
 
         filterStock();
 
@@ -1849,6 +1852,80 @@ async function adminStartup() {
             error
         );
     }
+
+    startOrderWatch();
+}
+
+
+/* =========================================================
+   LIVE NEW-ORDER ALERT
+   Every 30 s (only while this tab is visible) ask a tiny endpoint for the newest order
+   id. When a new order arrives: show a pop-up message, play a short beep and refresh
+   the list - the admin no longer has to keep pressing refresh.
+   ========================================================= */
+
+let ORDER_WATCH_LAST_ID = null;
+let ORDER_WATCH_TIMER = null;
+
+function orderBeep() {
+    try {
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        if (!Ctx) return;
+        const ctx = new Ctx();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = 880;
+        gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.25, ctx.currentTime + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.35);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.4);
+        osc.onended = () => ctx.close();
+    } catch (e) { /* sound is optional */ }
+}
+
+async function checkForNewOrders() {
+    if (document.hidden) return;
+
+    const pulse = await api('/api/admin/orders/pulse');
+
+    if (!pulse || !pulse._ok) return;
+
+    const latest = Number(pulse.latest_id || 0);
+
+    if (ORDER_WATCH_LAST_ID === null) {
+        ORDER_WATCH_LAST_ID = latest;
+        return;
+    }
+
+    if (latest > ORDER_WATCH_LAST_ID) {
+        ORDER_WATCH_LAST_ID = latest;
+
+        if (window.ceToast) {
+            window.ceToast(`🛎️ New order ${pulse.latest_code || ''} from ${pulse.latest_customer || 'a customer'}`, 'success', 6000);
+        }
+
+        orderBeep();
+
+        // do not redraw the table while the admin is typing in a pop-up window
+        const open = document.querySelector('#modal.open');
+        if (!open) loadAdminOrders();
+    }
+}
+
+function startOrderWatch() {
+    if (ORDER_WATCH_TIMER || !document.querySelector('#orderRows')) return;
+
+    checkForNewOrders();
+    ORDER_WATCH_TIMER = setInterval(checkForNewOrders, 30000);
+
+    // check straight away when the admin comes back to this tab
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) checkForNewOrders();
+    });
 }
 
 
