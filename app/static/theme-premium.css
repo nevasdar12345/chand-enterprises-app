@@ -1,0 +1,223 @@
+/* =========================================================
+   CHAND ENTERPRISES - THEME + PREMIUM FINISH
+   Loaded LAST (see base.html). Two jobs:
+   1. Make every screen readable in dark mode (the old CSS had many
+      hard-coded light colours and some variables that never existed).
+   2. A calm, consistent finish: focus rings, press feedback,
+      tabular numbers, smooth theme switching.
+   Delete this file + its <link> to go back to the old look.
+   ========================================================= */
+
+/* ---------- 1. Shared tokens (light) ---------- */
+:root {
+  --surface:   #f8fafc;
+  --surface-2: #eef3f8;
+  --nav-bg:    rgb(255 255 255 / 86%);
+
+  --warn-bg:   #fff7e6;
+  --warn-line: #f1c46a;
+  --warn-ink:  #8a4b00;
+
+  --bad-bg:    #fdeced;
+  --ring:      color-mix(in srgb, var(--pri) 28%, transparent);
+
+  /* names used by older rules that were never defined (they fell back to plain white) */
+  --border:        var(--line);
+  --border-color:  var(--line);
+  --card-bg:       var(--card);
+  --surface-color: var(--surface);
+  --text-color:    var(--ink);
+}
+
+/* ---------- 2. Shared tokens (dark) ---------- */
+:root[data-theme="dark"] {
+  --surface:   #101c28;
+  --surface-2: #1a2b3b;
+  --nav-bg:    rgb(15 26 38 / 88%);
+
+  --warn-bg:   #2a2110;
+  --warn-line: #6b5120;
+  --warn-ink:  #f2cf8c;
+
+  --bad-bg:    rgb(229 72 77 / 16%);
+  --ring:      color-mix(in srgb, var(--pri) 38%, transparent);
+}
+
+/* ---------- 3. Smooth theme switch (class is added for ~0.4s by the toggle only) ---------- */
+html.ce-theming,
+html.ce-theming *,
+html.ce-theming *::before,
+html.ce-theming *::after {
+  transition: background-color .3s ease, color .3s ease, border-color .3s ease, box-shadow .3s ease !important;
+}
+
+/* ---------- 4. Top bars ---------- */
+.admin-nav, .staff-nav {
+  background: var(--nav-bg);
+  -webkit-backdrop-filter: saturate(1.3) blur(12px);
+  backdrop-filter: saturate(1.3) blur(12px);
+}
+:root[data-theme="dark"] .admin-nav,
+:root[data-theme="dark"] .staff-nav {
+  border-bottom: 1px solid rgb(255 255 255 / 6%);
+}
+:root[data-theme="dark"] .nav-action,
+:root[data-theme="dark"] .store-logo,
+:root[data-theme="dark"] .store-logo small { color: var(--ink); }
+:root[data-theme="dark"] .store-logo small { color: var(--mut); }
+
+/* ---------- 5. Dark mode: panels, tables, chips ---------- */
+:root[data-theme="dark"] .danger { background: var(--bad-bg); color: #ff8f94; }
+
+:root[data-theme="dark"] .lowrow td,
+:root[data-theme="dark"] .admin-table tr.lowrow { background: rgb(245 158 11 / 9%); }
+:root[data-theme="dark"] .admin-table tr.lowrow:hover { background: rgb(245 158 11 / 15%); }
+
+:root[data-theme="dark"] .staff-table th { background: var(--surface-2); color: var(--mut); }
+:root[data-theme="dark"] .staff-table tbody tr:hover { background: var(--surface-2); }
+
+:root[data-theme="dark"] .metric-icon.orange,
+:root[data-theme="dark"] .staff-metric-icon.orange { background: rgb(245 158 11 / 16%); color: #f5a524; }
+:root[data-theme="dark"] .metric-icon.red { background: var(--bad-bg); color: #ff8f94; }
+:root[data-theme="dark"] .trust-icon.purple { background: rgb(139 92 246 / 18%); }
+
+:root[data-theme="dark"] .status.inactive { background: var(--bad-bg); color: #ff9da1; }
+:root[data-theme="dark"] .low-stock-label { background: rgb(245 158 11 / 16%); color: #f5b13d; }
+:root[data-theme="dark"] .threshold,
+:root[data-theme="dark"] .size-chip { background: var(--surface-2); color: var(--ink); }
+:root[data-theme="dark"] .inventory-summary > span { background: var(--surface-2); }
+
+/* warning banners (low stock, "Delete All Order Data", archive confirmations) */
+.low-stock-banner,
+.archive-confirm-card {
+  background: var(--warn-bg);
+  color: var(--warn-ink);
+  border-color: var(--warn-line);
+}
+.archive-confirm-card small,
+.low-stock-banner small { color: color-mix(in srgb, var(--warn-ink) 78%, transparent); }
+
+/* ---------- 6. Dark mode: staff login + WhatsApp pages ---------- */
+:root[data-theme="dark"] .staff-login-page,
+:root[data-theme="dark"] .wa-page {
+  background:
+    radial-gradient(circle at 10% 15%, rgb(10 124 255 / 14%), transparent 30%),
+    radial-gradient(circle at 90% 85%, rgb(0 194 209 / 12%), transparent 32%),
+    var(--bg);
+}
+:root[data-theme="dark"] .staff-login-shell,
+:root[data-theme="dark"] .wa-shell { background: var(--card); border-color: var(--line); }
+:root[data-theme="dark"] .staff-login-card,
+:root[data-theme="dark"] .wa-card { background: var(--card); }
+
+:root[data-theme="dark"] .staff-input-wrap input,
+:root[data-theme="dark"] .staff-input-wrap select,
+:root[data-theme="dark"] .wa-textarea-wrap textarea {
+  background: var(--surface);
+  border-color: var(--line);
+  color: var(--ink);
+}
+:root[data-theme="dark"] .staff-input-wrap input:hover,
+:root[data-theme="dark"] .staff-input-wrap select:hover,
+:root[data-theme="dark"] .wa-textarea-wrap textarea:hover { background: var(--surface-2); border-color: color-mix(in srgb, var(--mut) 55%, transparent); }
+:root[data-theme="dark"] .staff-input-wrap input:focus,
+:root[data-theme="dark"] .staff-input-wrap select:focus,
+:root[data-theme="dark"] .wa-textarea-wrap textarea:focus { background: var(--surface); border-color: var(--pri); box-shadow: 0 0 0 4px var(--ring); }
+
+:root[data-theme="dark"] .wa-hint,
+:root[data-theme="dark"] .staff-login-security,
+:root[data-theme="dark"] .wa-security { background: var(--surface); border-color: var(--line); }
+
+/* ---------- 7. Delivery operations + maps (white in dark mode before) ---------- */
+.ce-ops-panel,
+.ce-ops-metric,
+.ce-ops-alert {
+  border-color: var(--line);
+  color: var(--ink);
+}
+.ce-ops-panel  { background: var(--card); box-shadow: var(--shadow-sm); }
+.ce-ops-metric { background: var(--surface); }
+.ce-ops-metric small,
+.ce-ops-panel small { color: var(--mut); opacity: 1; }
+.ce-ops-metric strong { font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+.ce-ops-table-wrap th,
+.ce-ops-table-wrap td { border-bottom-color: var(--line); }
+
+:root[data-theme="dark"] .ce-driver-route-card {
+  border-color: var(--line);
+  background: linear-gradient(135deg, var(--surface-2), var(--card));
+  color: var(--ink);
+}
+
+/* ---------- 8. Inputs: one consistent focus ring in the brand colour ---------- */
+input:focus, select:focus, textarea:focus {
+  border-color: var(--pri);
+  box-shadow: 0 0 0 3px var(--ring);
+}
+:root[data-theme="dark"] input::placeholder,
+:root[data-theme="dark"] textarea::placeholder { color: color-mix(in srgb, var(--mut) 80%, transparent); }
+:root[data-theme="dark"] option { background: var(--card); color: var(--ink); }
+
+button:focus-visible, a:focus-visible, [role="button"]:focus-visible, summary:focus-visible {
+  outline: 3px solid var(--ring);
+  outline-offset: 2px;
+}
+
+/* ---------- 9. Premium finish ---------- */
+
+/* buttons feel physical: quick press, soft lift on hover (mouse only) */
+button, .primary, .soft, .nav-action {
+  transition: transform .16s var(--ease), box-shadow .22s var(--ease),
+              background-color .2s var(--ease), border-color .2s var(--ease), color .2s var(--ease);
+}
+button:active:not(:disabled) { transform: translateY(1px) scale(.985); }
+button:disabled { opacity: .55; cursor: not-allowed; }
+@media (hover: hover) {
+  .primary:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 10px 24px -10px color-mix(in srgb, var(--pri) 70%, transparent);
+  }
+}
+
+/* prices, totals and table figures line up */
+.price, [class*="price"], .total, .amount, table td, table th,
+.ce-ops-metric strong, .metric strong, .cart-bar .cb-info small {
+  font-variant-numeric: tabular-nums;
+}
+
+/* headings: tighter, steadier */
+h1, h2 { letter-spacing: -.02em; }
+h3 { letter-spacing: -.012em; }
+
+/* tables: calmer rows, clear hover */
+.admin-table th, .staff-table th { letter-spacing: .04em; }
+.admin-table td, .staff-table td { border-bottom-color: var(--line); }
+
+/* pop-ups and drawers: deeper, softer shadow so they sit above the page */
+#modal.open > *, .ui-modal-box, .ce-menu {
+  box-shadow: 0 30px 80px -20px rgb(0 0 0 / 45%);
+}
+
+/* skeleton shimmer is gentler in dark mode */
+:root[data-theme="dark"] .sk-img::after,
+:root[data-theme="dark"] .sk-line::after,
+:root[data-theme="dark"] .sk-dot::after {
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 8%), transparent);
+}
+
+/* native controls (date pickers, scrollbars on Firefox) follow the theme */
+:root[data-theme="dark"] { color-scheme: dark; scrollbar-color: #3a5063 var(--bg); }
+:root[data-theme="light"] { color-scheme: light; }
+
+/* print: always plain light, no tinted panels */
+@media print {
+  :root, :root[data-theme="dark"] {
+    --bg: #fff; --card: #fff; --ink: #111; --mut: #444; --line: #ccc;
+  }
+  body::before { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  button, .primary, .soft, .nav-action { transition: none; }
+  button:active:not(:disabled), .primary:hover:not(:disabled) { transform: none; }
+}
