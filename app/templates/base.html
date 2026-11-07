@@ -13,25 +13,14 @@
     <title>{% block title %}Chand Enterprises · Darbhanga{% endblock %}</title>
 
 
-    <!-- Theme: apply saved choice before first paint (keep this FIRST, before any CSS) -->
+    <!-- THEME ENGINE (keep FIRST, before any CSS).
+         One place decides light/dark and writes the colour variables, so the toggle,
+         the visitor's saved choice and the developer's default can never disagree.
+         Order of priority: visitor's saved choice > developer default (light/dark/auto). -->
     <script>
         (function () {
-            var theme = 'light';
-            try {
-                var saved = localStorage.getItem('ce_theme') || localStorage.getItem('admin-theme');
-                if (saved === 'dark' || saved === 'light') { theme = saved; }
-            } catch (e) {}
-            document.documentElement.setAttribute('data-theme', theme);
-            var meta = document.querySelector('meta[name="theme-color"]');
-            if (meta) { meta.setAttribute('content', theme === 'dark' ? '#0b141d' : '#ffffff'); }
-        })();
-    </script>
-
-
-    <!-- Developer-managed storefront appearance. The server writes the values here, so colours are
-         right on first paint and no extra /api/config request is needed. -->
-    <script>
-        (function () {
+            var root = document.documentElement;
+            var appearance = {{ appearance|tojson }};
             var presets = {
                 brand:  { accent:'#0a7cff', bg:'#f6f9fc', card:'#ffffff', ink:'#0f2233', muted:'#667a8c' },
                 ocean:  { accent:'#087eaa', bg:'#eff8fb', card:'#ffffff', ink:'#102d3a', muted:'#55717e' },
@@ -40,29 +29,94 @@
                 mono:   { accent:'#334155', bg:'#f5f6f7', card:'#ffffff', ink:'#17202a', muted:'#66717c' },
                 high:   { accent:'#0047ab', bg:'#ffffff', card:'#ffffff', ink:'#080808', muted:'#303030' }
             };
-            window.applyStoreAppearance = function (a) {
-                if (!a) return;
-                var root = document.documentElement;
+
+            function savedChoice() {
+                try {
+                    var s = localStorage.getItem('ce_theme') || localStorage.getItem('admin-theme');
+                    return (s === 'dark' || s === 'light') ? s : null;
+                } catch (e) { return null; }
+            }
+
+            function developerDefault(a) {
+                if (a && a.theme === 'dark') return 'dark';
+                if (a && a.theme === 'auto' && window.matchMedia &&
+                    window.matchMedia('(prefers-color-scheme: dark)').matches) return 'dark';
+                return 'light';
+            }
+
+            function syncToggles(theme) {
+                var dark = theme === 'dark';
+                var t = document.getElementById('themeToggle');
+                if (t) {
+                    var icon = t.querySelector('.theme-icon');
+                    if (icon) icon.textContent = dark ? '\u2600\uFE0F' : '\uD83C\uDF19';
+                    t.setAttribute('aria-label', dark ? 'Switch to light theme' : 'Switch to dark theme');
+                    t.title = dark ? 'Light theme' : 'Dark theme';
+                }
+                var at = document.getElementById('adminThemeToggle');
+                if (at) {
+                    at.textContent = dark ? '\u2600\uFE0F' : '\uD83C\uDF19';
+                    at.setAttribute('aria-label', dark ? 'Switch to light theme' : 'Switch to dark theme');
+                    at.title = dark ? 'Light theme' : 'Dark theme';
+                }
+            }
+
+            function paint(theme) {
+                var a = appearance || {};
                 var p = presets[a.preset] || presets.brand;
-                var contrast = Math.max(0, Math.min(100, Number(a.contrast || 70)));
-                var dark = a.theme === 'dark' ||
-                    (a.theme === 'auto' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
-                root.setAttribute('data-theme', dark ? 'dark' : 'light');
-                root.style.setProperty('--pri', a.accent || p.accent);
-                root.style.setProperty('--pri-2', a.accent || p.accent);
+                var dark = theme === 'dark';
+                var contrast = Math.max(0, Math.min(100, Number(a.contrast == null ? 70 : a.contrast)));
+                var accent = a.accent || p.accent;
+
+                root.setAttribute('data-theme', theme);
+                root.style.setProperty('--pri', accent);
+                root.style.setProperty('--pri-2', accent);
                 root.style.setProperty('--ce-contrast', String(contrast / 100));
                 root.style.setProperty('--ce-border-mix', Math.round(8 + contrast * .12) + '%');
-                root.style.setProperty('--bg', dark ? '#0b141d' : p.bg);
+                root.style.setProperty('--bg',   dark ? '#0b141d' : p.bg);
                 root.style.setProperty('--card', dark ? '#14212e' : p.card);
-                root.style.setProperty('--ink', dark ? '#e8f0f7' : p.ink);
-                root.style.setProperty('--mut', dark ? '#a8bac9' : p.muted);
-                root.style.setProperty('--line', dark ? '#34495b' : 'color-mix(in srgb, ' + p.ink + ' ' + Math.round(8 + contrast * .12) + '%, transparent)');
+                root.style.setProperty('--ink',  dark ? '#e8f0f7' : p.ink);
+                root.style.setProperty('--mut',  dark ? '#a8bac9' : p.muted);
+                root.style.setProperty('--line', dark ? '#2b4052'
+                    : 'color-mix(in srgb, ' + p.ink + ' ' + Math.round(8 + contrast * .12) + '%, transparent)');
+
                 var meta = document.querySelector('meta[name="theme-color"]');
                 if (meta) meta.setAttribute('content', dark ? '#0b141d' : p.bg);
+                syncToggles(theme);
+            }
+
+            /* Visitor presses the toggle (persist = true) or code syncs the state (persist = false) */
+            window.ceApplyTheme = function (theme, persist) {
+                theme = theme === 'dark' ? 'dark' : 'light';
+                if (persist) {
+                    root.classList.add('ce-theming');           /* short, smooth colour fade */
+                    window.setTimeout(function () { root.classList.remove('ce-theming'); }, 380);
+                    try { localStorage.setItem('ce_theme', theme); } catch (e) {}
+                }
+                paint(theme);
+                try { window.dispatchEvent(new CustomEvent('ce-theme', { detail: { theme: theme } })); } catch (e) {}
             };
-            window.applyStoreAppearance({{ appearance|tojson }});
+            window.ceGetTheme = function () {
+                return root.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+            };
+
+            /* Developer panel: preview/apply the site default. force = ignore the saved choice. */
+            window.applyStoreAppearance = function (a, force) {
+                if (!a) return;
+                appearance = a;
+                if (force) {
+                    try { localStorage.removeItem('ce_theme'); localStorage.removeItem('admin-theme'); } catch (e) {}
+                    paint(developerDefault(a));
+                } else {
+                    paint(savedChoice() || developerDefault(a));
+                }
+            };
+
+            paint(savedChoice() || developerDefault(appearance));
+            document.addEventListener('DOMContentLoaded', function () { syncToggles(window.ceGetTheme()); });
         })();
     </script>
+
 
     <!-- Product photos come from this image resizer / GitHub: open those connections early -->
     <link rel="preconnect" href="https://wsrv.nl" crossorigin>
@@ -89,6 +143,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='product-cards.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='cart-checkout.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='ui-polish.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='theme-premium.css') }}">
 
 
     <!-- Base styling -->
@@ -123,14 +178,14 @@
         ::-webkit-scrollbar { width: 9px; height: 9px; }
         ::-webkit-scrollbar-track { background: var(--bg); }
         ::-webkit-scrollbar-thumb {
-            background: #b9c7d3;
+            background: color-mix(in srgb, var(--mut) 45%, transparent);
             border-radius: 99px;
             border: 2px solid var(--bg);
         }
-        ::-webkit-scrollbar-thumb:hover { background: #8296a7; }
+        ::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, var(--mut) 75%, transparent); }
 
         /* Selection */
-        ::selection { background: #0a7cff; color: #fff; }
+        ::selection { background: var(--pri); color: #fff; }
 
         /* Focus */
         input:focus,
@@ -138,12 +193,12 @@
         textarea:focus {
             outline: none;
             border-color: var(--pri);
-            box-shadow: 0 0 0 3px #0a7cff18;
+            box-shadow: 0 0 0 3px color-mix(in srgb, var(--pri) 20%, transparent);
         }
 
         button:focus-visible,
         a:focus-visible {
-            outline: 3px solid #0a7cff55;
+            outline: 3px solid color-mix(in srgb, var(--pri) 40%, transparent);
             outline-offset: 2px;
         }
 
