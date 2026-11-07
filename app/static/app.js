@@ -55,7 +55,12 @@ async function api(url, method = "GET", body = undefined) {
    CUSTOMER STATE
    ========================= */
 
-let CART = JSON.parse(localStorage.getItem("cart") || "{}");
+let CART = {};
+try {
+  CART = JSON.parse(localStorage.getItem("cart") || "{}") || {};
+} catch (e) {
+  CART = {}; /* damaged or blocked storage: start with an empty cart instead of breaking the page */
+}
 
 let CAT = "All";
 
@@ -94,7 +99,7 @@ let CFG = {
 
   business_name: "Chand Enterprises",
 
-  business_mobile: "9304295574",
+  business_mobile: "9304285574",
 
   business_location: "Darbhanga, Bihar",
 
