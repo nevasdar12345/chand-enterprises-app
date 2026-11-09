@@ -1,4 +1,3 @@
-
 /* Premium Hero Motion Studio */
 .hm-studio{max-width:1050px;margin:auto;color:var(--text)}
 .hm-head,.hm-toolbar,.hm-actions{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
@@ -33,9 +32,9 @@
 @media(max-width:700px){.hm-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.hm-stage{height:220px}.hm-stage-bottle{right:16%;font-size:78px}.hm-stage-ice{right:2%;font-size:25px}.hm-stage-caption{left:4%}.hm-stage-caption b{font-size:23px}.hm-controls{grid-template-columns:1fr}.hm-preset{grid-template-columns:58px 1fr 12px;padding:6px}.hm-thumb{height:58px}}
 @media(prefers-reduced-motion:reduce){.hm-studio *, .ce-hero-motion *{animation:none!important;transition:none!important}}
 
-.ce-hero-motion{position:relative;isolation:isolate;overflow:hidden}
+.ce-hero-motion{isolation:isolate}
 .ce-motion-layers{position:absolute;inset:0;z-index:0;pointer-events:none;overflow:hidden;opacity:var(--ce-particle-opacity,.65)}
-.ce-hero-motion>*:not(.ce-motion-layers){position:relative;z-index:1}
+.ce-hero-motion>.hero-card-main{z-index:1}.ce-hero-motion>.hero-floating{z-index:3}
 .ce-motion-ring{position:absolute;width:55%;aspect-ratio:1;border:1px solid #8ceaff66;border-radius:50%;right:2%;top:8%;box-shadow:0 0 55px #26baff33;animation:hmOrbit var(--ce-motion-duration,6s) linear infinite}
 .ce-motion-ice{position:absolute;color:#b8f4ff;text-shadow:0 0 18px #54cfff;font-size:clamp(20px,4vw,46px);animation:hmIce var(--ce-motion-duration,6s) ease-in-out infinite}
 .ice-a{right:8%;bottom:15%}.ice-b{right:48%;top:12%;animation-delay:-2s}
@@ -61,6 +60,12 @@
 .ce-hero-motion[data-motion="neon-showcase"] #heroMain,.ce-hero-motion[data-motion="neon-prestige"] #heroMain{filter:drop-shadow(0 0 22px #55caff99)}
 .ce-hero-motion[data-motion="royal-gold"] #heroMain,.ce-hero-motion[data-motion="royal-gold"] #heroSide{filter:drop-shadow(0 0 18px #d6ad5b88)}
 .ce-hero-motion.motion-subtle #heroMain,.ce-hero-motion.motion-subtle #heroSide{animation-duration:calc(var(--ce-motion-duration,6s) * 1.35)}
-@keyframes hmProductEnter{0%{translate:0 75px;opacity:0;scale:.88}18%,82%{translate:0 0;opacity:1;scale:1}100%{translate:0 18px;opacity:1;scale:.99}}
+@keyframes hmProductEnter{0%{translate:0 75px;opacity:0;scale:.88}18%,80%{translate:0 0;opacity:1;scale:1}100%{translate:0 -14px;opacity:0;scale:.98}}@keyframes hmProductIn{0%{translate:0 75px;opacity:0;scale:.88}100%{translate:0 0;opacity:1;scale:1}}
 @keyframes hmProductFloat{0%,100%{translate:0 5px;rotate:-1deg}50%{translate:0 -13px;rotate:1deg}}
 @keyframes hmProductPop{0%{translate:0 100px;scale:.72;opacity:0}45%{translate:0 -9px;scale:1.04;opacity:1}65%,100%{translate:0 0;scale:1;opacity:1}}
+
+/* Playback modes for the product cards (not just the particle layers) */
+.ce-hero-motion.motion-once #heroMain,.ce-hero-motion.motion-once #heroSide{animation-iteration-count:1;animation-fill-mode:both}
+.ce-hero-motion.motion-once:not([data-motion="ice-orbit"]):not([data-motion="floating-luxury"]):not([data-motion="bottle-pop"]) #heroMain,
+.ce-hero-motion.motion-once:not([data-motion="bottle-pop"]) #heroSide{animation-name:hmProductIn}
+.ce-hero-motion.motion-paused #heroMain,.ce-hero-motion.motion-paused #heroSide{animation-play-state:paused}
