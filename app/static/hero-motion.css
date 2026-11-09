@@ -1,0 +1,66 @@
+
+/* Premium Hero Motion Studio */
+.hm-studio{max-width:1050px;margin:auto;color:var(--text)}
+.hm-head,.hm-toolbar,.hm-actions{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.hm-kicker{font-size:10px;letter-spacing:2px;color:#7c8cff;font-weight:800}
+.hm-head h2{margin:5px 0}.hm-live{font-size:10px;color:#16a876;font-weight:800;letter-spacing:1px}
+.hm-stage{height:260px;position:relative;overflow:hidden;border-radius:20px;margin:16px 0;background:radial-gradient(circle at 72% 45%,#176da4,#07182d 62%,#040b18);color:white;isolation:isolate}
+.hm-stage:before,.hm-stage:after{content:"";position:absolute;border:1px solid #8adfff44;border-radius:50%;width:330px;height:330px;right:8%;top:-60px;box-shadow:0 0 50px #20baff55;animation:hmOrbit 12s linear infinite}
+.hm-stage:after{width:220px;height:220px;right:15%;top:-5px;animation-direction:reverse}
+.hm-orb{position:absolute;width:210px;height:210px;border-radius:50%;right:15%;top:25px;background:radial-gradient(circle,#7eeaff66,transparent 70%);filter:blur(12px)}
+.hm-stage-ice{position:absolute;right:12%;bottom:24px;font-size:36px;letter-spacing:10px;animation:hmIce 4s ease-in-out infinite}
+.hm-stage-bottle{position:absolute;right:25%;bottom:38px;font-size:100px;filter:drop-shadow(0 18px 15px #0009);animation:hmBottle 4s ease-in-out infinite;z-index:2}
+.hm-stage-splash{position:absolute;right:12%;bottom:68px;font-size:100px;color:#8ceaff;opacity:.55;animation:hmSplash 4s ease-in-out infinite}
+.hm-stage-caption{position:absolute;left:5%;top:50%;transform:translateY(-50%);display:grid;gap:8px;z-index:3}
+.hm-stage-caption small{letter-spacing:2px;color:#9ceaff;font-weight:800}.hm-stage-caption b{font-size:clamp(24px,4vw,38px);line-height:1.05}.hm-stage-caption span{font-size:10px;letter-spacing:2px;color:#c2d6e8}
+.hm-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:12px 0 18px}
+.hm-preset{position:relative;text-align:left;padding:8px;border:1px solid var(--line,#dbe2ea);border-radius:13px;background:var(--card,#fff);color:var(--text);display:grid;grid-template-columns:84px 1fr 18px;gap:9px;align-items:center;min-width:0;cursor:pointer}
+.hm-preset.is-selected{border:2px solid #6488ff;box-shadow:0 0 0 3px #6488ff22}
+.hm-thumb{height:66px;border-radius:9px;background:linear-gradient(135deg,#07182d,#12628c);display:grid;place-items:center;position:relative;overflow:hidden;font-size:27px}
+.hm-thumb:before{content:"";position:absolute;width:70px;height:70px;border:1px solid #8eeaff88;border-radius:50%;animation:hmOrbit 7s linear infinite}
+.hm-thumb i{font-style:normal;z-index:1;filter:drop-shadow(0 5px 5px #0008);animation:hmBottle 3s ease-in-out infinite}
+.hm-thumb b{position:absolute;bottom:4px;right:5px;font-size:8px;color:#c9f5ff;letter-spacing:1px;text-transform:uppercase}
+.hm-card-copy{display:grid;gap:4px;min-width:0}.hm-card-copy strong{font-size:12px}.hm-card-copy small{font-size:10px;line-height:1.35;color:var(--muted,#667085)}
+.hm-check{opacity:0;color:#6488ff;font-weight:900}.is-selected .hm-check{opacity:1}
+.hm-controls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;padding:14px;border:1px solid var(--line);border-radius:14px}
+.hm-controls label{display:block;font-size:12px;font-weight:700;margin-bottom:6px}.hm-controls select,.hm-controls input{width:100%;max-width:100%}
+.hm-note{font-size:11px;margin:12px 0}.hm-actions{justify-content:flex-end;margin-top:12px}
+.hm-replay .hm-stage-bottle{animation:hmBottle .9s cubic-bezier(.2,.8,.2,1)}.hm-replay .hm-stage-ice{animation:hmIce .9s ease}
+.hm-stage[data-preset="royal-gold"]{background:radial-gradient(circle at 72% 45%,#9b6a21,#21160a 60%,#080705)}
+.hm-stage[data-preset="neon-prestige"],.hm-stage[data-preset="neon-showcase"]{background:radial-gradient(circle at 72% 45%,#542d9b,#080b20 65%)}
+.hm-stage[data-preset="wave-reveal"],.hm-stage[data-preset="liquid-infinity"]{background:radial-gradient(circle at 72% 45%,#087e9d,#06162c 65%)}
+@keyframes hmOrbit{to{transform:rotate(360deg)}}@keyframes hmBottle{0%,100%{transform:translateY(9px) rotate(-4deg)}50%{transform:translateY(-15px) rotate(4deg)}}@keyframes hmIce{0%,100%{transform:translateY(10px) rotate(-8deg)}50%{transform:translateY(-12px) rotate(8deg)}}@keyframes hmSplash{0%,100%{transform:scale(.85);opacity:.25}50%{transform:scale(1.15);opacity:.8}}
+@media(max-width:700px){.hm-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.hm-stage{height:220px}.hm-stage-bottle{right:16%;font-size:78px}.hm-stage-ice{right:2%;font-size:25px}.hm-stage-caption{left:4%}.hm-stage-caption b{font-size:23px}.hm-controls{grid-template-columns:1fr}.hm-preset{grid-template-columns:58px 1fr 12px;padding:6px}.hm-thumb{height:58px}}
+@media(prefers-reduced-motion:reduce){.hm-studio *, .ce-hero-motion *{animation:none!important;transition:none!important}}
+
+.ce-hero-motion{position:relative;isolation:isolate;overflow:hidden}
+.ce-motion-layers{position:absolute;inset:0;z-index:0;pointer-events:none;overflow:hidden;opacity:var(--ce-particle-opacity,.65)}
+.ce-hero-motion>*:not(.ce-motion-layers){position:relative;z-index:1}
+.ce-motion-ring{position:absolute;width:55%;aspect-ratio:1;border:1px solid #8ceaff66;border-radius:50%;right:2%;top:8%;box-shadow:0 0 55px #26baff33;animation:hmOrbit var(--ce-motion-duration,6s) linear infinite}
+.ce-motion-ice{position:absolute;color:#b8f4ff;text-shadow:0 0 18px #54cfff;font-size:clamp(20px,4vw,46px);animation:hmIce var(--ce-motion-duration,6s) ease-in-out infinite}
+.ice-a{right:8%;bottom:15%}.ice-b{right:48%;top:12%;animation-delay:-2s}
+.ce-motion-bubble{position:absolute;width:12px;height:12px;border:1px solid #b6f5ff;border-radius:50%;right:18%;bottom:4%;animation:hmBubble 5s ease-in infinite}
+.bubble-b{right:62%;animation-delay:-2.4s;width:8px;height:8px}
+.ce-motion-splash{position:absolute;right:5%;bottom:2%;width:45%;height:25%;border:2px solid #9deeff77;border-radius:50%;filter:blur(2px);transform:scaleX(1.4);animation:hmSplash var(--ce-motion-duration,6s) ease-in-out infinite}
+.ce-hero-motion[data-motion="royal-gold"] .ce-motion-ring,.ce-hero-motion[data-motion="royal-gold"] .ce-motion-ice{border-color:#e8c779;color:#f3d58d;text-shadow:0 0 18px #dba94a}
+.ce-hero-motion[data-motion="neon-prestige"] .ce-motion-ring,.ce-hero-motion[data-motion="neon-showcase"] .ce-motion-ring{border-color:#d4a6ff;box-shadow:0 0 50px #9a55ff77}
+.ce-hero-motion[data-motion="floating-luxury"] .ce-motion-splash{display:none}
+.ce-hero-motion[data-motion="wave-reveal"] .ce-motion-splash,.ce-hero-motion[data-motion="liquid-infinity"] .ce-motion-splash{height:38%;border-radius:45% 55% 30% 70%;animation:hmWave var(--ce-motion-duration,6s) ease-in-out infinite}
+.ce-hero-motion.motion-subtle .ce-motion-layers{opacity:.35}.ce-hero-motion.motion-dynamic .ce-motion-layers{opacity:1}
+.ce-hero-motion.motion-paused .ce-motion-layers *{animation-play-state:paused}
+.ce-hero-motion.motion-once .ce-motion-layers *{animation-iteration-count:1}
+@keyframes hmBubble{0%{transform:translateY(0) scale(.7);opacity:0}25%{opacity:.8}100%{transform:translateY(-220px) scale(1.2);opacity:0}}
+@keyframes hmWave{0%,100%{transform:scaleX(.9) rotate(-4deg);border-radius:45% 55% 30% 70%}50%{transform:scaleX(1.25) rotate(4deg);border-radius:60% 40% 65% 35%}}
+@media(max-width:700px){.ce-motion-ring{width:75%;right:-5%;top:10%}.ce-motion-splash{width:65%;right:-8%}.ice-b{right:58%}}
+
+/* Animate the existing hero product cards without replacing their content. */
+.ce-hero-motion #heroMain{transform-origin:50% 85%;animation:hmProductEnter var(--ce-motion-duration,6s) cubic-bezier(.2,.75,.25,1) infinite}
+.ce-hero-motion #heroSide{transform-origin:50% 85%;animation:hmProductEnter var(--ce-motion-duration,6s) .45s cubic-bezier(.2,.75,.25,1) infinite}
+.ce-hero-motion[data-motion="ice-orbit"] #heroMain,.ce-hero-motion[data-motion="floating-luxury"] #heroMain{animation-name:hmProductFloat}
+.ce-hero-motion[data-motion="bottle-pop"] #heroMain,.ce-hero-motion[data-motion="bottle-pop"] #heroSide{animation-name:hmProductPop}
+.ce-hero-motion[data-motion="neon-showcase"] #heroMain,.ce-hero-motion[data-motion="neon-prestige"] #heroMain{filter:drop-shadow(0 0 22px #55caff99)}
+.ce-hero-motion[data-motion="royal-gold"] #heroMain,.ce-hero-motion[data-motion="royal-gold"] #heroSide{filter:drop-shadow(0 0 18px #d6ad5b88)}
+.ce-hero-motion.motion-subtle #heroMain,.ce-hero-motion.motion-subtle #heroSide{animation-duration:calc(var(--ce-motion-duration,6s) * 1.35)}
+@keyframes hmProductEnter{0%{translate:0 75px;opacity:0;scale:.88}18%,82%{translate:0 0;opacity:1;scale:1}100%{translate:0 18px;opacity:1;scale:.99}}
+@keyframes hmProductFloat{0%,100%{translate:0 5px;rotate:-1deg}50%{translate:0 -13px;rotate:1deg}}
+@keyframes hmProductPop{0%{translate:0 100px;scale:.72;opacity:0}45%{translate:0 -9px;scale:1.04;opacity:1}65%,100%{translate:0 0;scale:1;opacity:1}}
