@@ -685,6 +685,10 @@ function settingsPicker() {
         <h2>Settings</h2>
         <p class="muted">Choose what you want to change.</p>
         <div style="display:grid;gap:10px;margin:12px 0">
+            <button type="button" onclick="openHeroMotionStudio()" style="display:flex;align-items:center;gap:12px;text-align:left;padding:12px 14px;border:1px solid #7c5cff">
+                <span style="font-size:22px">🎬</span>
+                <span><b>Premium Hero Motion Studio</b><br><small class="muted">12 animated presets, device controls and live previews.</small></span>
+            </button>
             <button type="button" onclick="openAppearanceManager()" style="display:flex;align-items:center;gap:12px;text-align:left;padding:12px 14px;border:1px solid var(--pri)">
                 <span style="font-size:22px">🎨</span>
                 <span><b>Website Appearance & Contrast</b><br><small class="muted">Themes, colour presets, accent and contrast controls.</small></span>
@@ -2120,3 +2124,66 @@ window.showDeveloperApiResponse = showDeveloperApiResponse;
 window.copyDeveloperApiResponse = copyDeveloperApiResponse;
 window.clearDeveloperApiHistory = clearDeveloperApiHistory;
 document.addEventListener('DOMContentLoaded', () => { if (document.getElementById('developerApiInspectorPanel')) loadDeveloperApiInspector(); });
+
+
+/* =========================================================
+   PREMIUM HERO MOTION STUDIO
+   ========================================================= */
+const HERO_MOTION_PRESETS = [
+ {id:'ice-rise',name:'Ice Rise & Splash',desc:'Ice rises first, then the bottle emerges through a splash.',tag:'Refreshing',icon:'🧊'},
+ {id:'ice-orbit',name:'Floating Ice Orbit',desc:'Product stays in focus while ice cubes orbit around it.',tag:'Elegant',icon:'❄️'},
+ {id:'bottle-pop',name:'Bottle Pop-up',desc:'Bottles rise from below and settle with a soft bounce.',tag:'Energetic',icon:'🥤'},
+ {id:'wave-reveal',name:'Wave Reveal',desc:'A flowing wave sweeps across and reveals the products.',tag:'Fluid',icon:'🌊'},
+ {id:'neon-showcase',name:'Neon Showcase',desc:'A luminous platform, glow and subtle product movement.',tag:'Modern',icon:'💎'},
+ {id:'cinematic-combo',name:'Cinematic Combo',desc:'Layered bottle entrance, splash, ice and lighting.',tag:'Showstopper',icon:'🎥'},
+ {id:'glacier-awakening',name:'Glacier Awakening',desc:'Crystal ice assembles around a slowly rising bottle.',tag:'Luxury',icon:'🏔️'},
+ {id:'floating-luxury',name:'Floating Luxury',desc:'A slow floating product reveal with depth and shadows.',tag:'Minimal',icon:'✨'},
+ {id:'liquid-infinity',name:'Liquid Infinity',desc:'Continuous liquid ribbons and droplets frame the product.',tag:'Fluid',icon:'💧'},
+ {id:'neon-prestige',name:'Neon Prestige',desc:'Neon rings, reflections and a premium display pedestal.',tag:'Futuristic',icon:'🔵'},
+ {id:'royal-gold',name:'Royal Gold',desc:'Warm gold particles and a cinematic spotlight reveal.',tag:'Signature',icon:'👑'},
+ {id:'grand-cinematic',name:'Grand Cinematic',desc:'The full sequence: ice, bottle, splash, particles and light.',tag:'Ultimate',icon:'🌟'}
+];
+function heroMotionCard(p, selected) {
+ return `<button type="button" class="hm-preset ${selected===p.id?'is-selected':''}" data-preset="${p.id}" onclick="selectHeroMotionPreset('${p.id}')">
+   <span class="hm-thumb hm-${p.id}"><i>${p.icon}</i><b>${p.tag}</b><em></em></span>
+   <span class="hm-card-copy"><strong>${p.name}</strong><small>${p.desc}</small></span>
+   <span class="hm-check">✓</span>
+ </button>`;
+}
+let HERO_MOTION_CURRENT = {};
+async function openHeroMotionStudio() {
+ const r = await api('/api/developer/hero-motion');
+ if (!r._ok) return alert(r.error || 'Unable to load hero animation settings');
+ HERO_MOTION_CURRENT = r.settings || {};
+ const a = HERO_MOTION_CURRENT;
+ modal(`<div class="hm-studio">
+  <div class="hm-head"><div><span class="hm-kicker">CHAND ENTERPRISES / CREATIVE CONTROL</span><h2>🎬 Premium Hero Motion Studio</h2><p class="muted">Choose a cinematic product entrance and preview it before publishing.</p></div><span class="hm-live">● STUDIO</span></div>
+  <div class="hm-stage" id="hmStage" data-preset="${esc(a.preset||'glacier-awakening')}"><div class="hm-orb"></div><div class="hm-stage-ice">❄　🧊　❄</div><div class="hm-stage-bottle">🥤</div><div class="hm-stage-splash">〰</div><div class="hm-stage-caption"><small>CHILLED & REFRESHING</small><b>Make every sip<br>feel special.</b><span>CHAND ENTERPRISES · DARBHANGA</span></div></div>
+  <div class="hm-toolbar"><b>Choose your experience</b><span class="muted">12 cinematic presets</span></div>
+  <div class="hm-grid">${HERO_MOTION_PRESETS.map(p=>heroMotionCard(p,a.preset||'glacier-awakening')).join('')}</div>
+  <div class="hm-controls">
+   <div><label>Apply on</label><select id="hmDevice"><option value="both" ${(a.device||'both')==='both'?'selected':''}>Desktop + Mobile</option><option value="desktop" ${a.device==='desktop'?'selected':''}>Desktop only</option><option value="mobile" ${a.device==='mobile'?'selected':''}>Mobile only</option></select></div>
+   <div><label>Motion intensity</label><select id="hmIntensity"><option value="subtle">Subtle</option><option value="balanced" ${(a.intensity||'balanced')==='balanced'?'selected':''}>Balanced</option><option value="dynamic">Dynamic</option></select></div>
+   <div><label>Loop duration · <b id="hmDurationValue">${Number(a.duration||6)}s</b></label><input id="hmDuration" type="range" min="3" max="12" value="${Number(a.duration||6)}" oninput="document.getElementById('hmDurationValue').textContent=this.value+'s'"></div>
+   <div><label>Particle density · <b id="hmParticlesValue">${Number(a.particles??65)}%</b></label><input id="hmParticles" type="range" min="0" max="100" value="${Number(a.particles??65)}" oninput="document.getElementById('hmParticlesValue').textContent=this.value+'%'"></div>
+   <div><label>Playback</label><select id="hmPlayback"><option value="continuous">Continuous loop</option><option value="once">Play once</option><option value="scroll">On scroll</option></select></div>
+  </div>
+  <p class="muted hm-note">Preview uses illustrative motion layers. Product artwork and effects are independently layered on the live homepage. Reduced-motion preferences are respected.</p>
+  <div class="hm-actions"><button type="button" onclick="previewHeroMotion()">↻ Replay preview</button><button type="button" onclick="resetHeroMotion()">Reset</button><button type="button" class="primary" onclick="saveHeroMotion()">Publish animation</button></div>
+  <p class="err" id="hmError"></p>
+ </div>`);
+ $('#hmPlayback').value=a.playback||'continuous';
+}
+function selectHeroMotionPreset(id) {
+ HERO_MOTION_CURRENT.preset=id;
+ document.querySelectorAll('.hm-preset').forEach(el=>el.classList.toggle('is-selected',el.dataset.preset===id));
+ const stage=$('#hmStage'); if(stage){stage.dataset.preset=id; stage.classList.remove('hm-replay'); void stage.offsetWidth; stage.classList.add('hm-replay');}
+}
+function previewHeroMotion(){const s=$('#hmStage');if(!s)return;s.classList.remove('hm-replay');void s.offsetWidth;s.classList.add('hm-replay');}
+function resetHeroMotion(){selectHeroMotionPreset('glacier-awakening');$('#hmDevice').value='both';$('#hmIntensity').value='balanced';$('#hmDuration').value=6;$('#hmParticles').value=65;$('#hmPlayback').value='continuous';}
+async function saveHeroMotion(){
+ const payload={preset:HERO_MOTION_CURRENT.preset||'glacier-awakening',device:$('#hmDevice').value,intensity:$('#hmIntensity').value,duration:Number($('#hmDuration').value),particles:Number($('#hmParticles').value),playback:$('#hmPlayback').value};
+ const r=await api('/api/developer/hero-motion','PUT',payload);
+ if(!r._ok){$('#hmError').textContent=r.error||'Unable to save animation';return;}
+ alert('Hero animation published successfully.');closeModal();
+}
