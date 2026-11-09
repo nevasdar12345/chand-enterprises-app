@@ -258,7 +258,7 @@
 
     </style>
 
-    {% block head %}{% endblock %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='hero-motion.css') }}">{% block head %}{% endblock %}
 
 </head>
 
@@ -315,6 +315,7 @@
         });
     </script>
 
+    <script src="{{ url_for('static', filename='js/hero-motion.js') }}" defer></script>
     <script src="{{ url_for('static', filename='js/responsive.js') }}"></script>
     <script src="{{ url_for('static', filename='js/ce-enhancements.js') }}" defer></script>
 
