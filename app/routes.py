@@ -3777,3 +3777,43 @@ def developer_scheduler_run():
     if not role_ok("developer"):
         return jsonify(error="Forbidden"), 403
     return jsonify(cron_run())
+
+
+# Premium homepage hero motion settings
+_HERO_MOTION_PRESETS = {"ice-rise","ice-orbit","bottle-pop","wave-reveal","neon-showcase","cinematic-combo","glacier-awakening","floating-luxury","liquid-infinity","neon-prestige","royal-gold","grand-cinematic"}
+_HERO_MOTION_DEFAULTS = {"preset":"glacier-awakening","device":"both","intensity":"balanced","duration":6,"particles":65,"playback":"continuous"}
+
+@main.get("/api/developer/hero-motion")
+def developer_get_hero_motion():
+    if not role_ok("developer"): return jsonify(error="Developer access required"), 403
+    data=dict(_HERO_MOTION_DEFAULTS)
+    for key in data:
+        raw=setting_value("hero_motion_"+key)
+        if raw not in (None,""):
+            try: data[key]=int(raw) if key in {"duration","particles"} else raw
+            except (TypeError,ValueError): pass
+    return jsonify(ok=True,settings=data)
+
+@main.put("/api/developer/hero-motion")
+def developer_save_hero_motion():
+    if not role_ok("developer"): return jsonify(error="Developer access required"), 403
+    d=request.get_json(silent=True) or {}
+    preset=str(d.get("preset","glacier-awakening")); device=str(d.get("device","both"))
+    intensity=str(d.get("intensity","balanced")); playback=str(d.get("playback","continuous"))
+    try: duration=int(d.get("duration",6)); particles=int(d.get("particles",65))
+    except (TypeError,ValueError): return jsonify(error="Invalid numeric setting"),400
+    if preset not in _HERO_MOTION_PRESETS or device not in {"both","desktop","mobile"} or intensity not in {"subtle","balanced","dynamic"} or playback not in {"continuous","once","scroll"} or not 3<=duration<=12 or not 0<=particles<=100:
+        return jsonify(error="Invalid hero animation configuration"),400
+    values={"preset":preset,"device":device,"intensity":intensity,"duration":duration,"particles":particles,"playback":playback}
+    for key,value in values.items(): set_setting("hero_motion_"+key,str(value))
+    return jsonify(ok=True,message="Hero animation published",settings=values)
+
+@main.get("/api/hero-motion")
+def public_hero_motion():
+    data=dict(_HERO_MOTION_DEFAULTS)
+    for key in data:
+        raw=setting_value("hero_motion_"+key)
+        if raw not in (None,""):
+            try: data[key]=int(raw) if key in {"duration","particles"} else raw
+            except (TypeError,ValueError): pass
+    return jsonify(settings=data)
