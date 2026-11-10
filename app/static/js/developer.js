@@ -2158,7 +2158,7 @@ async function openHeroMotionStudio() {
  const a = HERO_MOTION_CURRENT;
  modal(`<div class="hm-studio">
   <div class="hm-head"><div><span class="hm-kicker">CHAND ENTERPRISES / CREATIVE CONTROL</span><h2>🎬 Premium Hero Motion Studio</h2><p class="muted">Choose a cinematic product entrance and preview it before publishing.</p></div><span class="hm-live">● STUDIO</span></div>
-  <div class="hm-stage" id="hmStage" data-preset="${esc(a.preset||'glacier-awakening')}"><div class="hm-orb"></div><div class="hm-stage-ice">❄　🧊　❄</div><div class="hm-stage-bottle">🥤</div><div class="hm-stage-splash">〰</div><div class="hm-stage-caption"><small>CHILLED & REFRESHING</small><b>Make every sip<br>feel special.</b><span>CHAND ENTERPRISES · DARBHANGA</span></div></div>
+  <div class="hm-stage" id="hmStage" data-preset="${esc(a.preset||'glacier-awakening')}"><div class="hm-stage-caption"><small>CHILLED & REFRESHING</small><b>Make every sip<br>feel special.</b><span>CHAND ENTERPRISES · DARBHANGA</span></div><div class="ce-mock" id="hmMock"><div class="hero-card hero-card-main"><span>🥤</span></div><div class="hero-card hero-card-water"><span>💧</span></div></div></div>
   <div class="hm-toolbar"><b>Choose your experience</b><span class="muted">12 cinematic presets</span></div>
   <div class="hm-grid">${HERO_MOTION_PRESETS.map(p=>heroMotionCard(p,a.preset||'glacier-awakening')).join('')}</div>
   <div class="hm-controls">
@@ -2168,19 +2168,28 @@ async function openHeroMotionStudio() {
    <div><label>Particle density · <b id="hmParticlesValue">${Number(a.particles??65)}%</b></label><input id="hmParticles" type="range" min="0" max="100" value="${Number(a.particles??65)}" oninput="document.getElementById('hmParticlesValue').textContent=this.value+'%'"></div>
    <div><label>Playback</label><select id="hmPlayback"><option value="continuous">Continuous loop</option><option value="once">Play once</option><option value="scroll">On scroll</option></select></div>
   </div>
-  <p class="muted hm-note">Preview uses illustrative motion layers. Product artwork and effects are independently layered on the live homepage. Reduced-motion preferences are respected.</p>
+  <p class="muted hm-note">The preview runs the exact same animation engine as the live homepage, using your product artwork there. Reduced-motion preferences are respected.</p>
   <div class="hm-actions"><button type="button" onclick="previewHeroMotion()">↻ Replay preview</button><button type="button" onclick="resetHeroMotion()">Reset</button><button type="button" class="primary" onclick="saveHeroMotion()">Publish animation</button></div>
   <p class="err" id="hmError"></p>
  </div>`);
  $('#hmPlayback').value=a.playback||'continuous';
+ hmMount();
+ ['hmIntensity','hmDuration','hmParticles','hmPlayback'].forEach(id=>{const el=$('#'+id);if(el)el.addEventListener('input',hmMount);});
 }
+function hmOpts(){
+ const num=(id,d)=>{const el=$('#'+id);const v=el?Number(el.value):NaN;return Number.isFinite(v)?v:d;};
+ const pb=$('#hmPlayback')?$('#hmPlayback').value:'continuous';
+ return {preset:HERO_MOTION_CURRENT.preset||'glacier-awakening',duration:num('hmDuration',6),particles:num('hmParticles',65),intensity:$('#hmIntensity')?$('#hmIntensity').value:'balanced',playback:pb==='once'?'once':'continuous'};
+}
+function hmMount(){const m=$('#hmMock');if(m&&window.CEHeroMotion)window.CEHeroMotion.mount(m,hmOpts());}
 function selectHeroMotionPreset(id) {
  HERO_MOTION_CURRENT.preset=id;
  document.querySelectorAll('.hm-preset').forEach(el=>el.classList.toggle('is-selected',el.dataset.preset===id));
- const stage=$('#hmStage'); if(stage){stage.dataset.preset=id; stage.classList.remove('hm-replay'); void stage.offsetWidth; stage.classList.add('hm-replay');}
+ const stage=$('#hmStage'); if(stage)stage.dataset.preset=id;
+ hmMount();
 }
-function previewHeroMotion(){const s=$('#hmStage');if(!s)return;s.classList.remove('hm-replay');void s.offsetWidth;s.classList.add('hm-replay');}
-function resetHeroMotion(){selectHeroMotionPreset('glacier-awakening');$('#hmDevice').value='both';$('#hmIntensity').value='balanced';$('#hmDuration').value=6;$('#hmParticles').value=65;$('#hmPlayback').value='continuous';}
+function previewHeroMotion(){const m=$('#hmMock');if(m&&window.CEHeroMotion)window.CEHeroMotion.replay(m);}
+function resetHeroMotion(){selectHeroMotionPreset('glacier-awakening');$('#hmDevice').value='both';$('#hmIntensity').value='balanced';$('#hmDuration').value=6;$('#hmParticles').value=65;$('#hmPlayback').value='continuous';hmMount();}
 async function saveHeroMotion(){
  const payload={preset:HERO_MOTION_CURRENT.preset||'glacier-awakening',device:$('#hmDevice').value,intensity:$('#hmIntensity').value,duration:Number($('#hmDuration').value),particles:Number($('#hmParticles').value),playback:$('#hmPlayback').value};
  const r=await api('/api/developer/hero-motion','PUT',payload);
